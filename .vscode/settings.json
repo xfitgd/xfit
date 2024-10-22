@@ -9,5 +9,5 @@
         "**/Thumbs.db": true,
         "**/.zig-cache": true
     },
-    "hide-files.files": []
+    "json.validate.enable": false
 }
