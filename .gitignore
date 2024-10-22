@@ -5,3 +5,4 @@
 *.spv
 *.exe
 /engine/shaders/out
+com/
