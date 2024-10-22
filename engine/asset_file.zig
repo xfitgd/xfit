@@ -4,9 +4,10 @@ const system = @import("system.zig");
 const __android = @import("__android.zig");
 
 const AAsset = __android.android.AAsset;
+const xfit = @import("xfit.zig");
 
 comptime {
-    if (system.platform != .android) @compileError("asset_file only can use android.");
+    if (xfit.platform != .android) @compileError("asset_file only can use android.");
 }
 
 const Self = @This();

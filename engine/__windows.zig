@@ -494,8 +494,8 @@ fn WindowProc(hwnd: HWND, uMsg: u32, wParam: win32.WPARAM, lParam: win32.LPARAM)
             if (system.a_fn(__system.general_input_callback) != null) end: {
                 var size: u32 = undefined;
                 _ = win32.GetRawInputData(@ptrFromInt(@as(usize, @intCast(lParam))), win32.RID_INPUT, null, &size, @sizeOf(win32.RAWINPUTHEADER));
-                const inputT: []align(@alignOf(*win32.RAWINPUT)) u8 = __system.allocator.alignedAlloc(u8, @alignOf(*win32.RAWINPUT), size) catch |e| system.handle_error3("alignedAlloc RAWINPUT", e);
-                defer __system.allocator.free(inputT);
+                const inputT: []align(@alignOf(*win32.RAWINPUT)) u8 = std.heap.c_allocator.alignedAlloc(u8, @alignOf(*win32.RAWINPUT), size) catch |e| system.handle_error3("alignedAlloc RAWINPUT", e);
+                defer std.heap.c_allocator.free(inputT);
                 const input_: *win32.RAWINPUT = @ptrCast(inputT.ptr);
 
                 if (0 < win32.GetRawInputData(@ptrFromInt(@as(usize, @intCast(lParam))), win32.RID_INPUT, @ptrCast(input_), &size, @sizeOf(win32.RAWINPUTHEADER))) {
@@ -729,7 +729,7 @@ fn MonitorEnumProc(hMonitor: win32.HMONITOR, hdcMonitor: win32.HDC, lprcMonitor:
     __system.monitors.append(system.monitor_info{
         .is_primary = false,
         .rect = math.recti.init(0, 0, 0, 0),
-        .resolutions = ArrayList(system.screen_info).init(__system.allocator),
+        .resolutions = ArrayList(system.screen_info).init(std.heap.c_allocator),
         .__hmonitor = hMonitor,
     }) catch |e| system.handle_error3("MonitorEnumProc __system.monitors.append", e);
     var last = &__system.monitors.items[__system.monitors.items.len - 1];

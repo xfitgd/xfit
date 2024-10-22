@@ -6,9 +6,10 @@ const __windows = @import("__windows.zig");
 const __system = @import("__system.zig");
 const raw_input = @import("raw_input.zig");
 const system = @import("system.zig");
+const xfit = @import("xfit.zig");
 
 comptime {
-    if (system.platform != .windows) @compileError("__raw_input only can run windows");
+    if (xfit.platform != .windows) @compileError("__raw_input only can run windows");
 }
 
 const win32 = __windows.win32;
@@ -31,7 +32,7 @@ user_data: ?*anyopaque = null,
 
 pub fn start() void {
     mutex.lock();
-    list = ArrayList(*Self).init(__system.allocator);
+    list = ArrayList(*Self).init(std.heap.c_allocator);
     mutex.unlock();
 }
 pub fn destroy() void {
@@ -45,8 +46,8 @@ pub fn connect(self: *Self, path: []const u8) u32 {
     while (i < self.*.devices.len) : (i += 1) {
         if (self.*.devices[i].handle != null) return i;
     }
-    const path_t = __system.allocator.dupeZ(u8, path) catch system.handle_error_msg2("rawinput connect device path dupeZ");
-    defer __system.allocator.free(path_t);
+    const path_t = std.heap.c_allocator.dupeZ(u8, path) catch system.handle_error_msg2("rawinput connect device path dupeZ");
+    defer std.heap.c_allocator.free(path_t);
 
     const handle: win32.HANDLE = win32.CreateFileA(path_t.ptr, win32.GENERIC_READ | win32.GENERIC_WRITE, win32.FILE_SHARE_READ | win32.FILE_SHARE_WRITE, null, win32.OPEN_EXISTING, 0, null);
     if (handle == win32.INVALID_HANDLE_VALUE) return std.math.maxInt(u32);
@@ -54,7 +55,7 @@ pub fn connect(self: *Self, path: []const u8) u32 {
     while (i < self.*.devices.len) : (i += 1) {
         if (self.*.devices[i].handle == null) {
             self.*.devices[i].handle = handle;
-            self.*.devices[i].path = __system.allocator.alloc(u8, path.len) catch system.handle_error_msg2("rawinput connect device path alloc");
+            self.*.devices[i].path = std.heap.c_allocator.alloc(u8, path.len) catch system.handle_error_msg2("rawinput connect device path alloc");
             @memcpy(self.*.devices[i].path, path);
             self.*.change_fn(i, true, self.*.user_data);
 
@@ -69,17 +70,17 @@ pub fn init(_MAX_DEVICES: u32, _guid: *const raw_input.GUID, _change_fn: raw_inp
         system.print_error("WARN rawinput _MAX_DEVICES can't 0\n", .{});
         return raw_input.ERROR.ZERO_DEVICE;
     }
-    const self = __system.allocator.create(Self) catch system.handle_error_msg2("rawinput create");
+    const self = std.heap.c_allocator.create(Self) catch system.handle_error_msg2("rawinput create");
     self.* = .{
         .guid = _guid,
-        .devices = __system.allocator.alloc(device, _MAX_DEVICES) catch system.handle_error_msg2("rawinput device alloc"),
+        .devices = std.heap.c_allocator.alloc(device, _MAX_DEVICES) catch system.handle_error_msg2("rawinput device alloc"),
         .change_fn = _change_fn,
         .user_data = _user_data,
     };
     @memset(self.*.devices, .{ .handle = null, .path = undefined });
     errdefer {
-        __system.allocator.free(self.*.devices);
-        __system.allocator.destroy(self);
+        std.heap.c_allocator.free(self.*.devices);
+        std.heap.c_allocator.destroy(self);
     }
     var db = win32.DEV_BROADCAST_DEVICEINTERFACE_A{
         .dbcc_size = @sizeOf(win32.DEV_BROADCAST_DEVICEINTERFACE_A),
@@ -101,7 +102,7 @@ pub fn init(_MAX_DEVICES: u32, _guid: *const raw_input.GUID, _change_fn: raw_inp
         var size: u32 = undefined;
         _ = win32.SetupDiGetDeviceInterfaceDetailA(dev, &idata, null, 0, &size, null);
 
-        const detail = __system.allocator.alignedAlloc(u8, 4, size) catch system.handle_error_msg2("rawinput init detail alloc");
+        const detail = std.heap.c_allocator.alignedAlloc(u8, 4, size) catch system.handle_error_msg2("rawinput init detail alloc");
         const detailA: win32.PSP_DEVICE_INTERFACE_DETAIL_DATA_A = @ptrCast(detail.ptr);
         detailA.*.cbSize = @sizeOf(win32.SP_DEVICE_INTERFACE_DETAIL_DATA_A); // ! size변수가 아니다!
 
@@ -109,13 +110,13 @@ pub fn init(_MAX_DEVICES: u32, _guid: *const raw_input.GUID, _change_fn: raw_inp
         if (win32.SetupDiGetDeviceInterfaceDetailA(dev, &idata, detailA, size, &size, &data) == win32.FALSE) {
             system.print_error("WARN code {d} SetupDiGetDeviceInterfaceDetailA 2\n", .{win32.GetLastError()});
             self.*.deinit();
-            __system.allocator.free(detail);
+            std.heap.c_allocator.free(detail);
             return raw_input.ERROR.SYSTEM_ERROR;
         }
 
         const len = std.mem.len(@as([*c]const u8, @ptrCast(@alignCast(&detailA.*.DevicePath[0]))));
         _ = self.*.connect(@as([*]const u8, @ptrCast(&detailA.*.DevicePath[0]))[0..len]);
-        __system.allocator.free(detail);
+        std.heap.c_allocator.free(detail);
         index += 1;
     }
 
@@ -147,7 +148,7 @@ fn destroy_device(dev: *device) void {
     _ = win32.CloseHandle(dev.*.handle);
 
     dev.*.handle = null;
-    __system.allocator.free(dev.*.path);
+    std.heap.c_allocator.free(dev.*.path);
 }
 
 pub fn deinit(self: *Self) void {
@@ -160,7 +161,7 @@ pub fn deinit(self: *Self) void {
             destroy_device(&self.*.devices[i]);
         }
     }
-    __system.allocator.free(self.*.devices);
+    std.heap.c_allocator.free(self.*.devices);
 
     i = 0;
     while (i < list.items.len) : (i += 1) {
@@ -170,7 +171,7 @@ pub fn deinit(self: *Self) void {
         }
     }
 
-    __system.allocator.destroy(self);
+    std.heap.c_allocator.destroy(self);
 }
 
 pub fn get(self: *Self, idx: u32, ctl_code: u32, in: []const u8, out: []u8) bool {
@@ -180,8 +181,8 @@ pub fn get(self: *Self, idx: u32, ctl_code: u32, in: []const u8, out: []u8) bool
     }
     if (self.*.devices[idx].handle == null) return false;
 
-    const in_ = __system.allocator.alloc(u8, in.len) catch system.handle_error_msg2("rawinput get in_ alloc");
-    defer __system.allocator.free(in_);
+    const in_ = std.heap.c_allocator.alloc(u8, in.len) catch system.handle_error_msg2("rawinput get in_ alloc");
+    defer std.heap.c_allocator.free(in_);
     @memcpy(in_, in);
 
     var size: u32 = undefined;

@@ -14,6 +14,7 @@ const render_command = @import("render_command.zig");
 const __render_command = @import("__render_command.zig");
 const __system = @import("__system.zig");
 const root = @import("root");
+const xfit = @import("xfit.zig");
 
 const __vulkan_allocator = @import("__vulkan_allocator.zig");
 
@@ -230,7 +231,7 @@ fn chooseSwapExtent(capabilities: vk.VkSurfaceCapabilitiesKHR) vk.VkExtent2D {
     if (capabilities.currentExtent.width != std.math.maxInt(u32)) {
         return capabilities.currentExtent;
     } else {
-        var swapchainExtent = if (system.platform == .android)
+        var swapchainExtent = if (xfit.platform == .android)
             vk.VkExtent2D{ .width = @max(0, __android.android.ANativeWindow_getWidth(__android.app.window)), .height = @max(0, __android.android.ANativeWindow_getHeight(__android.app.window)) }
         else
             vk.VkExtent2D{ .width = @max(0, window.window_width()), .height = @max(0, window.window_height()) };
@@ -453,13 +454,13 @@ fn debug_callback(messageSeverity: vk.VkDebugUtilsMessageSeverityFlagBitsEXT, me
     _ = messageType;
     _ = pUserData;
 
-    if (system.platform == .android) {
+    if (xfit.platform == .android) {
         _ = __android.LOGE(pCallbackData.?.*.pMessage, .{});
     } else {
         const len = std.mem.len(pCallbackData.?.*.pMessage);
-        const msg = __system.allocator.alloc(u8, len) catch |e| system.handle_error3("debug_callback.alloc()", e);
+        const msg = std.heap.c_allocator.alloc(u8, len) catch |e| system.handle_error3("debug_callback.alloc()", e);
         @memcpy(msg, pCallbackData.?.*.pMessage[0..len]);
-        defer __system.allocator.free(msg);
+        defer std.heap.c_allocator.free(msg);
 
         system.print("{s}\n\n", .{msg});
     }
@@ -713,9 +714,9 @@ pub fn vulkan_start() void {
         };
         const checkedl: [layers.len]*bool = .{&validation_layer_support};
 
-        var extension_names = ArrayList([*:0]const u8).init(__system.allocator);
+        var extension_names = ArrayList([*:0]const u8).init(std.heap.c_allocator);
         defer extension_names.deinit();
-        var layers_names = ArrayList([*:0]const u8).init(__system.allocator);
+        var layers_names = ArrayList([*:0]const u8).init(std.heap.c_allocator);
         defer layers_names.deinit();
 
         extension_names.append(vk.VK_KHR_SURFACE_EXTENSION_NAME) catch |e| system.handle_error3("vulkan_start.extension_names.append(vk.VK_KHR_SURFACE_EXTENSION_NAME)", e);
@@ -723,9 +724,9 @@ pub fn vulkan_start() void {
         var count: u32 = undefined;
         _ = vk.vkEnumerateInstanceLayerProperties(&count, null);
 
-        const available_layers = __system.allocator.alloc(vk.VkLayerProperties, count) catch
+        const available_layers = std.heap.c_allocator.alloc(vk.VkLayerProperties, count) catch
             system.handle_error_msg2("vulkan_start.allocator.alloc(vk.VkLayerProperties) OutOfMemory");
-        defer __system.allocator.free(available_layers);
+        defer std.heap.c_allocator.free(available_layers);
 
         _ = vk.vkEnumerateInstanceLayerProperties(&count, available_layers.ptr);
 
@@ -740,9 +741,9 @@ pub fn vulkan_start() void {
 
         _ = vk.vkEnumerateInstanceExtensionProperties(null, &count, null);
 
-        const available_ext = __system.allocator.alloc(vk.VkExtensionProperties, count) catch
+        const available_ext = std.heap.c_allocator.alloc(vk.VkExtensionProperties, count) catch
             system.handle_error_msg2("vulkan_start.allocator.alloc(vk.VkLayerProperties) OutOfMemory");
-        defer __system.allocator.free(available_ext);
+        defer std.heap.c_allocator.free(available_ext);
 
         _ = vk.vkEnumerateInstanceExtensionProperties(null, &count, available_ext.ptr);
 
@@ -761,9 +762,9 @@ pub fn vulkan_start() void {
             validation_layer_support = false;
         }
 
-        if (system.platform == .windows) {
+        if (xfit.platform == .windows) {
             extension_names.append(vk.VK_KHR_WIN32_SURFACE_EXTENSION_NAME) catch |e| system.handle_error3("vulkan_start.extension_names.append(vk.VK_KHR_WIN32_SURFACE_EXTENSION_NAME)", e);
-        } else if (system.platform == .android) {
+        } else if (xfit.platform == .android) {
             extension_names.append(vk.VK_KHR_ANDROID_SURFACE_EXTENSION_NAME) catch |e| system.handle_error3("vulkan_start.extension_names.append(vk.VK_KHR_ANDROID_SURFACE_EXTENSION_NAME)", e);
         } else {
             @compileError("not support platform");
@@ -802,9 +803,9 @@ pub fn vulkan_start() void {
         system.handle_error(result == vk.VK_SUCCESS, "__vulkan.vulkan_start.vkCreateDebugUtilsMessengerEXT : {d}", .{result});
     }
 
-    if (system.platform == .windows) {
+    if (xfit.platform == .windows) {
         __windows.vulkan_windows_start(vkInstance, &vkSurface);
-    } else if (system.platform == .android) {
+    } else if (xfit.platform == .android) {
         __android.vulkan_android_start(vkInstance, &vkSurface);
     } else {
         @compileError("not support platform");
@@ -816,9 +817,9 @@ pub fn vulkan_start() void {
 
     //system.print_debug("deviceCount : {d}", .{deviceCount});
     system.handle_error(deviceCount != 0, "__vulkan.vulkan_start.deviceCount 0", .{});
-    const vk_physical_devices = __system.allocator.alloc(vk.VkPhysicalDevice, deviceCount) catch
+    const vk_physical_devices = std.heap.c_allocator.alloc(vk.VkPhysicalDevice, deviceCount) catch
         system.handle_error_msg2("vulkan_start.allocator.alloc(vk.VkPhysicalDevice) OutOfMemory");
-    defer __system.allocator.free(vk_physical_devices);
+    defer std.heap.c_allocator.free(vk_physical_devices);
 
     result = vk.vkEnumeratePhysicalDevices(vkInstance, &deviceCount, vk_physical_devices.ptr);
     system.handle_error(result == vk.VK_SUCCESS, "__vulkan.vulkan_start.vkEnumeratePhysicalDevices vk_physical_devices.ptr : {d}", .{result});
@@ -827,9 +828,9 @@ pub fn vulkan_start() void {
         vk.vkGetPhysicalDeviceQueueFamilyProperties(pd, &queueFamiliesCount, null);
         system.handle_error(queueFamiliesCount != 0, "__vulkan.vulkan_start.queueFamiliesCount 0", .{});
 
-        const queueFamilies = __system.allocator.alloc(vk.VkQueueFamilyProperties, queueFamiliesCount) catch
+        const queueFamilies = std.heap.c_allocator.alloc(vk.VkQueueFamilyProperties, queueFamiliesCount) catch
             system.handle_error_msg2("vulkan_start.allocator.alloc(vk.VkQueueFamilyProperties) OutOfMemory");
-        defer __system.allocator.free(queueFamilies);
+        defer std.heap.c_allocator.free(queueFamilies);
 
         vk.vkGetPhysicalDeviceQueueFamilyProperties(pd, &queueFamiliesCount, queueFamilies.ptr);
 
@@ -876,11 +877,11 @@ pub fn vulkan_start() void {
     {
         var deviceExtensionCount: u32 = 0;
         _ = vk.vkEnumerateDeviceExtensionProperties(vk_physical_device, null, &deviceExtensionCount, null);
-        const extensions = __system.allocator.alloc(vk.VkExtensionProperties, deviceExtensionCount) catch system.handle_error_msg2("vulkan_start extensions alloc");
-        defer __system.allocator.free(extensions);
+        const extensions = std.heap.c_allocator.alloc(vk.VkExtensionProperties, deviceExtensionCount) catch system.handle_error_msg2("vulkan_start extensions alloc");
+        defer std.heap.c_allocator.free(extensions);
         _ = vk.vkEnumerateDeviceExtensionProperties(vk_physical_device, null, &deviceExtensionCount, extensions.ptr);
 
-        var device_extension_names = ArrayList([*:0]const u8).init(__system.allocator);
+        var device_extension_names = ArrayList([*:0]const u8).init(std.heap.c_allocator);
         defer device_extension_names.deinit();
         device_extension_names.append(vk.VK_KHR_SWAPCHAIN_EXTENSION_NAME) catch system.handle_error_msg2("vulkan_start dev ex append");
         var i: u32 = 0;
@@ -917,7 +918,7 @@ pub fn vulkan_start() void {
         result = vk.vkCreateDevice(vk_physical_device, &deviceCreateInfo, null, &vkDevice);
         system.handle_error(result == vk.VK_SUCCESS, "__vulkan.vulkan_start.vkCreateDevice : {d}", .{result});
     }
-    if (system.platform == .android) VK_EXT_full_screen_exclusive_support = false;
+    if (xfit.platform == .android) VK_EXT_full_screen_exclusive_support = false;
 
     if (graphicsFamilyIndex == presentFamilyIndex) {
         vk.vkGetDeviceQueue(vkDevice, graphicsFamilyIndex, 0, &vkGraphicsQueue);
@@ -1386,9 +1387,9 @@ pub fn vulkan_destroy() void {
 }
 
 fn recreateSurface() void {
-    if (system.platform == .windows) {
+    if (xfit.platform == .windows) {
         __windows.vulkan_windows_start(vkInstance, &vkSurface);
-    } else if (system.platform == .android) {
+    } else if (xfit.platform == .android) {
         //__android.vulkan_android_start(vkInstance, &vkSurface);
     } else {
         @compileError("not support platform");
@@ -1411,24 +1412,24 @@ fn cleanup_swapchain() void {
         __vulkan_allocator.execute_and_wait_all_op();
 
         //if (depth_stencil_image_sample.pvulkan_buffer != null and depth_stencil_image_sample.pvulkan_buffer.?.*.is_empty()) depth_stencil_image_sample.pvulkan_buffer.?.*.deinit();
-        __system.allocator.free(vk_swapchain_frame_buffers);
-        __system.allocator.free(vk_swapchain_frame_buffer_clears);
+        std.heap.c_allocator.free(vk_swapchain_frame_buffers);
+        std.heap.c_allocator.free(vk_swapchain_frame_buffer_clears);
         i = 0;
         while (i < vk_swapchain_images.len) : (i += 1) {
             vk.vkDestroyImageView(vkDevice, vk_swapchain_images[i].__image_view, null);
         }
-        __system.allocator.free(vk_swapchain_images);
+        std.heap.c_allocator.free(vk_swapchain_images);
         vk.vkDestroySwapchainKHR(vkDevice, vkSwapchain, null);
         vkSwapchain = null;
 
-        __system.allocator.free(formats);
+        std.heap.c_allocator.free(formats);
     }
 }
 
 fn create_framebuffer() void {
-    vk_swapchain_frame_buffers = __system.allocator.alloc(__vulkan_allocator.frame_buffer, vk_swapchain_images.len) catch
+    vk_swapchain_frame_buffers = std.heap.c_allocator.alloc(__vulkan_allocator.frame_buffer, vk_swapchain_images.len) catch
         system.handle_error_msg2("__vulkan.create_framebuffer.allocator.alloc(__vulkan_allocator.frame_buffer)");
-    vk_swapchain_frame_buffer_clears = __system.allocator.alloc(__vulkan_allocator.frame_buffer, vk_swapchain_images.len) catch
+    vk_swapchain_frame_buffer_clears = std.heap.c_allocator.alloc(__vulkan_allocator.frame_buffer, vk_swapchain_images.len) catch
         system.handle_error_msg2("__vulkan.create_framebuffer.allocator.alloc(__vulkan_allocator.frame_buffer)");
 
     depth_stencil_image_sample.create_texture(.{
@@ -1475,7 +1476,7 @@ fn create_framebuffer() void {
 var rotate_mat: matrix = undefined;
 
 pub fn refresh_pre_matrix() void {
-    if (system.platform == .android) {
+    if (xfit.platform == .android) {
         const orientation = window.get_screen_orientation();
         rotate_mat = switch (orientation) {
             .unknown => matrix.identity(),
@@ -1518,7 +1519,7 @@ fn create_swapchain_and_imageviews() void {
     system.handle_error(result == vk.VK_SUCCESS, "__vulkan.create_swapchain_and_imageviews.vkGetPhysicalDeviceSurfaceFormatsKHR : {d}", .{result});
     system.handle_error_msg(formatCount != 0, "__vulkan.create_swapchain_and_imageviews.formatCount 0");
 
-    formats = __system.allocator.alloc(vk.VkSurfaceFormatKHR, formatCount) catch
+    formats = std.heap.c_allocator.alloc(vk.VkSurfaceFormatKHR, formatCount) catch
         system.handle_error_msg2("create_swapchain_and_imageviews.allocator.alloc(vk.VkSurfaceFormatKHR) OutOfMemory");
 
     result = vk.vkGetPhysicalDeviceSurfaceFormatsKHR(vk_physical_device, vkSurface, &formatCount, formats.ptr);
@@ -1530,10 +1531,10 @@ fn create_swapchain_and_imageviews() void {
     system.handle_error(result == vk.VK_SUCCESS, "__vulkan.create_swapchain_and_imageviews.vkGetPhysicalDeviceSurfacePresentModesKHR : {d}", .{result});
     system.handle_error_msg(presentModeCount != 0, "__vulkan.create_swapchain_and_imageviews.vkGetPhysicalDeviceSurfacePresentModesKHR presentModeCount 0");
 
-    const presentModes = __system.allocator.alloc(vk.VkPresentModeKHR, presentModeCount) catch {
+    const presentModes = std.heap.c_allocator.alloc(vk.VkPresentModeKHR, presentModeCount) catch {
         system.handle_error_msg2("create_swapchain_and_imageviews.allocator.alloc(vk.VkPresentModeKHR) OutOfMemory");
     };
-    defer __system.allocator.free(presentModes);
+    defer std.heap.c_allocator.free(presentModes);
 
     result = vk.vkGetPhysicalDeviceSurfacePresentModesKHR(vk_physical_device, vkSurface, &presentModeCount, presentModes.ptr);
     system.handle_error(result == vk.VK_SUCCESS, "__vulkan.create_swapchain_and_imageviews.vkGetPhysicalDeviceSurfacePresentModesKHR presentModes.ptr : {d}", .{result});
@@ -1543,11 +1544,11 @@ fn create_swapchain_and_imageviews() void {
 
     vkExtent = chooseSwapExtent(surfaceCap);
     if (vkExtent.width <= 0 or vkExtent.height <= 0) {
-        __system.allocator.free(formats);
+        std.heap.c_allocator.free(formats);
         return;
     }
 
-    if (system.platform == .android) {
+    if (xfit.platform == .android) {
         if (surfaceCap.currentTransform & vk.VK_SURFACE_TRANSFORM_ROTATE_90_BIT_KHR != 0) {
             vkExtent_rotation.width = vkExtent.height;
             vkExtent_rotation.height = vkExtent.width;
@@ -1582,7 +1583,7 @@ fn create_swapchain_and_imageviews() void {
     };
 
     var fullWin: vk.VkSurfaceFullScreenExclusiveWin32InfoEXT = undefined;
-    if (system.platform == .windows and system.current_monitor() != null) {
+    if (xfit.platform == .windows and system.current_monitor() != null) {
         fullWin = .{
             .hmonitor = system.current_monitor().?.*.__hmonitor,
         };
@@ -1623,14 +1624,14 @@ fn create_swapchain_and_imageviews() void {
     result = vk.vkGetSwapchainImagesKHR(vkDevice, vkSwapchain, &swapchain_image_count, null);
     system.handle_error(result == vk.VK_SUCCESS, "__vulkan.create_swapchain_and_imageviews.vkGetSwapchainImagesKHR : {d}", .{result});
 
-    const swapchain_images = __system.allocator.alloc(vk.VkImage, swapchain_image_count) catch
+    const swapchain_images = std.heap.c_allocator.alloc(vk.VkImage, swapchain_image_count) catch
         system.handle_error_msg2("__vulkan.create_swapchain_and_imageviews.allocator.alloc(vk.VkImage) OutOfMemory");
-    defer __system.allocator.free(swapchain_images);
+    defer std.heap.c_allocator.free(swapchain_images);
 
     result = vk.vkGetSwapchainImagesKHR(vkDevice, vkSwapchain, &swapchain_image_count, swapchain_images.ptr);
     system.handle_error(result == vk.VK_SUCCESS, "__vulkan.create_swapchain_and_imageviews.vkGetSwapchainImagesKHR swapchain_images.ptr : {d}", .{result});
 
-    vk_swapchain_images = __system.allocator.alloc(__vulkan_allocator.vulkan_res_node(.texture), swapchain_image_count) catch |e| system.handle_error3("vulkan_start.vk_swapchain_images alloc", e);
+    vk_swapchain_images = std.heap.c_allocator.alloc(__vulkan_allocator.vulkan_res_node(.texture), swapchain_image_count) catch |e| system.handle_error3("vulkan_start.vk_swapchain_images alloc", e);
 
     var i: usize = 0;
     while (i < swapchain_image_count) : (i += 1) {
@@ -1668,7 +1669,7 @@ fn create_swapchain_and_imageviews() void {
 
 pub fn set_fullscreen_ex() void {
     if (VK_EXT_full_screen_exclusive_support and is_fullscreen_ex) {
-        if (system.platform == .windows) {
+        if (xfit.platform == .windows) {
             __windows.__change_fullscreen_mode();
         }
         _ = vk.vkAcquireFullScreenExclusiveModeEXT(vkInstance, vkDevice, vkSwapchain);
@@ -1717,9 +1718,9 @@ pub fn recreate_swapchain() void {
     __vulkan_allocator.execute_and_wait_all_op();
     wait_device_idle();
 
-    if (system.platform == .android) {
+    if (xfit.platform == .android) {
         __android.vulkan_android_start(vkInstance, &vkSurface);
-    } else if (system.platform == .windows) {
+    } else if (xfit.platform == .windows) {
         //__windows.vulkan_windows_start(vkInstance, &vkSurface);
     }
 
@@ -1754,7 +1755,7 @@ pub fn drawFrame() void {
     if (vkExtent.width <= 0 or vkExtent.height <= 0) {
         recreate_swapchain();
         return;
-    } else if (system.platform == .android) {
+    } else if (xfit.platform == .android) {
         if (__android.orientationChanged) {
             recreate_swapchain();
             __android.orientationChanged = false;
@@ -1772,8 +1773,8 @@ pub fn drawFrame() void {
             return;
         }
 
-        const cmds = __system.allocator.alloc(vk.VkCommandBuffer, graphics.render_cmd.?.len + 1) catch system.handle_error_msg2("drawframe cmds alloc");
-        defer __system.allocator.free(cmds);
+        const cmds = std.heap.c_allocator.alloc(vk.VkCommandBuffer, graphics.render_cmd.?.len + 1) catch system.handle_error_msg2("drawframe cmds alloc");
+        defer std.heap.c_allocator.free(cmds);
 
         cmds[0] = vkCommandBuffer;
 

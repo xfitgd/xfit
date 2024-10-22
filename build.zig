@@ -1,5 +1,4 @@
 const std = @import("std");
-const builtin = @import("builtin");
 const engine = @import("engine/engine.zig");
 pub const XfitPlatform = engine.XfitPlatform;
 
@@ -13,10 +12,10 @@ const EXAMPLE: EXAMPLES = EXAMPLES.GRAPHICS2D;
 //*
 
 const examples = [_][]const u8{
-    "main.zig",
-    "main_input.zig",
-    "main_sound.zig",
-    "main_console.zig",
+    "examples/main.zig",
+    "examples/main_input.zig",
+    "examples/main_sound.zig",
+    "examples/main_console.zig",
 };
 const EXAMPLES = enum(usize) {
     GRAPHICS2D,

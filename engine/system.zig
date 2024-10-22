@@ -5,6 +5,7 @@ const ArrayList = std.ArrayList;
 
 const root = @import("root");
 
+const xfit = @import("xfit.zig");
 const __android = @import("__android.zig");
 const __windows = @import("__windows.zig");
 const window = @import("window.zig");
@@ -79,7 +80,7 @@ pub const platform_version = struct {
         Unknown,
     };
 
-    platform: XfitPlatform,
+    platform: xfit.XfitPlatform,
     version: union {
         windows: struct {
             version: windows_version,
@@ -91,11 +92,6 @@ pub const platform_version = struct {
         },
     },
 };
-
-pub const platform = @import("build_options").platform;
-pub const subsystem = @import("build_options").subsystem;
-pub const XfitPlatform = @TypeOf(platform);
-pub const SubSystem = @TypeOf(subsystem);
 
 pub const screen_info = struct {
     monitor: *monitor_info,
@@ -110,7 +106,7 @@ pub const monitor_info = struct {
     is_primary: bool,
     primary_resolution: ?*screen_info = null,
     resolutions: ArrayList(screen_info),
-    __hmonitor: if (platform == .windows) windows.HMONITOR else void = if (platform == .windows) undefined else {},
+    __hmonitor: if (xfit.platform == .windows) windows.HMONITOR else void = if (xfit.platform == .windows) undefined else {},
 
     name: [32]u8 = std.mem.zeroes([32]u8),
 
@@ -121,21 +117,21 @@ pub const monitor_info = struct {
                 .y = window.window_y(),
                 .width = window.window_width(),
                 .height = window.window_height(),
-                .state = if (platform == .windows) __windows.get_window_state() else window.window_state.Restore,
+                .state = if (xfit.platform == .windows) __windows.get_window_state() else window.window_state.Restore,
             };
         }
     }
 
     pub fn set_fullscreen_mode(self: *Self, resolution: *screen_info) void {
         save_prev_window_state();
-        if (platform == .windows) {
+        if (xfit.platform == .windows) {
             __windows.set_fullscreen_mode(self, resolution);
             @atomicStore(screen_mode, &__system.init_set.screen_mode, screen_mode.FULLSCREEN, std.builtin.AtomicOrder.monotonic);
         } else {}
     }
     pub fn set_borderlessscreen_mode(self: *Self) void {
         save_prev_window_state();
-        if (platform == .windows) {
+        if (xfit.platform == .windows) {
             __windows.set_borderlessscreen_mode(self);
             @atomicStore(screen_mode, &__system.init_set.screen_mode, screen_mode.BORDERLESSSCREEN, std.builtin.AtomicOrder.monotonic);
         } else {}
@@ -193,7 +189,7 @@ pub inline fn current_resolution() ?*screen_info {
     return __system.current_resolution;
 }
 pub inline fn get_monitor_from_window() *monitor_info {
-    if (platform == .windows) return __windows.get_monitor_from_window();
+    if (xfit.platform == .windows) return __windows.get_monitor_from_window();
     return primary_monitor();
 }
 
@@ -227,41 +223,41 @@ pub inline fn get_platform_version() *const platform_version {
     return &__system.platform_ver;
 }
 pub fn print(comptime fmt: []const u8, args: anytype) void {
-    if (platform != .android) {
+    if (xfit.platform != .android) {
         std.debug.print(fmt, args);
     } else {
-        const str = std.fmt.allocPrint(__system.allocator, fmt ++ " ", args) catch return;
-        defer __system.allocator.free(str);
+        const str = std.fmt.allocPrint(std.heap.c_allocator, fmt ++ " ", args) catch return;
+        defer std.heap.c_allocator.free(str);
 
         str[str.len - 1] = 0;
         _ = __android.LOGV(str.ptr, .{});
     }
 }
 pub fn write(_str: []const u8) void {
-    if (platform != .android) {
+    if (xfit.platform != .android) {
         _ = std.io.getStdOut().write(_str) catch return;
     } else {
-        const str = __system.allocator.dupeZ(u8, _str) catch return;
-        defer __system.allocator.free(str);
+        const str = std.heap.c_allocator.dupeZ(u8, _str) catch return;
+        defer std.heap.c_allocator.free(str);
         _ = android.__android_log_write(android.ANDROID_LOG_VERBOSE, "xfit", str.ptr);
     }
 }
 pub fn print_with_time(comptime fmt: []const u8, args: anytype) void {
-    const now_str = datetime.Datetime.now().formatHttp(__system.allocator) catch return;
-    defer __system.allocator.free(now_str);
+    const now_str = datetime.Datetime.now().formatHttp(std.heap.c_allocator) catch return;
+    defer std.heap.c_allocator.free(now_str);
 
     print("{s} @ " ++ fmt, .{now_str} ++ args);
 }
 pub fn print_debug_with_time(comptime fmt: []const u8, args: anytype) void {
     if (dbg) {
-        const now_str = datetime.Datetime.now().formatHttp(__system.allocator) catch return;
-        defer __system.allocator.free(now_str);
+        const now_str = datetime.Datetime.now().formatHttp(std.heap.c_allocator) catch return;
+        defer std.heap.c_allocator.free(now_str);
 
         print_debug("{s} @ " ++ fmt, .{now_str} ++ args);
     }
 }
 pub fn notify() void {
-    if (platform == .windows) {
+    if (xfit.platform == .windows) {
         _ = __windows.win32.FlashWindow(__windows.hWnd, __windows.TRUE);
     } else {
         @compileError("not support platform");
@@ -269,9 +265,9 @@ pub fn notify() void {
 }
 pub fn text_notify(text: []const u8) void {
     _ = text;
-    if (platform == .windows) {
+    if (xfit.platform == .windows) {
         //TODO 윈도우즈 텍스트 알림 구현
-    } else if (platform == .android) {
+    } else if (xfit.platform == .android) {
         //TODO 안드로이드 텍스트 알림 구현
     } else {
         @compileError("not support platform");
@@ -280,11 +276,11 @@ pub fn text_notify(text: []const u8) void {
 
 pub fn print_debug(comptime fmt: []const u8, args: anytype) void {
     if (dbg) {
-        if (platform != .android) {
+        if (xfit.platform != .android) {
             std.log.debug(fmt, args);
         } else {
-            const str = std.fmt.allocPrint(__system.allocator, fmt ++ " ", args) catch return;
-            defer __system.allocator.free(str);
+            const str = std.fmt.allocPrint(std.heap.c_allocator, fmt ++ " ", args) catch return;
+            defer std.heap.c_allocator.free(str);
 
             str[str.len - 1] = 0;
             _ = android.__android_log_write(android.ANDROID_LOG_DEBUG, "xfit", str.ptr);
@@ -294,17 +290,17 @@ pub fn print_debug(comptime fmt: []const u8, args: anytype) void {
 
 pub fn print_error(comptime fmt: []const u8, args: anytype) void {
     @branchHint(.cold);
-    const now_str = datetime.Datetime.now().formatHttp(__system.allocator) catch return;
-    defer __system.allocator.free(now_str);
+    const now_str = datetime.Datetime.now().formatHttp(std.heap.c_allocator) catch return;
+    defer std.heap.c_allocator.free(now_str);
 
     // var fs: file = .{};
     // defer fs.close();
     const debug_info = std.debug.getSelfDebugInfo() catch return;
-    if (platform != .android) {
-        const str = std.fmt.allocPrint(__system.allocator, "{s} @ " ++ fmt, .{now_str} ++ args) catch return;
-        defer __system.allocator.free(str);
+    if (xfit.platform != .android) {
+        const str = std.fmt.allocPrint(std.heap.c_allocator, "{s} @ " ++ fmt, .{now_str} ++ args) catch return;
+        defer std.heap.c_allocator.free(str);
 
-        var str2 = ArrayList(u8).init(__system.allocator);
+        var str2 = ArrayList(u8).init(std.heap.c_allocator);
         defer str2.deinit();
         std.debug.writeCurrentStackTrace(str2.writer(), debug_info, .no_color, @returnAddress()) catch return;
         std.debug.print("{s}\n{s}", .{ str, str2.items });
@@ -312,18 +308,18 @@ pub fn print_error(comptime fmt: []const u8, args: anytype) void {
         if (a_fn(__system.error_handling_func) != null) a_fn(__system.error_handling_func).?(str, str2.items);
         // fs.open("xfit_err.log", .{ .truncate = false }) catch fs.open("xfit_err.log", .{ .exclusive = true }) catch  return;
     } else {
-        const str = std.fmt.allocPrint(__system.allocator, "{s} @ " ++ fmt ++ " ", .{now_str} ++ args) catch return;
-        defer __system.allocator.free(str);
+        const str = std.fmt.allocPrint(std.heap.c_allocator, "{s} @ " ++ fmt ++ " ", .{now_str} ++ args) catch return;
+        defer std.heap.c_allocator.free(str);
 
-        // const path = std.fmt.allocPrint(__system.allocator, "{s}/xfit_err.log" ++ fmt, .{__android.get_file_dir()} ++ args) catch  return;
-        // defer __system.allocator.free(path);
+        // const path = std.fmt.allocPrint(std.heap.c_allocator, "{s}/xfit_err.log" ++ fmt, .{__android.get_file_dir()} ++ args) catch  return;
+        // defer std.heap.c_allocator.free(path);
 
         // fs.open(path, .{ .truncate = false }) catch fs.open(path, .{ .exclusive = true }) catch  return;
 
         str[str.len - 1] = 0;
         _ = android.__android_log_write(android.ANDROID_LOG_ERROR, "xfit", str.ptr);
 
-        var str2 = ArrayList(u8).init(__system.allocator);
+        var str2 = ArrayList(u8).init(std.heap.c_allocator);
         defer str2.deinit();
 
         std.debug.writeCurrentStackTrace(str2.writer(), debug_info, .no_color, @returnAddress()) catch return;
@@ -373,7 +369,7 @@ pub inline fn handle_error3(funcion_name: []const u8, err: anytype) void {
 }
 
 pub inline fn sleep(ns: u64) void {
-    if (platform == .windows) {
+    if (xfit.platform == .windows) {
         __windows.nanosleep(ns);
     } else {
         std.time.sleep(ns);
@@ -389,13 +385,13 @@ pub inline fn console_cls() void {
     _ = system("cls");
 }
 pub fn exit() void {
-    if (subsystem == .Console) {
+    if (xfit.subsystem == .Console) {
         std.posix.exit(0);
         return;
     }
-    if (platform == .windows) {
+    if (xfit.platform == .windows) {
         _ = __windows.win32.DestroyWindow(__windows.hWnd);
-    } else if (platform == .android) {
+    } else if (xfit.platform == .android) {
         __system.exiting.store(true, .release);
         @atomicStore(bool, &__android.app.destroryRequested, true, .monotonic);
     }

@@ -9,9 +9,10 @@ const math = @import("math.zig");
 
 pub const general_input = @import("general_input.zig");
 pub const xbox_pad_input = @import("xbox_pad_input.zig");
+const xfit = @import("xfit.zig");
 
 pub const key =
-    if (system.platform == .windows)
+    if (xfit.platform == .windows)
     enum(u16) {
         A = 'A',
         B = 'B',
@@ -123,7 +124,7 @@ pub const key =
         Alt = __windows.win32.VK_MENU,
         _,
     }
-else if (system.platform == .android)
+else if (xfit.platform == .android)
     enum(u16) {
         Unknown = __android.android.AKEYCODE_UNKNOWN,
 

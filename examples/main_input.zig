@@ -1,29 +1,22 @@
-// !! windows platform only do not change
-pub const UNICODE = false;
 // !! android platform only do not change
 comptime {
-    if (@import("engine/system.zig").platform == .android)
-        _ = @import("engine/__android.zig").android.ANativeActivity_createFunc;
+    _ = xfit.__android_entry;
 }
 // !!
 
 const std = @import("std");
-const xfit = @import("engine/xfit.zig");
-const system = @import("engine/system.zig");
-const window = @import("engine/window.zig");
-const input = @import("engine/input.zig");
+const xfit = @import("xfit");
+const system = xfit.system;
+const window = xfit.window;
+const input = xfit.input;
 const xbox_pad_input = input.xbox_pad_input;
 const general_input = input.general_input;
-
-const timer_callback = @import("engine/timer_callback.zig");
+const timer_callback = xfit.timer_callback;
 
 const ArrayList = std.ArrayList;
 const MemoryPoolExtra = std.heap.MemoryPoolExtra;
 var gpa: std.heap.GeneralPurposeAllocator(.{}) = undefined;
 var allocator: std.mem.Allocator = undefined;
-
-const math = @import("engine/math.zig");
-const mem = @import("engine/mem.zig");
 
 fn xinput_callback(state: xbox_pad_input.XBOX_STATE) void {
     system.print("XBOX PAD [{d}]\n", .{state.device_idx});

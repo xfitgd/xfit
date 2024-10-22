@@ -1,25 +1,19 @@
-// !! windows platform only do not change
-pub const UNICODE = false;
 // !! android platform only do not change
 comptime {
-    if (@import("engine/system.zig").platform == .android)
-        _ = @import("engine/__android.zig").android.ANativeActivity_createFunc;
+    _ = xfit.__android_entry;
 }
 // !!
 
 const std = @import("std");
-const xfit = @import("engine/xfit.zig");
-const system = @import("engine/system.zig");
-const sound = @import("engine/sound.zig");
+const xfit = @import("xfit");
+const system = xfit.system;
+const sound = xfit.sound;
+const timer_callback = xfit.timer_callback;
 
 var gpa: std.heap.GeneralPurposeAllocator(.{}) = undefined;
 var allocator: std.mem.Allocator = undefined;
 
-const file = @import("engine/file.zig");
-const asset_file = @import("engine/asset_file.zig");
-const timer_callback = @import("engine/timer_callback.zig");
-
-const file_ = if (system.platform == .android) asset_file else file;
+const file_ = if (xfit.platform == .android) xfit.asset_file else xfit.file;
 
 var bg_source: *sound.sound_source = undefined;
 var bg_snd: *sound = undefined;

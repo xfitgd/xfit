@@ -650,8 +650,8 @@ fn engine_handle_input(_event: ?*android.AInputEvent) i32 {
             } else if (tool_type == android.AMOTION_EVENT_TOOL_TYPE_FINGER) {
                 count = @min(100, android.AMotionEvent_getPointerCount(_event));
             } else return 0;
-            const poses = __system.allocator.alloc(point, count) catch system.handle_error_msg2("engine_handle_input alloc poses");
-            defer __system.allocator.free(poses);
+            const poses = std.heap.c_allocator.alloc(point, count) catch system.handle_error_msg2("engine_handle_input alloc poses");
+            defer std.heap.c_allocator.free(poses);
             var i: u32 = 0;
             while (i < poses.len) : (i += 1) {
                 poses[i][0] = android.AMotionEvent_getX(_event, i);

@@ -13,8 +13,9 @@ const file = @import("file.zig");
 const asset_file = @import("asset_file.zig");
 const AutoHashMap = std.AutoHashMap;
 const ArrayList = std.ArrayList;
+const xfit = @import("xfit.zig");
 
-const file_ = if (system.platform == .android) asset_file else file;
+const file_ = if (xfit.platform == .android) asset_file else file;
 const Self = @This();
 
 var g_ends: ArrayList(*Self) = undefined;
@@ -35,8 +36,8 @@ pub fn start() void {
     if (system.dbg and __system.sound_started) system.handle_error_msg2("sound already started");
     __system.sound_started = true;
 
-    sounds = AutoHashMap(*Self, *Self).init(__system.allocator);
-    g_ends = ArrayList(*Self).init(__system.allocator);
+    sounds = AutoHashMap(*Self, *Self).init(std.heap.c_allocator);
+    g_ends = ArrayList(*Self).init(std.heap.c_allocator);
 
     var resourceManagerConfig = miniaudio.ma_resource_manager_config_init();
     pCustomBackendVTables[0] = &miniaudio.g_ma_decoding_backend_vtable_libopus;
@@ -103,13 +104,13 @@ pub const sound_source = struct {
     pub fn deinit(self: *sound_source) void {
         if (system.dbg and self.*.out_data == null) system.handle_error_msg2("sound_source not inited cant deinit");
         std.c.free(self.*.out_data.?.ptr);
-        __system.allocator.destroy(self);
+        std.heap.c_allocator.destroy(self);
     }
     pub fn play_sound_memory(self: *sound_source, volume: f32, loop: bool) !?*Self {
         if (!@atomicLoad(bool, &__system.sound_started, .acquire)) return null;
 
-        const result_sound: *Self = try __system.allocator.create(Self);
-        errdefer __system.allocator.destroy(self);
+        const result_sound: *Self = try std.heap.c_allocator.create(Self);
+        errdefer std.heap.c_allocator.destroy(self);
         result_sound.* = .{ .source = self };
 
         const audio_buf_config: miniaudio.ma_audio_buffer_config = .{
@@ -156,12 +157,12 @@ pub fn play_sound(path: []const u8, volume: f32, loop: bool) !?*Self {
     if (!@atomicLoad(bool, &__system.sound_started, .acquire)) return null;
 
     var self: *Self = undefined;
-    self = try __system.allocator.create(Self);
-    self.* = .{ .source = try __system.allocator.create(sound_source) };
+    self = try std.heap.c_allocator.create(Self);
+    self.* = .{ .source = try std.heap.c_allocator.create(sound_source) };
     self.*.source.?.* = .{};
     errdefer {
-        __system.allocator.destroy(self.source.?);
-        __system.allocator.destroy(self);
+        std.heap.c_allocator.destroy(self.source.?);
+        std.heap.c_allocator.destroy(self);
     }
 
     var decoder: miniaudio.ma_decoder = undefined;
@@ -169,8 +170,8 @@ pub fn play_sound(path: []const u8, volume: f32, loop: bool) !?*Self {
     decoder_config.ppCustomBackendVTables = @ptrCast(&pCustomBackendVTables[0]);
     decoder_config.customBackendCount = 2;
 
-    const data = try file_.read_file(path, __system.allocator);
-    defer __system.allocator.free(data);
+    const data = try file_.read_file(path, std.heap.c_allocator);
+    defer std.heap.c_allocator.free(data);
 
     var result = miniaudio.ma_decoder_init_memory(data.ptr, data.len, &decoder_config, &decoder);
     if (result != miniaudio.MA_SUCCESS) {
@@ -282,8 +283,8 @@ pub fn is_playing(self: *Self) bool {
 pub fn decode_sound_memory(data: []const u8) !*sound_source {
     if (!@atomicLoad(bool, &__system.sound_started, .acquire)) return std.posix.UnexpectedError.Unexpected;
 
-    const self: *sound_source = try __system.allocator.create(sound_source);
-    errdefer __system.allocator.destroy(self);
+    const self: *sound_source = try std.heap.c_allocator.create(sound_source);
+    errdefer std.heap.c_allocator.destroy(self);
     self.* = .{};
 
     var decoder: miniaudio.ma_decoder = undefined;
@@ -320,7 +321,7 @@ pub fn deinit(self: *Self) void {
     if (system.dbg and self.*.__sound == null) system.handle_error_msg2("sound not inited cant deinit");
     miniaudio.ma_sound_uninit(&self.*.__sound.?);
     miniaudio.ma_audio_buffer_uninit(&self.*.__audio_buf);
-    __system.allocator.destroy(self);
+    std.heap.c_allocator.destroy(self);
     if (@atomicLoad(bool, &__system.sound_started, .acquire)) {
         _ = sounds.remove(self);
     }

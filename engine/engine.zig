@@ -219,9 +219,16 @@ pub fn init(
             b.installArtifact(result);
         } else unreachable;
 
-        const system = b.addModule("system", .{ .root_source_file = b.path(engine_path ++ "/system.zig") });
-        system.addImport("build_options", build_options_module);
         result.root_module.addImport("build_options", build_options_module);
+
+        const xfit = b.addModule("xfit", .{ .root_source_file = b.path(engine_path ++ "/xfit.zig") });
+        xfit.addImport("build_options", build_options_module);
+        result.root_module.addImport("xfit", xfit);
+
+        xfit.addIncludePath(get_lazypath(b, engine_path ++ "/include"));
+        xfit.addIncludePath(get_lazypath(b, engine_path ++ "/include/freetype"));
+        xfit.addIncludePath(get_lazypath(b, engine_path ++ "/include/opus"));
+        xfit.addIncludePath(get_lazypath(b, engine_path ++ "/include/opusfile"));
 
         result.addIncludePath(get_lazypath(b, engine_path ++ "/include"));
         result.addIncludePath(get_lazypath(b, engine_path ++ "/include/freetype"));

@@ -2,8 +2,9 @@ const std = @import("std");
 const system = @import("system.zig");
 
 const Self = @This();
+const xfit = @import("xfit.zig");
 
-pub const INVALID_FILE_HANDLE: std.fs.File.Handle = if (system.platform == .windows) @ptrCast(std.os.windows.INVALID_HANDLE_VALUE) else 0;
+pub const INVALID_FILE_HANDLE: std.fs.File.Handle = if (xfit.platform == .windows) @ptrCast(std.os.windows.INVALID_HANDLE_VALUE) else 0;
 
 hFile: std.fs.File = .{ .handle = INVALID_FILE_HANDLE },
 

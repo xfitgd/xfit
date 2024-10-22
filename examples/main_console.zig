@@ -1,21 +1,15 @@
-// !! windows platform only do not change
-pub const UNICODE = false;
 // !! android platform only do not change
 comptime {
-    if (@import("engine/system.zig").platform == .android)
-        _ = @import("engine/__android.zig").android.ANativeActivity_createFunc;
+    _ = xfit.__android_entry;
 }
 // !!
 
 const std = @import("std");
-const xfit = @import("engine/xfit.zig");
-const system = @import("engine/system.zig");
+const xfit = @import("xfit");
+const system = xfit.system;
 
 var gpa: std.heap.GeneralPurposeAllocator(.{}) = undefined;
 var allocator: std.mem.Allocator = undefined;
-
-const math = @import("engine/math.zig");
-const mem = @import("engine/mem.zig");
 
 pub fn xfit_init() !void {
     system.print("hello world!\n", .{});

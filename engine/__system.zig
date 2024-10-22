@@ -18,7 +18,7 @@ const render_command = @import("render_command.zig");
 const __raw_input = @import("__raw_input.zig");
 
 const root = @import("root");
-
+const xfit = @import("xfit.zig");
 pub var exiting: std.atomic.Value(bool) = std.atomic.Value(bool).init(false);
 
 comptime {
@@ -124,7 +124,7 @@ pub fn init(_allocator: std.mem.Allocator, init_setting: *const system.init_sett
     allocator = _allocator;
 
     monitors = ArrayList(system.monitor_info).init(allocator);
-    if (system.platform == .android) {
+    if (xfit.platform == .android) {
         const width = init_set.window_width;
         const height = init_set.window_height;
         init_set = init_setting.*;

@@ -128,8 +128,9 @@ pub const ChangeDeviceFn = *const fn (_device_idx: u32, add_or_remove: bool) voi
 
 var fn_: ?CallbackFn = null;
 var change_fn_: ChangeDeviceFn = undefined;
+const xfit = @import("xfit.zig");
 
-var raw: if (system.platform == .windows) raw_input else void = if (system.platform == .windows) .{ .handle = undefined } else {};
+var raw: if (xfit.platform == .windows) raw_input else void = if (xfit.platform == .windows) .{ .handle = undefined } else {};
 var out_data: [XBOX_OUT_PACKET_SIZE]u8 = undefined;
 
 fn change_fn(_device_idx: u32, add_or_remove: bool, _user_data: ?*anyopaque) void {
@@ -139,18 +140,18 @@ fn change_fn(_device_idx: u32, add_or_remove: bool, _user_data: ?*anyopaque) voi
 
 pub fn start(_change_fn: ChangeDeviceFn) raw_input.ERROR!void {
     change_fn_ = _change_fn;
-    if (system.platform == .windows) {
+    if (xfit.platform == .windows) {
         raw = .{ .handle = undefined };
         try raw.init(XBOX_MAX_CONTROLLERS, &XBOX_WIN_GUID, change_fn, null);
-    } else if (system.platform == .android) {} else {
+    } else if (xfit.platform == .android) {} else {
         @compileError("not support platform");
     }
 }
 
 pub fn destroy() void {
-    if (system.platform == .windows) {
+    if (xfit.platform == .windows) {
         raw.deinit();
-    } else if (system.platform == .android) {
+    } else if (xfit.platform == .android) {
         //__android.xbox_pad_callback = null;
     } else {
         @compileError("not support platform");
@@ -159,7 +160,7 @@ pub fn destroy() void {
 
 fn callback(handle: ?*anyopaque, device_idx: u32, _user_data: ?*anyopaque) void {
     var state: XBOX_STATE = undefined;
-    if (system.platform == .windows) {
+    if (xfit.platform == .windows) {
         if (!__raw_input.get(@alignCast(@ptrCast(handle)), device_idx, XBOX_CONTROL_CODE, XBOX_IN[0..XBOX_IN.len], out_data[0..XBOX_OUT_PACKET_SIZE])) return;
         state.device_idx = device_idx;
         //state.packet = std.mem.bytesToValue(u32, &out_data[5]);
@@ -193,9 +194,9 @@ fn callback(handle: ?*anyopaque, device_idx: u32, _user_data: ?*anyopaque) void 
 }
 pub fn set_callback(_fn: CallbackFn) void {
     fn_ = _fn;
-    if (system.platform == .windows) {
+    if (xfit.platform == .windows) {
         raw.set_callback(callback);
-    } else if (system.platform == .android) {
+    } else if (xfit.platform == .android) {
         //__android.xbox_pad_callback = callback;
     } else {
         @compileError("not support platform");
@@ -223,7 +224,7 @@ pub fn set_vibration(
     device_idx: u32,
     vib: XBOX_VIBRATION,
 ) !u32 {
-    if (system.platform == .windows) {
+    if (xfit.platform == .windows) {
         const data: [9]u8 = .{
             0x03,
             0x0F,
@@ -236,7 +237,7 @@ pub fn set_vibration(
             vib.repeat,
         };
         return try raw.set(device_idx, data[0..data.len]);
-    } else if (system.platform == .android) {
+    } else if (xfit.platform == .android) {
         return 0;
     } else {
         @compileError("not support platform");

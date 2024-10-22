@@ -1,42 +1,34 @@
-// !! windows platform only do not change
-pub const UNICODE = false;
 // !! android platform only do not change
 comptime {
-    if (@import("engine/system.zig").platform == .android)
-        _ = @import("engine/__android.zig").android.ANativeActivity_createFunc;
+    _ = xfit.__android_entry;
 }
 // !!
 
 const std = @import("std");
-const xfit = @import("engine/xfit.zig");
-const system = @import("engine/system.zig");
-const font = @import("engine/font.zig");
-const file = @import("engine/file.zig");
-const asset_file = @import("engine/asset_file.zig");
-const webp = @import("engine/webp.zig");
-const image_util = @import("engine/image_util.zig");
-const window = @import("engine/window.zig");
-const animator = @import("engine/animator.zig");
-const input = @import("engine/input.zig");
-const collision = @import("engine/collision.zig");
-const components = @import("engine/components.zig");
-
-const lua = @import("engine/lua.zig");
-
-const timer_callback = @import("engine/timer_callback.zig");
-
-const file_ = if (system.platform == .android) asset_file else file;
+const xfit = @import("xfit");
+const system = xfit.system;
+const font = xfit.font;
+const webp = xfit.webp;
+const image_util = xfit.image_util;
+const window = xfit.window;
+const animator = xfit.animator;
+const input = xfit.input;
+const collision = xfit.collision;
+const components = xfit.components;
+const lua = xfit.lua;
+const timer_callback = xfit.timer_callback;
+const file_ = if (xfit.platform == .android) xfit.asset_file else xfit.file;
+const file = xfit.file;
+const math = xfit.math;
+const mem = xfit.mem;
+const graphics = xfit.graphics;
+const render_command = xfit.render_command;
+const geometry = xfit.geometry;
 
 const ArrayList = std.ArrayList;
 const MemoryPoolExtra = std.heap.MemoryPoolExtra;
 var gpa: std.heap.GeneralPurposeAllocator(.{}) = undefined;
 var allocator: std.mem.Allocator = undefined;
-
-const math = @import("engine/math.zig");
-const mem = @import("engine/mem.zig");
-const graphics = @import("engine/graphics.zig");
-const render_command = @import("engine/render_command.zig");
-const geometry = @import("engine/geometry.zig");
 
 const matrix = math.matrix;
 const iarea = collision.iarea;
@@ -110,7 +102,7 @@ pub fn xfit_init() !void {
 
     try luaT.luaL_dostring("print(\"hello\")\n");
 
-    if (system.platform != .android) {
+    if (xfit.platform != .android) {
         try luaT.luaL_loadfile("test.lua");
         try luaT.lua_pcall(0, 0, 0);
         _ = luaT.lua_getglobal("Printhello");
@@ -301,7 +293,7 @@ fn key_down(_key: input.key) void {
             window.set_window_mode();
         }
     } else {
-        switch (system.platform) {
+        switch (xfit.platform) {
             .android => {
                 if (_key == input.key.Back) {
                     system.exit();
