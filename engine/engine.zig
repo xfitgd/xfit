@@ -58,20 +58,14 @@ pub fn init(
 
     const arch_text = comptime [_][]const u8{
         "aarch64-linux-android",
-        "arm-linux-androideabi",
-        //"i686-linux-android",
         "x86_64-linux-android",
     };
     const out_arch_text = comptime [_][]const u8{
         "../lib/arm64-v8a",
-        "../lib/armeabi-v7a",
-        //"../lib/x86",
         "../lib/x86_64",
     };
     const targets = [_]std.Target.Query{
         .{ .os_tag = .linux, .cpu_arch = .aarch64, .abi = .android, .cpu_features_add = std.Target.aarch64.featureSet(&.{.v8a}) },
-        .{ .os_tag = .linux, .cpu_arch = .arm, .abi = .android, .cpu_features_add = std.Target.arm.featureSet(&.{.v7a}) },
-        //.{ .os_tag = .linux, .cpu_arch = .x86, .abi = .android },
         .{ .os_tag = .linux, .cpu_arch = .x86_64, .abi = .android },
     };
 
@@ -108,8 +102,6 @@ pub fn init(
                 .optimize = OPTIMIZE,
                 .pic = true,
             });
-            //if (targets[i].cpu_arch == .x86) result.link_z_notext = true; //x86 only
-
             var contents = std.ArrayList(u8).init(b.allocator);
             var writer = contents.writer();
             writer.print("include_dir={s}\n", .{std.fmt.allocPrint(b.allocator, "{s}/toolchains/llvm/prebuilt/windows-x86_64/sysroot/usr/include", .{ANDROID_NDK_PATH}) catch unreachable}) catch unreachable;
