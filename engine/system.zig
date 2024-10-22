@@ -169,7 +169,7 @@ pub const init_setting = struct {
     can_resizewindow: bool = true,
     use_console: bool = if (dbg) true else false,
 
-    window_title: []const u8 = "Xfit",
+    window_title: []const u8 = "XfitTest",
     icon: ?[]const u8 = null,
     cursor: ?[]const u8 = null,
     //*

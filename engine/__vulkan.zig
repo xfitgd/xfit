@@ -694,9 +694,9 @@ pub var VK_KHR_create_renderpass2_support = false;
 pub fn vulkan_start() void {
     const appInfo: vk.VkApplicationInfo = .{
         .sType = vk.VK_STRUCTURE_TYPE_APPLICATION_INFO,
-        .pApplicationName = "Hello Triangle",
+        .pApplicationName = __system.title.ptr,
         .applicationVersion = vk.VK_MAKE_API_VERSION(1, 0, 0, 0),
-        .pEngineName = "No Engine",
+        .pEngineName = "Xfit",
         .engineVersion = vk.VK_MAKE_API_VERSION(1, 0, 0, 0),
         .apiVersion = vk.VK_API_VERSION_1_1,
     };
