@@ -23,11 +23,31 @@ pub var exiting: std.atomic.Value(bool) = std.atomic.Value(bool).init(false);
 
 comptime {
     @export(&lua_writestring, .{ .name = "lua_writestring", .linkage = .strong });
+    @export(&lua_writestringerror, .{ .name = "lua_writestringerror", .linkage = .strong });
 }
 
 fn lua_writestring(ptr: ?*const anyopaque, size: usize) callconv(.C) usize {
     system.print("{s}", .{@as([*]const u8, @ptrCast(ptr.?))[0..size]});
     return size;
+}
+fn lua_writestringerror(fmt: [*c]const u8, ...) callconv(.C) void {
+    var ap = @cVaStart();
+    defer @cVaEnd(&ap);
+
+    var out: ArrayList(u8) = ArrayList(u8).init(std.heap.c_allocator);
+    defer out.deinit();
+
+    var i: usize = 0;
+    while (fmt[i] != 0) : (i += 1) {
+        if (fmt[i] == '%' and fmt[i + 1] == 's') {
+            const str = @cVaArg(&ap, [*c]const u8);
+            out.appendSlice(str[0..std.mem.len(str)]) catch unreachable;
+            i += 1;
+        } else {
+            out.append(fmt[i]) catch unreachable;
+        }
+    }
+    _ = lua_writestring(@ptrCast(out.items.ptr), out.items.len);
 }
 
 pub var prev_window: struct {

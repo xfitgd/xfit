@@ -42,6 +42,12 @@ pub fn xfit_main(_allocator: std.mem.Allocator, init_setting: *const system.init
         root.xfit_init() catch |e| {
             system.handle_error3("xfit_init", e);
         };
+    } else if (system.platform == .linux) {
+        __vulkan.vulkan_start();
+
+        root.xfit_init() catch |e| {
+            system.handle_error3("xfit_init", e);
+        };
     } else {
         @compileError("not support platform");
     }

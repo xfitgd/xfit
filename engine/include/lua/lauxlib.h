@@ -255,23 +255,22 @@ typedef struct luaL_Stream {
 ** ===================================================================
 */
 
-/* print a string */
-// #if !defined(lua_writestring)
-// #define lua_writestring(s,l)   fwrite((s), sizeof(char), (l), stdout)
-// #endif
-extern size_t lua_writestring(const void* ptr, size_t size);//수정 MODIFY
+extern size_t lua_writestring(const void* ptr, size_t size);
 
 /* print a newline and flush the output */
 #if !defined(lua_writeline)
 //#define lua_writeline()        (lua_writestring("\n", 1), fflush(stdout))
-#define lua_writeline()        lua_writestring("\n", 1)//수정 MODIFY
+#define lua_writeline()        lua_writestring("\n", 1)
 #endif
 
 /* print an error message */
-#if !defined(lua_writestringerror)
-#define lua_writestringerror(s,p) \
-        (fprintf(stderr, (s), (p)), fflush(stderr))
-#endif
+// #if !defined(lua_writestringerror)
+// #define lua_writestringerror(s,p) \
+//          (fprintf(stderr, (s), (p)), fflush(stderr))
+// #endif
+
+extern void lua_writestringerror(const char *fmt, ...);
+
 
 /* }================================================================== */
 

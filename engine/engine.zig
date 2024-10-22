@@ -49,8 +49,13 @@ pub fn init(
     callback: fn (*std.Build.Step.Compile, std.Build.ResolvedTarget) void,
     is_console: bool, //ignores for target mobile
 ) void {
-    var pro = std.process.Child.init(&[_][]const u8{ engine_path ++ "/shader_compile.bat", engine_path }, b.allocator);
-    _ = pro.spawnAndWait() catch unreachable;
+    if (builtin.os.tag == .windows) {
+        var pro = std.process.Child.init(&[_][]const u8{ engine_path ++ "/shader_compile.bat", engine_path }, b.allocator);
+        _ = pro.spawnAndWait() catch unreachable;
+    } else {
+        var pro = std.process.Child.init(&[_][]const u8{ engine_path ++ "/shader_compile.sh", engine_path }, b.allocator);
+        _ = pro.spawnAndWait() catch unreachable;
+    }
 
     const build_options = b.addOptions();
 
@@ -84,6 +89,26 @@ pub fn init(
         "libvorbisfile.a",
         "libminiaudio.a",
         "liblua.a",
+    };
+
+    const linux_system_lib_names = comptime [_][]const u8{
+        "libwebp.a",
+        "libwebpdemux.a",
+        "libfreetype.a",
+        "libogg.a",
+        "libopus.a",
+        "libopusfile.a",
+        "libvorbis.a",
+        "libvorbisenc.a",
+        "libvorbisfile.a",
+        "libvulkan.so",
+        "libwayland-client.so",
+        "libwayland-server.so",
+        "libwayland-cursor.so",
+    };
+    const linux_local_lib_names = comptime [_][]const u8{
+        "liblua.a",
+        "miniaudio.o",
     };
 
     var i: usize = 0;
@@ -164,6 +189,34 @@ pub fn init(
             callback(result, target);
 
             b.installArtifact(result);
+        } else if (PLATFORM == XfitPlatform.linux) {
+            const target = b.standardTargetOptions(.{ .default_target = .{
+                .os_tag = .linux,
+            } });
+
+            result = b.addExecutable(.{
+                .target = target,
+                .name = name,
+                .root_source_file = root_source_file,
+                .optimize = OPTIMIZE,
+            });
+            result.linkLibC();
+            if (is_console) {
+                result.subsystem = .Console;
+            } else {
+                result.subsystem = .Posix;
+            }
+
+            for (linux_system_lib_names) |n| {
+                result.addObjectFile(.{ .cwd_relative = std.fmt.allocPrint(b.allocator, "/usr/lib/{s}-linux-gnu/{s}", .{ get_arch_text(target.result.cpu.arch), n }) catch unreachable });
+            }
+            for (linux_local_lib_names) |n| {
+                result.addObjectFile(get_lazypath(b, std.fmt.allocPrint(b.allocator, "{s}/lib/linux/{s}/{s}", .{ engine_path, get_arch_text(target.result.cpu.arch), n }) catch unreachable));
+            }
+
+            callback(result, target);
+
+            b.installArtifact(result);
         } else unreachable;
 
         const system = b.addModule("system", .{ .root_source_file = b.path(engine_path ++ "/system.zig") });
@@ -179,10 +232,18 @@ pub fn init(
     }
 
     var cmd: *std.Build.Step.Run = undefined;
-    if (PLATFORM == XfitPlatform.android) {
-        cmd = b.addSystemCommand(&.{ engine_path ++ "/compile.bat", engine_path, b.install_path, "android", ANDROID_PATH, std.fmt.comptimePrint("{d}", .{ANDROID_VER}), ANDROID_BUILD_TOOL_VER });
+    if (builtin.os.tag == .windows) {
+        if (PLATFORM == XfitPlatform.android) {
+            cmd = b.addSystemCommand(&.{ engine_path ++ "/compile.bat", engine_path, b.install_path, "android", ANDROID_PATH, std.fmt.comptimePrint("{d}", .{ANDROID_VER}), ANDROID_BUILD_TOOL_VER });
+        } else {
+            cmd = b.addSystemCommand(&.{engine_path ++ "/compile.bat"});
+        }
     } else {
-        cmd = b.addSystemCommand(&.{engine_path ++ "/compile.bat"});
+        if (PLATFORM == XfitPlatform.android) {
+            cmd = b.addSystemCommand(&.{ engine_path ++ "/compile.bat", engine_path, b.install_path, "android", ANDROID_PATH, std.fmt.comptimePrint("{d}", .{ANDROID_VER}), ANDROID_BUILD_TOOL_VER });
+        } else {
+            cmd = b.addSystemCommand(&.{engine_path ++ "/compile.sh"});
+        }
     }
     cmd.step.dependOn(install_step);
 
