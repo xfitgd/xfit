@@ -41,6 +41,7 @@ inline fn get_arch_text(arch: std.Target.Cpu.Arch) []const u8 {
 
 pub fn init(
     b: *std.Build,
+    comptime name: []const u8, //manefest의 android.app.lib_name 와 같게
     root_source_file: std.Build.LazyPath,
     comptime engine_path: []const u8,
     PLATFORM: XfitPlatform,
@@ -97,7 +98,7 @@ pub fn init(
             const target = b.resolveTargetQuery(targets[i]);
             result = b.addSharedLibrary(.{
                 .target = target,
-                .name = "XfitTest",
+                .name = name,
                 .root_source_file = root_source_file,
                 .optimize = OPTIMIZE,
                 .pic = true,
@@ -124,8 +125,8 @@ pub fn init(
             result.linkSystemLibrary("c");
             result.linkSystemLibrary("log");
 
-            for (lib_names) |name| {
-                result.addObjectFile(get_lazypath(b, std.fmt.allocPrint(b.allocator, "{s}/lib/android/{s}/{s}", .{ engine_path, get_arch_text(targets[i].cpu_arch.?), name }) catch unreachable));
+            for (lib_names) |n| {
+                result.addObjectFile(get_lazypath(b, std.fmt.allocPrint(b.allocator, "{s}/lib/android/{s}/{s}", .{ engine_path, get_arch_text(targets[i].cpu_arch.?), n }) catch unreachable));
             }
 
             callback(result, target);
@@ -140,7 +141,7 @@ pub fn init(
 
             result = b.addExecutable(.{
                 .target = target,
-                .name = "XfitTest",
+                .name = name,
                 .root_source_file = root_source_file,
                 .optimize = OPTIMIZE,
             });
@@ -156,8 +157,8 @@ pub fn init(
             //result.linkSystemLibrary("Gdi32");
 
             result.addObjectFile(get_lazypath(b, engine_path ++ "/lib/windows/vulkan.lib"));
-            for (lib_names) |name| {
-                result.addObjectFile(get_lazypath(b, std.fmt.allocPrint(b.allocator, "{s}/lib/windows/{s}/{s}", .{ engine_path, get_arch_text(target.result.cpu.arch), name }) catch unreachable));
+            for (lib_names) |n| {
+                result.addObjectFile(get_lazypath(b, std.fmt.allocPrint(b.allocator, "{s}/lib/windows/{s}/{s}", .{ engine_path, get_arch_text(target.result.cpu.arch), n }) catch unreachable));
             }
 
             callback(result, target);

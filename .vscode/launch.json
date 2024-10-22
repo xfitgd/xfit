@@ -17,7 +17,7 @@
             "request": "launch",
             "target": "select",
             "mode": "native", // Change to `java` or `native` to attach only Java or Native debugger.
-            "packageName": "com.example.xfittest", // Package name for your app.
+            "packageName": "com.example.xfittest", // Package name for your app. manifest.package
             "launchActivity": "android.app.NativeActivity",  // Activity to launch
             "preLaunchTask": "build zig",
             "native": {

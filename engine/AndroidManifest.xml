@@ -23,6 +23,7 @@
 
             >
             <!-- Tell NativeActivity the name of our .so -->
+            <!-- build.zig, engine.zig의 'name'과 같게 -->
             <meta-data android:name="android.app.lib_name"
                 android:value="XfitTest" />
             <intent-filter>

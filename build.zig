@@ -36,6 +36,7 @@ pub fn build(b: *std.Build) void {
     b.release_mode = .fast;
     engine.init(
         b,
+        "XfitTest",
         b.path(examples[@intFromEnum(EXAMPLE)]),
         "engine",
         platform,
