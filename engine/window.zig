@@ -30,6 +30,11 @@ pub const screen_orientation = enum {
     vertical360,
 };
 
+pub inline fn get_monitor_from_window() *system.monitor_info {
+    if (xfit.platform == .windows) return __windows.get_monitor_from_window();
+    return system.primary_monitor();
+}
+
 pub fn get_screen_orientation() screen_orientation {
     return @atomicLoad(screen_orientation, &__system.__screen_orientation, std.builtin.AtomicOrder.monotonic);
 }
@@ -44,7 +49,7 @@ pub fn window_x() i32 {
     if (xfit.platform == .windows) {
         return @atomicLoad(i32, &__system.init_set.window_x, std.builtin.AtomicOrder.monotonic);
     } else if (xfit.platform == .android) {
-        system.print("WARN window_x not support mobile platform.\n", .{});
+        xfit.print("WARN window_x not support mobile platform.\n", .{});
         return 0;
     }
     @compileError("not support platform.");
@@ -53,7 +58,7 @@ pub fn window_y() i32 {
     if (xfit.platform == .windows) {
         return @atomicLoad(i32, &__system.init_set.window_y, std.builtin.AtomicOrder.monotonic);
     } else if (xfit.platform == .android) {
-        system.print("WARN window_y not support mobile platform.\n", .{});
+        xfit.print("WARN window_y not support mobile platform.\n", .{});
         return 0;
     }
     @compileError("not support platform.");
@@ -62,7 +67,7 @@ pub fn can_maximize() bool {
     if (xfit.platform == .windows) {
         return @atomicLoad(bool, &__system.init_set.can_maximize, std.builtin.AtomicOrder.monotonic);
     } else if (xfit.platform == .android) {
-        system.print("WARN can_maximize not support mobile platform.\n", .{});
+        xfit.print("WARN can_maximize not support mobile platform.\n", .{});
         return false;
     }
     @compileError("not support platform.");
@@ -71,7 +76,7 @@ pub fn can_minimize() bool {
     if (xfit.platform == .windows) {
         return @atomicLoad(bool, &__system.init_set.can_minimize, std.builtin.AtomicOrder.monotonic);
     } else if (xfit.platform == .android) {
-        system.print("WARN can_minimize not support mobile platform.\n", .{});
+        xfit.print("WARN can_minimize not support mobile platform.\n", .{});
         return false;
     }
     @compileError("not support platform.");
@@ -80,17 +85,17 @@ pub fn can_resizewindow() bool {
     if (xfit.platform == .windows) {
         return @atomicLoad(bool, &__system.init_set.can_resizewindow, std.builtin.AtomicOrder.monotonic);
     } else if (xfit.platform == .android) {
-        system.print("WARN can_resizewindow not support mobile platform.\n", .{});
+        xfit.print("WARN can_resizewindow not support mobile platform.\n", .{});
         return false;
     }
     @compileError("not support platform.");
 }
-pub fn get_screen_mode() system.screen_mode {
+pub fn get_screen_mode() xfit.screen_mode {
     if (xfit.platform == .windows) {
-        return @atomicLoad(system.screen_mode, &__system.init_set.screen_mode, std.builtin.AtomicOrder.monotonic);
+        return @atomicLoad(xfit.screen_mode, &__system.init_set.screen_mode, std.builtin.AtomicOrder.monotonic);
     } else if (xfit.platform == .android) {
-        system.print("WARN get_screen_mode not support mobile platform.\n", .{});
-        return system.screen_mode.WINDOW;
+        xfit.print("WARN get_screen_mode not support mobile platform.\n", .{});
+        return xfit.screen_mode.WINDOW;
     }
     @compileError("not support platform.");
 }
@@ -100,7 +105,7 @@ pub fn get_window_title() []const u8 {
 }
 pub fn set_window_title(title: []const u8) void {
     std.heap.c_allocator.free(__system.title);
-    title = std.heap.c_allocator.dupeZ(u8, title) catch |e| system.handle_error3("set_window_title.title = allocator.dupeZ", e);
+    title = std.heap.c_allocator.dupeZ(u8, title) catch |e| xfit.herr3("set_window_title.title = allocator.dupeZ", e);
 
     __windows.set_window_title();
 }
@@ -109,7 +114,7 @@ pub fn set_window_size(w: u32, h: u32) void {
     if (xfit.platform == .windows) {
         __windows.set_window_size(w, h);
     } else {
-        system.print_error("WARN window.set_window_size not support mobile platform.\n", .{});
+        xfit.print_error("WARN window.set_window_size not support mobile platform.\n", .{});
         return;
     }
 }
@@ -117,7 +122,7 @@ pub fn set_window_pos(x: i32, y: i32) void {
     if (xfit.platform == .windows) {
         __windows.set_window_pos(x, y);
     } else {
-        system.print_error("WARN window.set_window_pos not support mobile platform.\n", .{});
+        xfit.print_error("WARN window.set_window_pos not support mobile platform.\n", .{});
         return;
     }
     @atomicStore(i32, &__system.init_set.window_x, __system.prev_window.x, std.builtin.AtomicOrder.monotonic);
@@ -128,10 +133,10 @@ pub fn set_window_mode() void {
     if (xfit.platform == .windows) {
         __windows.set_window_mode();
     } else {
-        system.print_error("WARN window.set_window_mode not support mobile platform.\n", .{});
+        xfit.print_error("WARN window.set_window_mode not support mobile platform.\n", .{});
         return;
     }
-    @atomicStore(system.screen_mode, &__system.init_set.screen_mode, system.screen_mode.WINDOW, std.builtin.AtomicOrder.monotonic);
+    @atomicStore(xfit.screen_mode, &__system.init_set.screen_mode, xfit.screen_mode.WINDOW, std.builtin.AtomicOrder.monotonic);
     @atomicStore(i32, &__system.init_set.window_x, __system.prev_window.x, std.builtin.AtomicOrder.monotonic);
     @atomicStore(i32, &__system.init_set.window_y, __system.prev_window.y, std.builtin.AtomicOrder.monotonic);
 
@@ -151,10 +156,10 @@ pub fn set_window_mode2(pos: math.point(i32), size: math.point(u32), state: syst
     if (xfit.platform == .windows) {
         __windows.set_window_mode2(pos, size, state, state, _can_maximize, _can_minimize, _can_resizewindow);
     } else {
-        system.print_error("WARN monitor_info.set_window_mode not support mobile platform.\n", .{});
+        xfit.print_error("WARN monitor_info.set_window_mode not support mobile platform.\n", .{});
         return;
     }
-    @atomicStore(system.screen_mode, &__system.init_set.screen_mode, system.screen_mode.WINDOW, std.builtin.AtomicOrder.monotonic);
+    @atomicStore(xfit.screen_mode, &__system.init_set.screen_mode, xfit.screen_mode.WINDOW, std.builtin.AtomicOrder.monotonic);
     @atomicStore(bool, &__system.init_set.can_maximize, _can_maximize, std.builtin.AtomicOrder.monotonic);
     @atomicStore(bool, &__system.init_set.can_minimize, _can_minimize, std.builtin.AtomicOrder.monotonic);
     @atomicStore(bool, &__system.init_set.can_resizewindow, _can_resizewindow, std.builtin.AtomicOrder.monotonic);

@@ -3,8 +3,9 @@ const std = @import("std");
 const system = @import("system.zig");
 const window = @import("window.zig");
 const __system = @import("__system.zig");
+const xfit = @import("xfit.zig");
 
-const dbg = system.dbg;
+const dbg = xfit.dbg;
 
 const __vulkan_allocator = @import("__vulkan_allocator.zig");
 
@@ -184,7 +185,7 @@ pub fn vertices(comptime vertexT: type) type {
         pub fn build(self: *Self, _flag: write_flag) !void {
             self.*.__check_init.init();
             if (self.*.array == null or self.*.array.?.len == 0) {
-                system.print_error("WARN vertice array 0 or null\n", .{});
+                xfit.print_error("WARN vertice array 0 or null\n", .{});
                 return error.is_not_polygon;
             }
             self.*.node.create_buffer(.{
@@ -466,7 +467,7 @@ pub const texture = struct {
     pub fn build(self: *Self) void {
         self.*.__check_init.init();
         if (self.*.width == 0 or self.*.height == 0) {
-            system.print_error("WARN can't build texture\n", .{});
+            xfit.print_error("WARN can't build texture\n", .{});
             return;
         }
         self.*.__image.create_texture(.{
@@ -530,7 +531,7 @@ pub const texture_array = struct {
     pub fn build(self: *Self) void {
         self.*.__check_init.init();
         if (self.*.width == 0 or self.*.height == 0 or self.*.frames == 0) {
-            system.print_error("WARN can't build texture array\n", .{});
+            xfit.print_error("WARN can't build texture array\n", .{});
             return;
         }
         self.*.__image.create_texture(.{

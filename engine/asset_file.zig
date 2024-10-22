@@ -40,7 +40,7 @@ pub inline fn read(self: *Self, buffer: []u8) !usize {
 }
 pub inline fn close(self: *Self) void {
     if (self.handle == INVALID_FILE_HANDLE) {
-        system.print_error("WARN Can't close INVALID_FILE_HANDLE(not open asset_file)\n", .{});
+        xfit.print_error("WARN Can't close INVALID_FILE_HANDLE(not open asset_file)\n", .{});
         return;
     }
     __android.android.AAsset_close(self.handle);

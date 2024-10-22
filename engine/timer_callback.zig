@@ -1,10 +1,10 @@
 const std = @import("std");
-const system = @import("system.zig");
+const xfit = @import("xfit.zig");
 
 const graphics = @import("graphics.zig");
 
 inline fn loop(wait_nanosec: u64, comptime function: anytype, args: anytype) bool {
-    system.sleep(wait_nanosec);
+    xfit.sleep(wait_nanosec);
     return callback_(function, args);
 }
 
@@ -13,12 +13,12 @@ fn callback_(comptime function: anytype, args: anytype) bool {
     if (res == .error_union) { // ? 표준 라이브러리 Thread.zig에서 가져온 코드
         if (res.error_union.payload == bool) {
             return @call(.auto, function, args) catch |err| {
-                system.print_error("ERR : {s}\n", .{@errorName(err)});
+                xfit.print_error("ERR : {s}\n", .{@errorName(err)});
                 unreachable;
             };
         } else {
             _ = @call(.auto, function, args) catch |err| {
-                system.print_error("ERR : {s}\n", .{@errorName(err)});
+                xfit.print_error("ERR : {s}\n", .{@errorName(err)});
                 unreachable;
             };
         }
@@ -33,9 +33,9 @@ fn callback_(comptime function: anytype, args: anytype) bool {
 fn callback(wait_nanosec: u64, repeat: u64, comptime function: anytype, args: anytype) void {
     var re = repeat;
     if (re == 0) {
-        while (loop(wait_nanosec, function, args) and !system.exiting()) {}
+        while (loop(wait_nanosec, function, args) and !xfit.exiting()) {}
     } else {
-        while (re > 0 and loop(wait_nanosec, function, args) and !system.exiting()) : (re -= 1) {}
+        while (re > 0 and loop(wait_nanosec, function, args) and !xfit.exiting()) : (re -= 1) {}
     }
 }
 
@@ -54,9 +54,9 @@ fn callback2(
         if (!callback_(start_func, start_args)) return;
     }
     if (re == 0) {
-        while (loop(wait_nanosec, function, args) and !system.exiting()) {}
+        while (loop(wait_nanosec, function, args) and !xfit.exiting()) {}
     } else {
-        while (re > 0 and loop(wait_nanosec, function, args) and !system.exiting()) : (re -= 1) {}
+        while (re > 0 and loop(wait_nanosec, function, args) and !xfit.exiting()) : (re -= 1) {}
     }
     if (@TypeOf(end_func) != @TypeOf(null)) {
         _ = callback_(end_func, end_args);

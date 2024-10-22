@@ -33,7 +33,7 @@ __audio_buf: miniaudio.ma_audio_buffer = undefined,
 source: ?*sound_source = null,
 
 pub fn start() void {
-    if (system.dbg and __system.sound_started) system.handle_error_msg2("sound already started");
+    if (xfit.dbg and __system.sound_started) xfit.herrm("sound already started");
     __system.sound_started = true;
 
     sounds = AutoHashMap(*Self, *Self).init(std.heap.c_allocator);
@@ -47,13 +47,13 @@ pub fn start() void {
     resourceManagerConfig.pCustomDecodingBackendUserData = null;
 
     var result = miniaudio.ma_resource_manager_init(&resourceManagerConfig, &resourceManager);
-    if (result != miniaudio.MA_SUCCESS) system.handle_error2("miniaudio.ma_resource_manager_init {d}", .{result});
+    if (result != miniaudio.MA_SUCCESS) xfit.herr2("miniaudio.ma_resource_manager_init {d}", .{result});
     var engineConfig: miniaudio.ma_engine_config = miniaudio.ma_engine_config_init();
     engineConfig.pResourceManager = &resourceManager;
 
     result = miniaudio.ma_engine_init(&engineConfig, &engine);
 
-    if (result != miniaudio.MA_SUCCESS) system.handle_error2("miniaudio.ma_engine_init {d}", .{result});
+    if (result != miniaudio.MA_SUCCESS) xfit.herr2("miniaudio.ma_engine_init {d}", .{result});
 
     _ = std.Thread.spawn(.{}, callback_thread, .{}) catch unreachable;
 }
@@ -71,7 +71,7 @@ fn end_callback(userdata: ?*anyopaque, sound: [*c]miniaudio.ma_sound) callconv(.
     const self: *Self = @alignCast(@ptrCast(userdata.?));
 
     g_mutex2.lock();
-    g_ends.append(self) catch |e| system.handle_error3("g_ends.append", e);
+    g_ends.append(self) catch |e| xfit.herr3("g_ends.append", e);
     g_mutex2.unlock();
     g_sem.post();
 }
@@ -102,7 +102,7 @@ pub const sound_source = struct {
 
     ///TODO 사용중인 경우 sound destroy 이후에 호출 -> 해당 사운드가 재생중일때 메모리를 해제할 수 없다.
     pub fn deinit(self: *sound_source) void {
-        if (system.dbg and self.*.out_data == null) system.handle_error_msg2("sound_source not inited cant deinit");
+        if (xfit.dbg and self.*.out_data == null) xfit.herrm("sound_source not inited cant deinit");
         std.c.free(self.*.out_data.?.ptr);
         std.heap.c_allocator.destroy(self);
     }
@@ -122,7 +122,7 @@ pub const sound_source = struct {
         };
         var result = miniaudio.ma_audio_buffer_init(&audio_buf_config, &result_sound.*.__audio_buf);
         if (result != miniaudio.MA_SUCCESS) {
-            system.print_error("miniaudio.ma_audio_buffer_init {d}\n", .{result});
+            xfit.print_error("miniaudio.ma_audio_buffer_init {d}\n", .{result});
             return std.posix.UnexpectedError.Unexpected;
         }
 
@@ -136,14 +136,14 @@ pub const sound_source = struct {
 
         result = miniaudio.ma_sound_init_ex(&engine, &sound_config, &result_sound.*.__sound.?);
         if (result != miniaudio.MA_SUCCESS) {
-            system.print_error("miniaudio.ma_sound_init_from_data_source {d}\n", .{result});
+            xfit.print_error("miniaudio.ma_sound_init_from_data_source {d}\n", .{result});
             return std.posix.UnexpectedError.Unexpected;
         }
         miniaudio.ma_sound_set_volume(&result_sound.*.__sound.?, volume);
 
         result = miniaudio.ma_sound_start(&result_sound.__sound.?);
         if (result != miniaudio.MA_SUCCESS) {
-            system.print_error("miniaudio.ma_sound_start {d}\n", .{result});
+            xfit.print_error("miniaudio.ma_sound_start {d}\n", .{result});
             return std.posix.UnexpectedError.Unexpected;
         }
         g_mutex.lock();
@@ -175,14 +175,14 @@ pub fn play_sound(path: []const u8, volume: f32, loop: bool) !?*Self {
 
     var result = miniaudio.ma_decoder_init_memory(data.ptr, data.len, &decoder_config, &decoder);
     if (result != miniaudio.MA_SUCCESS) {
-        system.print_error("miniaudio.ma_decoder_init_memory {d}\n", .{result});
+        xfit.print_error("miniaudio.ma_decoder_init_memory {d}\n", .{result});
         return std.posix.UnexpectedError.Unexpected;
     }
     defer _ = miniaudio.ma_decoder_uninit(&decoder);
 
     result = miniaudio.ma_data_source_get_data_format(&decoder, &self.*.source.?.*.format, &self.*.source.?.*.channels, &self.*.source.?.*.sampleRate, null, 0);
     if (result != miniaudio.MA_SUCCESS) {
-        system.print_error("miniaudio.ma_data_source_get_data_format {d}\n", .{result});
+        xfit.print_error("miniaudio.ma_data_source_get_data_format {d}\n", .{result});
         return std.posix.UnexpectedError.Unexpected;
     }
     var output: ?*anyopaque = undefined;
@@ -190,7 +190,7 @@ pub fn play_sound(path: []const u8, volume: f32, loop: bool) !?*Self {
     result = miniaudio.ma_decode_memory(data.ptr, data.len, &decoder_config, &self.*.source.?.*.size_in_frames, &output);
 
     if (result != miniaudio.MA_SUCCESS) {
-        system.print_error("miniaudio.ma_decode_memory {d}\n", .{result});
+        xfit.print_error("miniaudio.ma_decode_memory {d}\n", .{result});
         return std.posix.UnexpectedError.Unexpected;
     }
     self.*.source.?.*.out_data = @as([*]u8, @ptrCast(output.?))[0..@intCast(self.*.source.?.*.size_in_frames * self.*.source.?.*.channels)];
@@ -204,7 +204,7 @@ pub fn play_sound(path: []const u8, volume: f32, loop: bool) !?*Self {
     };
     result = miniaudio.ma_audio_buffer_init(&audio_buf_config, &self.*.__audio_buf);
     if (result != miniaudio.MA_SUCCESS) {
-        system.print_error("miniaudio.ma_audio_buffer_init {d}\n", .{result});
+        xfit.print_error("miniaudio.ma_audio_buffer_init {d}\n", .{result});
         return std.posix.UnexpectedError.Unexpected;
     }
 
@@ -217,14 +217,14 @@ pub fn play_sound(path: []const u8, volume: f32, loop: bool) !?*Self {
 
     result = miniaudio.ma_sound_init_ex(&engine, &sound_config, &self.*.__sound.?);
     if (result != miniaudio.MA_SUCCESS) {
-        system.print_error("miniaudio.ma_sound_init_from_data_source {d}\n", .{result});
+        xfit.print_error("miniaudio.ma_sound_init_from_data_source {d}\n", .{result});
         return std.posix.UnexpectedError.Unexpected;
     }
     miniaudio.ma_sound_set_volume(&self.*.__sound.?, volume);
 
     result = miniaudio.ma_sound_start(&self.__sound.?);
     if (result != miniaudio.MA_SUCCESS) {
-        system.print_error("miniaudio.ma_sound_start {d}\n", .{result});
+        xfit.print_error("miniaudio.ma_sound_start {d}\n", .{result});
         return std.posix.UnexpectedError.Unexpected;
     }
     g_mutex.lock();
@@ -294,14 +294,14 @@ pub fn decode_sound_memory(data: []const u8) !*sound_source {
 
     var result = miniaudio.ma_decoder_init_memory(data.ptr, data.len, &decoder_config, &decoder);
     if (result != miniaudio.MA_SUCCESS) {
-        system.print_error("miniaudio.ma_decoder_init_memory {d}\n", .{result});
+        xfit.print_error("miniaudio.ma_decoder_init_memory {d}\n", .{result});
         return std.posix.UnexpectedError.Unexpected;
     }
     defer _ = miniaudio.ma_decoder_uninit(&decoder);
 
     result = miniaudio.ma_data_source_get_data_format(&decoder, &self.*.format, &self.*.channels, &self.*.sampleRate, null, 0);
     if (result != miniaudio.MA_SUCCESS) {
-        system.print_error("miniaudio.ma_data_source_get_data_format {d}\n", .{result});
+        xfit.print_error("miniaudio.ma_data_source_get_data_format {d}\n", .{result});
         return std.posix.UnexpectedError.Unexpected;
     }
     var output: ?*anyopaque = undefined;
@@ -309,7 +309,7 @@ pub fn decode_sound_memory(data: []const u8) !*sound_source {
     result = miniaudio.ma_decode_memory(data.ptr, data.len, &decoder_config, &self.*.size_in_frames, &output);
 
     if (result != miniaudio.MA_SUCCESS) {
-        system.print_error("miniaudio.ma_decode_memory {d}\n", .{result});
+        xfit.print_error("miniaudio.ma_decode_memory {d}\n", .{result});
         return std.posix.UnexpectedError.Unexpected;
     }
     self.*.out_data = @as([*]u8, @ptrCast(output.?))[0..@intCast(self.*.size_in_frames * self.*.channels)];
@@ -318,7 +318,7 @@ pub fn decode_sound_memory(data: []const u8) !*sound_source {
 
 pub fn deinit(self: *Self) void {
     g_mutex.lock();
-    if (system.dbg and self.*.__sound == null) system.handle_error_msg2("sound not inited cant deinit");
+    if (xfit.dbg and self.*.__sound == null) xfit.herrm("sound not inited cant deinit");
     miniaudio.ma_sound_uninit(&self.*.__sound.?);
     miniaudio.ma_audio_buffer_uninit(&self.*.__audio_buf);
     std.heap.c_allocator.destroy(self);
@@ -329,7 +329,7 @@ pub fn deinit(self: *Self) void {
 }
 
 pub fn destroy() void {
-    if (system.dbg and !__system.sound_started) system.handle_error_msg2("sound not started");
+    if (xfit.dbg and !__system.sound_started) xfit.herrm("sound not started");
     @atomicStore(bool, &__system.sound_started, false, .release);
 
     miniaudio.ma_engine_uninit(&engine);

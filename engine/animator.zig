@@ -1,6 +1,6 @@
 const std = @import("std");
 const graphics = @import("graphics.zig");
-const system = @import("system.zig");
+const xfit = @import("xfit.zig");
 
 const animate_image = graphics.animate_image;
 const iobject = graphics.iobject;
@@ -11,38 +11,38 @@ pub const animate_object = struct {
     pub inline fn prev_frame(self: *animate_object) void {
         switch (self.obj.*) {
             inline ._anim_image => |*case| case.*.prev_frame(),
-            else => system.print_error("WARN animate_object.prev_frame not support\n", .{}),
+            else => xfit.print_error("WARN animate_object.prev_frame not support\n", .{}),
         }
     }
     pub inline fn map_update_frame(self: *animate_object) void {
         switch (self.obj.*) {
             inline ._anim_image => |*case| case.*.map_update_frame(),
-            else => system.print_error("WARN animate_object.map_update_frame not support\n", .{}),
+            else => xfit.print_error("WARN animate_object.map_update_frame not support\n", .{}),
         }
     }
     pub inline fn next_frame(self: *animate_object) void {
         switch (self.obj.*) {
             inline ._anim_image => |*case| case.*.next_frame(),
-            else => system.print_error("WARN animate_object.next_frame not support\n", .{}),
+            else => xfit.print_error("WARN animate_object.next_frame not support\n", .{}),
         }
     }
     pub inline fn set_frame(self: *animate_object, _frame: u32) void {
         switch (self.obj.*) {
             inline ._anim_image => |*case| case.*.set_frame(_frame),
-            else => system.print_error("WARN animate_object.set_frame not support\n", .{}),
+            else => xfit.print_error("WARN animate_object.set_frame not support\n", .{}),
         }
     }
     pub inline fn cur_frame(self: *animate_object) u32 {
         switch (self.obj.*) {
             inline ._anim_image => |*case| return case.*.frame,
-            else => system.print_error("WARN animate_object.cur_frame not support\n", .{}),
+            else => xfit.print_error("WARN animate_object.cur_frame not support\n", .{}),
         }
         return 0;
     }
     pub inline fn get_frame_count_build(self: *animate_object) u32 {
         switch (self.obj.*) {
             inline ._anim_image => |*case| return case.*.src.*.get_frame_count_build(),
-            else => system.print_error("WARN animate_object.get_frame_count_build not support\n", .{}),
+            else => xfit.print_error("WARN animate_object.get_frame_count_build not support\n", .{}),
         }
         return 0;
     }

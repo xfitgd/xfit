@@ -8,6 +8,7 @@ const input = @import("input.zig");
 const __vulkan = @import("__vulkan.zig");
 const vk = __vulkan.vk;
 const __vulkan_allocator = @import("__vulkan_allocator.zig");
+const xfit = @import("xfit.zig");
 
 const system = @import("system.zig");
 const general_input = @import("general_input.zig");
@@ -123,7 +124,7 @@ pub fn vulkan_android_start(vkInstance: __vulkan.vk.VkInstance, vkSurface: *__vu
     const androidSurfaceCreateInfo: __vulkan.vk.VkAndroidSurfaceCreateInfoKHR = .{ .window = @ptrCast(app.window), .flags = 0 };
     const result = __vulkan.vk.vkCreateAndroidSurfaceKHR(@ptrCast(vkInstance), &androidSurfaceCreateInfo, null, @ptrCast(vkSurface));
 
-    system.handle_error(result == __vulkan.vk.VK_SUCCESS, "vkCreateAndroidSurfaceKHR code : {d}", .{result});
+    xfit.herr(result == __vulkan.vk.VK_SUCCESS, "vkCreateAndroidSurfaceKHR code : {d}", .{result});
 }
 
 fn destroy_android() void {
@@ -131,7 +132,7 @@ fn destroy_android() void {
     __vulkan_allocator.execute_and_wait_all_op();
 
     root.xfit_destroy() catch |e| {
-        system.handle_error3("xfit_destroy", e);
+        xfit.herr3("xfit_destroy", e);
     };
     __vulkan.vulkan_destroy();
 
@@ -140,11 +141,11 @@ fn destroy_android() void {
 
 fn android_app_write_cmd(cmd: AppEvent) void {
     const _cmd = [_]i8{@intFromEnum(cmd)};
-    _ = std.posix.write(app.msgwrite, @ptrCast(&_cmd)) catch |e| system.print_error("android_app_write_cmd std.posix.write error:{}, cmd:{d}\n", .{ e, _cmd[0] });
+    _ = std.posix.write(app.msgwrite, @ptrCast(&_cmd)) catch |e| xfit.print_error("android_app_write_cmd std.posix.write error:{}, cmd:{d}\n", .{ e, _cmd[0] });
 }
 
 fn onConfigurationChanged(_activity: [*c]android.ANativeActivity) callconv(.C) void {
-    if (system.dbg) _ = LOGV("ConfigurationChanged: %p", .{_activity});
+    if (xfit.dbg) _ = LOGV("ConfigurationChanged: %p", .{_activity});
     android_app_write_cmd(AppEvent.APP_CMD_CONFIG_CHANGED);
 }
 pub fn get_device_width() u32 {
@@ -157,17 +158,17 @@ pub fn get_device_height() u32 {
 }
 pub fn get_cache_dir() []const u8 {
     return app.cache_dir orelse blk: {
-        system.print_error("WARN get_cache_dir null\n", .{});
+        xfit.print_error("WARN get_cache_dir null\n", .{});
         break :blk "";
     };
 }
 pub fn get_file_dir() []const u8 {
-    if (app.activity.?.*.internalDataPath == null) system.handle_error_msg2("get_file_dir null");
+    if (app.activity.?.*.internalDataPath == null) xfit.herrm("get_file_dir null");
     return app.activity.?.*.internalDataPath[0..std.mem.len(app.activity.?.*.internalDataPath)];
 }
 
 fn onSaveInstanceState(_activity: [*c]android.ANativeActivity, _out_len: [*c]usize) callconv(.C) ?*anyopaque {
-    if (system.dbg) _ = LOGV("SaveInstanceState: %p", .{_activity});
+    if (xfit.dbg) _ = LOGV("SaveInstanceState: %p", .{_activity});
     _ = _out_len;
     // var savedState: ?*anyopaque = null;
 
@@ -189,7 +190,7 @@ fn onSaveInstanceState(_activity: [*c]android.ANativeActivity, _out_len: [*c]usi
 }
 fn onContentRectChanged(_activity: [*c]android.ANativeActivity, _rect: [*c]const android.ARect) callconv(.C) void {
     _ = _activity;
-    if (system.dbg) _ = LOGV("ContentRectChanged: l=%d,t=%d,r=%d,b=%d", .{ _rect.*.left, _rect.*.top, _rect.*.right, _rect.*.bottom });
+    if (xfit.dbg) _ = LOGV("ContentRectChanged: l=%d,t=%d,r=%d,b=%d", .{ _rect.*.left, _rect.*.top, _rect.*.right, _rect.*.bottom });
 
     app.mutex.lock();
     app.contentRect = _rect.*;
@@ -270,71 +271,71 @@ fn print_cur_config() void {
 
 fn onDestroy(_activity: [*c]android.ANativeActivity) callconv(.C) void {
     _ = _activity;
-    // if (system.dbg) _ = LOGV("Destroy: %p", .{_activity});
+    // if (xfit.dbg) _ = LOGV("Destroy: %p", .{_activity});
     android_app_free();
 }
 fn onInputQueueCreated(_activity: [*c]android.ANativeActivity, _queue: ?*android.AInputQueue) callconv(.C) void {
     _ = _activity;
-    // if (system.dbg) _ = LOGV("InputQueueCreated: %p -- %p", .{ _activity, _queue });
+    // if (xfit.dbg) _ = LOGV("InputQueueCreated: %p -- %p", .{ _activity, _queue });
     android_app_set_input(_queue);
 }
 fn onInputQueueDestroyed(_activity: [*c]android.ANativeActivity, _queue: ?*android.AInputQueue) callconv(.C) void {
     _ = _activity;
     _ = _queue;
-    //if (system.dbg) _ = LOGV("InputQueueDestroyed: %p -- %p", .{ _activity, _queue });
+    //if (xfit.dbg) _ = LOGV("InputQueueDestroyed: %p -- %p", .{ _activity, _queue });
     android_app_set_input(null);
 }
 fn onLowMemory(_activity: [*c]android.ANativeActivity) callconv(.C) void {
     _ = _activity;
-    //if (system.dbg) _ = LOGV("LowMemory: %p", .{_activity});
+    //if (xfit.dbg) _ = LOGV("LowMemory: %p", .{_activity});
     android_app_write_cmd(AppEvent.APP_CMD_LOW_MEMORY);
 }
 fn onNativeWindowCreated(_activity: [*c]android.ANativeActivity, _window: ?*android.ANativeWindow) callconv(.C) void {
-    //if (system.dbg) _ = LOGV("NativeWindowCreated: %p -- %p", .{ _activity, _window });
+    //if (xfit.dbg) _ = LOGV("NativeWindowCreated: %p -- %p", .{ _activity, _window });
     _ = _activity;
     android_app_set_window(_window);
 }
 fn onNativeWindowDestroyed(_activity: [*c]android.ANativeActivity, _window: ?*android.ANativeWindow) callconv(.C) void {
     _ = _activity;
     _ = _window;
-    //if (system.dbg) _ = LOGV("NativeWindowDestroyed: %p -- %p", .{ _activity, _window });
+    //if (xfit.dbg) _ = LOGV("NativeWindowDestroyed: %p -- %p", .{ _activity, _window });
     android_app_set_window(null);
 }
 fn onNativeWindowRedrawNeeded(_activity: [*c]android.ANativeActivity, _window: ?*android.ANativeWindow) callconv(.C) void {
     _ = _activity;
     _ = _window;
-    // if (system.dbg) _ = LOGV("NativeWindowRedrawNeeded: %p -- %p", .{ _activity, _window });
+    // if (xfit.dbg) _ = LOGV("NativeWindowRedrawNeeded: %p -- %p", .{ _activity, _window });
     android_app_write_cmd(AppEvent.APP_CMD_WINDOW_REDRAW_NEEDED);
 }
 fn onNativeWindowResized(_activity: [*c]android.ANativeActivity, _window: ?*android.ANativeWindow) callconv(.C) void {
     _ = _activity;
     _ = _window;
-    //if (system.dbg) _ = LOGV("NativeWindowRedrawNeeded: %p -- %p", .{ _activity, _window });
+    //if (xfit.dbg) _ = LOGV("NativeWindowRedrawNeeded: %p -- %p", .{ _activity, _window });
     android_app_write_cmd(AppEvent.APP_CMD_WINDOW_RESIZED);
 }
 fn onPause(_activity: [*c]android.ANativeActivity) callconv(.C) void {
     _ = _activity;
-    //if (system.dbg) _ = LOGV("Pause: %p", .{_activity});
+    //if (xfit.dbg) _ = LOGV("Pause: %p", .{_activity});
     android_app_set_activity_state(AppEvent.APP_CMD_PAUSE);
 }
 fn onResume(_activity: [*c]android.ANativeActivity) callconv(.C) void {
     _ = _activity;
-    //if (system.dbg) _ = LOGV("Resume: %p", .{_activity});
+    //if (xfit.dbg) _ = LOGV("Resume: %p", .{_activity});
     android_app_set_activity_state(AppEvent.APP_CMD_RESUME);
 }
 fn onStart(_activity: [*c]android.ANativeActivity) callconv(.C) void {
     _ = _activity;
-    //if (system.dbg) _ = LOGV("Start: %p", .{_activity});
+    //if (xfit.dbg) _ = LOGV("Start: %p", .{_activity});
     android_app_set_activity_state(AppEvent.APP_CMD_START);
 }
 fn onStop(_activity: [*c]android.ANativeActivity) callconv(.C) void {
     _ = _activity;
-    //if (system.dbg) _ = LOGV("Stop: %p", .{_activity});
+    //if (xfit.dbg) _ = LOGV("Stop: %p", .{_activity});
     android_app_set_activity_state(AppEvent.APP_CMD_STOP);
 }
 fn onWindowFocusChanged(_activity: [*c]android.ANativeActivity, _focused: i32) callconv(.C) void {
     _ = _activity;
-    //if (system.dbg) _ = LOGV("NativeWindowRedrawNeeded: %p -- %d", .{ _activity, _focused });
+    //if (xfit.dbg) _ = LOGV("NativeWindowRedrawNeeded: %p -- %d", .{ _activity, _focused });
     android_app_write_cmd(if (_focused != 0) AppEvent.APP_CMD_GAINED_FOCUS else AppEvent.APP_CMD_LOST_FOCUS);
 }
 
@@ -354,44 +355,44 @@ fn android_app_read_cmd() u8 {
 fn android_app_pre_exec_cmd(_cmd: u8) void {
     switch (@as(AppEvent, @enumFromInt(_cmd))) {
         AppEvent.APP_CMD_INPUT_CHANGED => {
-            if (system.dbg) _ = LOGV("APP_CMD_INPUT_CHANGED", .{});
+            if (xfit.dbg) _ = LOGV("APP_CMD_INPUT_CHANGED", .{});
             app.mutex.lock();
             if (app.input_queue != null) {
                 android.AInputQueue_detachLooper(app.input_queue);
             }
             app.input_queue = app.pendingInputQueue;
             if (app.input_queue != null) {
-                if (system.dbg) _ = LOGV("Attaching input queue to looper", .{});
+                if (xfit.dbg) _ = LOGV("Attaching input queue to looper", .{});
                 android.AInputQueue_attachLooper(app.input_queue, app.looper, @intFromEnum(LooperEvent.LOOPER_ID_INPUT), null, &app.input_poll_source);
             }
             app.cond.broadcast();
             app.mutex.unlock();
         },
         AppEvent.APP_CMD_INIT_WINDOW => {
-            if (system.dbg) _ = LOGV("APP_CMD_INIT_WINDOW", .{});
+            if (xfit.dbg) _ = LOGV("APP_CMD_INIT_WINDOW", .{});
             app.mutex.lock();
             app.window = app.pendingWindow;
             app.cond.broadcast();
             app.mutex.unlock();
         },
         AppEvent.APP_CMD_TERM_WINDOW => {
-            if (system.dbg) _ = LOGV("APP_CMD_TERM_WINDOW", .{});
+            if (xfit.dbg) _ = LOGV("APP_CMD_TERM_WINDOW", .{});
             app.cond.broadcast();
         },
         AppEvent.APP_CMD_RESUME, AppEvent.APP_CMD_START, AppEvent.APP_CMD_PAUSE, AppEvent.APP_CMD_STOP => {
-            if (system.dbg) _ = LOGV("activityState=%d", .{_cmd});
+            if (xfit.dbg) _ = LOGV("activityState=%d", .{_cmd});
             app.mutex.lock();
             app.activityState = @enumFromInt(_cmd);
             app.cond.broadcast();
             app.mutex.unlock();
         },
         AppEvent.APP_CMD_CONFIG_CHANGED => {
-            if (system.dbg) _ = LOGV("APP_CMD_CONFIG_CHANGED", .{});
+            if (xfit.dbg) _ = LOGV("APP_CMD_CONFIG_CHANGED", .{});
             android.AConfiguration_fromAssetManager(app.config, app.activity.?.*.assetManager);
             print_cur_config();
         },
         AppEvent.APP_CMD_DESTROY => {
-            if (system.dbg) _ = LOGV("APP_CMD_DESTROY", .{});
+            if (xfit.dbg) _ = LOGV("APP_CMD_DESTROY", .{});
             @atomicStore(bool, &app.destroryRequested, true, .monotonic);
         },
         else => {},
@@ -401,14 +402,14 @@ fn android_app_pre_exec_cmd(_cmd: u8) void {
 fn android_app_post_exec_cmd(_cmd: u8) void {
     switch (@as(AppEvent, @enumFromInt(_cmd))) {
         AppEvent.APP_CMD_TERM_WINDOW => {
-            if (system.dbg) _ = LOGV("APP_CMD_TERM_WINDOW", .{});
+            if (xfit.dbg) _ = LOGV("APP_CMD_TERM_WINDOW", .{});
             app.mutex.lock();
             app.window = null;
             app.cond.broadcast();
             app.mutex.unlock();
         },
         AppEvent.APP_CMD_SAVE_STATE => {
-            if (system.dbg) _ = LOGV("APP_CMD_SAVE_STATE", .{});
+            if (xfit.dbg) _ = LOGV("APP_CMD_SAVE_STATE", .{});
             app.mutex.lock();
             app.stateSaved = true;
             app.cond.broadcast();
@@ -456,7 +457,7 @@ fn engine_handle_cmd(_cmd: AppEvent) void {
     switch (_cmd) {
         AppEvent.APP_CMD_SAVE_STATE => {
             // app.savedStateSize = @sizeOf(saved_state);
-            // app.savedState = @as([*]u8, @ptrCast(c_allocator.alloc(u8, app.savedStateSize) catch |e| system.handle_error3("engine_handle_cmd c_allocator.alloc app.savedState", e)))[0..app.savedStateSize];
+            // app.savedState = @as([*]u8, @ptrCast(c_allocator.alloc(u8, app.savedStateSize) catch |e| xfit.herr3("engine_handle_cmd c_allocator.alloc app.savedState", e)))[0..app.savedStateSize];
             // @memcpy(app.savedState.?, std.mem.asBytes(&app.savedata));
         },
         AppEvent.APP_CMD_INIT_WINDOW => {
@@ -482,7 +483,7 @@ fn engine_handle_cmd(_cmd: AppEvent) void {
             __system.pause.store(false, std.builtin.AtomicOrder.monotonic);
             __system.activated.store(false, std.builtin.AtomicOrder.monotonic);
             root.xfit_activate(false, false) catch |e| {
-                system.handle_error3("xfit_activate", e);
+                xfit.herr3("xfit_activate", e);
             };
         },
         AppEvent.APP_CMD_LOST_FOCUS => {
@@ -493,7 +494,7 @@ fn engine_handle_cmd(_cmd: AppEvent) void {
             __system.pause.store(true, std.builtin.AtomicOrder.monotonic);
             __system.activated.store(true, std.builtin.AtomicOrder.monotonic);
             root.xfit_activate(true, true) catch |e| {
-                system.handle_error3("xfit_activate", e);
+                xfit.herr3("xfit_activate", e);
             };
         },
         AppEvent.APP_CMD_WINDOW_RESIZED => {
@@ -650,7 +651,7 @@ fn engine_handle_input(_event: ?*android.AInputEvent) i32 {
             } else if (tool_type == android.AMOTION_EVENT_TOOL_TYPE_FINGER) {
                 count = @min(100, android.AMotionEvent_getPointerCount(_event));
             } else return 0;
-            const poses = std.heap.c_allocator.alloc(point, count) catch system.handle_error_msg2("engine_handle_input alloc poses");
+            const poses = std.heap.c_allocator.alloc(point, count) catch xfit.herrm("engine_handle_input alloc poses");
             defer std.heap.c_allocator.free(poses);
             var i: u32 = 0;
             while (i < poses.len) : (i += 1) {
@@ -678,7 +679,7 @@ fn engine_handle_input(_event: ?*android.AInputEvent) i32 {
                         if (system.a_fn(__system.touch_down_func) != null) system.a_fn(__system.touch_down_func).?(pointer_id, poses[pointer_id]);
                     } else {
                         @branchHint(.unlikely);
-                        system.print("WARN engine_handle_input AMOTION_EVENT_ACTION_POINTER_DOWN out of range poses[{d}] value : {d}\n", .{ count, pointer_id });
+                        xfit.print("WARN engine_handle_input AMOTION_EVENT_ACTION_POINTER_DOWN out of range poses[{d}] value : {d}\n", .{ count, pointer_id });
                         return 0;
                     }
                 },
@@ -700,12 +701,12 @@ fn engine_handle_input(_event: ?*android.AInputEvent) i32 {
             if (keycode < __system.KEY_SIZE) {
                 if (!__system.keys[keycode].load(std.builtin.AtomicOrder.monotonic)) {
                     __system.keys[keycode].store(true, std.builtin.AtomicOrder.monotonic);
-                    //system.print_debug("input key_down {d}", .{keycode});
+                    //xfit.print_debug("input key_down {d}", .{keycode});
                     if (system.a_fn(__system.key_down_func) != null) system.a_fn(__system.key_down_func).?(@enumFromInt(keycode));
                 }
             } else {
                 @branchHint(.unlikely);
-                system.print("WARN engine_handle_input AKEY_EVENT_ACTION_DOWN out of range __system.keys[{d}] value : {d}\n", .{ __system.KEY_SIZE, keycode });
+                xfit.print("WARN engine_handle_input AKEY_EVENT_ACTION_DOWN out of range __system.keys[{d}] value : {d}\n", .{ __system.KEY_SIZE, keycode });
                 return 0;
             }
         } else if (act == android.AKEY_EVENT_ACTION_UP) {
@@ -714,11 +715,11 @@ fn engine_handle_input(_event: ?*android.AInputEvent) i32 {
             }
             if (keycode < __system.KEY_SIZE) {
                 __system.keys[keycode].store(false, std.builtin.AtomicOrder.monotonic);
-                //system.print_debug("input key_up {d}", .{keycode});
+                //xfit.print_debug("input key_up {d}", .{keycode});
                 if (system.a_fn(__system.key_up_func) != null) system.a_fn(__system.key_up_func).?(@enumFromInt(keycode));
             } else {
                 @branchHint(.unlikely);
-                system.print("WARN engine_handle_input AKEY_EVENT_ACTION_UP out of range __system.keys[{d}] value : {d}\n", .{ __system.KEY_SIZE, keycode });
+                xfit.print("WARN engine_handle_input AKEY_EVENT_ACTION_UP out of range __system.keys[{d}] value : {d}\n", .{ __system.KEY_SIZE, keycode });
                 return 0;
             }
         } else {
@@ -726,13 +727,13 @@ fn engine_handle_input(_event: ?*android.AInputEvent) i32 {
                 const cnt = android.AKeyEvent_getRepeatCount(_event);
                 var i: i32 = 0;
                 while (i < cnt) : (i += 1) {
-                    //system.print_debug("input key_multiple({d}) {d}", .{ i, keycode });
+                    //xfit.print_debug("input key_multiple({d}) {d}", .{ i, keycode });
                     if (system.a_fn(__system.key_down_func) != null) system.a_fn(__system.key_down_func).?(@enumFromInt(keycode));
                     if (system.a_fn(__system.key_up_func) != null) system.a_fn(__system.key_up_func).?(@enumFromInt(keycode));
                 }
             } else {
                 @branchHint(.unlikely);
-                system.print("WARN engine_handle_input AKEY_EVENT_ACTION_MULTIPLE out of range __system.keys[{d}] value : {d}\n", .{ __system.KEY_SIZE, keycode });
+                xfit.print("WARN engine_handle_input AKEY_EVENT_ACTION_MULTIPLE out of range __system.keys[{d}] value : {d}\n", .{ __system.KEY_SIZE, keycode });
                 return 0;
             }
         }
@@ -789,7 +790,7 @@ fn set_cache_path() void {
     const cache_path_string: android.jstring = env.*.*.CallObjectMethod.?(env, cache_dir, getPath);
 
     const cache_path_chars = env.*.*.GetStringUTFChars.?(env, cache_path_string, null);
-    app.cache_dir = c_allocator.alloc(u8, std.mem.len(cache_path_chars)) catch |e| system.handle_error3("anrdoid_app_entry c_allocator.alloc app.cache_dir", e);
+    app.cache_dir = c_allocator.alloc(u8, std.mem.len(cache_path_chars)) catch |e| xfit.herr3("anrdoid_app_entry c_allocator.alloc app.cache_dir", e);
     @memcpy(app.cache_dir.?, cache_path_chars[0..app.cache_dir.?.len]);
     env.*.*.ReleaseStringUTFChars.?(env, cache_path_string, cache_path_chars);
 
@@ -834,7 +835,7 @@ fn anrdoid_app_entry() void {
         var ident: i32 = undefined;
         var source: ?*android_poll_source = null;
         ident = android.ALooper_pollOnce(if (app.paused) -1 else 0, null, null, @ptrCast(&source));
-        if (ident == android.ALOOPER_POLL_ERROR) system.handle_error_msg2("ALooper_pollOnce");
+        if (ident == android.ALOOPER_POLL_ERROR) xfit.herrm("ALooper_pollOnce");
 
         if (source != null) {
             source.?.*.process.?(source);
@@ -850,7 +851,7 @@ fn anrdoid_app_entry() void {
     }
 
     root.xfit_clean() catch |e| {
-        system.handle_error3("xfit_clean", e);
+        xfit.herr3("xfit_clean", e);
     };
     __system.real_destroy();
 
@@ -897,16 +898,16 @@ export fn ANativeActivity_onCreate(_activity: [*c]android.ANativeActivity, _save
     // if (_savedState != null and _savedStateSize != 0) {
     //     app.savedStateSize = _savedStateSize;
 
-    //     app.savedState = @as([*]u8, @ptrCast(c_allocator.alloc(u8, app.savedStateSize) catch |e| system.handle_error3("ANativeActivity_onCreate c_allocator.alloc app.savedState", e)))[0..app.savedStateSize];
+    //     app.savedState = @as([*]u8, @ptrCast(c_allocator.alloc(u8, app.savedStateSize) catch |e| xfit.herr3("ANativeActivity_onCreate c_allocator.alloc app.savedState", e)))[0..app.savedStateSize];
 
     //     @memcpy(app.savedState.?, @as(?[*]u8, @ptrCast(_savedState)).?);
     // }
 
-    const pipe = std.posix.pipe() catch |e| system.handle_error3("ANativeActivity_onCreate std.posix.pipe", e);
+    const pipe = std.posix.pipe() catch |e| xfit.herr3("ANativeActivity_onCreate std.posix.pipe", e);
     app.msgread = pipe[0];
     app.msgwrite = pipe[1];
 
-    app.thread = std.Thread.spawn(.{}, anrdoid_app_entry, .{}) catch |e| system.handle_error3("ANativeActivity_onCreate std.Thread.spawn", e);
+    app.thread = std.Thread.spawn(.{}, anrdoid_app_entry, .{}) catch |e| xfit.herr3("ANativeActivity_onCreate std.Thread.spawn", e);
 
     app.mutex.lock();
     while (!app.running) {

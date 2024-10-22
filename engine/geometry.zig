@@ -484,7 +484,7 @@ pub const line = struct {
         var d2: f64 = undefined;
         var d3: f64 = undefined;
         if (self.*.curve_type == .line) {
-            //system.print_debug("line", .{});
+            //xfit.print_debug("line", .{});
             return;
         }
         const cur_type = if (self.*.curve_type == .quadratic) .quadratic else try __get_curve_type(_start, _control0, _control1, _end, &d1, &d2, &d3);
@@ -522,7 +522,7 @@ pub const line = struct {
                 mat.e[3][2] = @floatCast(-(mtMinusMs * mtMinusMs * mtMinusMs));
 
                 if (mat.e[0][0] > 0) flip = true;
-                //system.print_debug("serpentine {} {d}", .{ flip, mat.e[0][0] });
+                //xfit.print_debug("serpentine {} {d}", .{ flip, mat.e[0][0] });
             },
             .loop => {
                 const t1 = sqrt(4.0 * d1 * d3 - 3.0 * d2 * d2);
@@ -536,11 +536,11 @@ pub const line = struct {
                 if (repeat == -1 and 0.0 < ql and ql < 1.0) {
                     artifact = 1;
                     subdiv = @floatCast(ql);
-                    //system.print_debug("loop(1)", .{});
+                    //xfit.print_debug("loop(1)", .{});
                 } else if (repeat == -1 and 0.0 < qm and qm < 1.0) {
                     artifact = 2;
                     subdiv = @floatCast(ql);
-                    //system.print_debug("loop(2)", .{});
+                    //xfit.print_debug("loop(2)", .{});
                 } else {
                     const ltMinusLs = lt - ls;
                     const mtMinusMs = mt - ms;
@@ -562,7 +562,7 @@ pub const line = struct {
                     mat.e[3][2] = @floatCast(-ltMinusLs * mtMinusMs * mtMinusMs);
 
                     //if (repeat == -1) flip = ((d1 > 0 and mat.e[0][0] < 0) or (d1 < 0 and mat.e[0][0] > 0));
-                    //system.print_debug("loop flip {}", .{flip});
+                    //xfit.print_debug("loop flip {}", .{flip});
                 }
             },
             .cusp => {
@@ -586,7 +586,7 @@ pub const line = struct {
                 mat.e[3][1] = @floatCast(lsMinusLt * lsMinusLt * lsMinusLt);
                 mat.e[3][2] = 1;
 
-                //system.print_debug("cusp {}", .{flip});
+                //xfit.print_debug("cusp {}", .{flip});
             },
             .quadratic => {
                 mat.e[0][0] = 0;
@@ -606,10 +606,10 @@ pub const line = struct {
                 mat.e[3][2] = 1;
 
                 //if (math.cross2(_control0 - _start, _control1 - _control0) < 0) flip = true;
-                //system.print_debug("quadratic {}", .{flip});
+                //xfit.print_debug("quadratic {}", .{flip});
             },
             .line => {
-                //system.print_debug("line", .{});
+                //xfit.print_debug("line", .{});
                 return;
             },
             else => return line_error.is_not_curve,

@@ -46,7 +46,7 @@ pub fn connect(self: *Self, path: []const u8) u32 {
     while (i < self.*.devices.len) : (i += 1) {
         if (self.*.devices[i].handle != null) return i;
     }
-    const path_t = std.heap.c_allocator.dupeZ(u8, path) catch system.handle_error_msg2("rawinput connect device path dupeZ");
+    const path_t = std.heap.c_allocator.dupeZ(u8, path) catch xfit.herrm("rawinput connect device path dupeZ");
     defer std.heap.c_allocator.free(path_t);
 
     const handle: win32.HANDLE = win32.CreateFileA(path_t.ptr, win32.GENERIC_READ | win32.GENERIC_WRITE, win32.FILE_SHARE_READ | win32.FILE_SHARE_WRITE, null, win32.OPEN_EXISTING, 0, null);
@@ -55,7 +55,7 @@ pub fn connect(self: *Self, path: []const u8) u32 {
     while (i < self.*.devices.len) : (i += 1) {
         if (self.*.devices[i].handle == null) {
             self.*.devices[i].handle = handle;
-            self.*.devices[i].path = std.heap.c_allocator.alloc(u8, path.len) catch system.handle_error_msg2("rawinput connect device path alloc");
+            self.*.devices[i].path = std.heap.c_allocator.alloc(u8, path.len) catch xfit.herrm("rawinput connect device path alloc");
             @memcpy(self.*.devices[i].path, path);
             self.*.change_fn(i, true, self.*.user_data);
 
@@ -67,13 +67,13 @@ pub fn connect(self: *Self, path: []const u8) u32 {
 
 pub fn init(_MAX_DEVICES: u32, _guid: *const raw_input.GUID, _change_fn: raw_input.ChangeDeviceFn, _user_data: ?*anyopaque) raw_input.ERROR!*Self {
     if (_MAX_DEVICES == 0) {
-        system.print_error("WARN rawinput _MAX_DEVICES can't 0\n", .{});
+        xfit.print_error("WARN rawinput _MAX_DEVICES can't 0\n", .{});
         return raw_input.ERROR.ZERO_DEVICE;
     }
-    const self = std.heap.c_allocator.create(Self) catch system.handle_error_msg2("rawinput create");
+    const self = std.heap.c_allocator.create(Self) catch xfit.herrm("rawinput create");
     self.* = .{
         .guid = _guid,
-        .devices = std.heap.c_allocator.alloc(device, _MAX_DEVICES) catch system.handle_error_msg2("rawinput device alloc"),
+        .devices = std.heap.c_allocator.alloc(device, _MAX_DEVICES) catch xfit.herrm("rawinput device alloc"),
         .change_fn = _change_fn,
         .user_data = _user_data,
     };
@@ -88,12 +88,12 @@ pub fn init(_MAX_DEVICES: u32, _guid: *const raw_input.GUID, _change_fn: raw_inp
         .dbcc_classguid = _guid.*,
     };
     if (null == win32.RegisterDeviceNotificationA(__windows.hWnd, @ptrCast(&db), win32.DEVICE_NOTIFY_WINDOW_HANDLE)) {
-        system.print_error("WARN RegisterDeviceNotificationA code : {d}\n", .{win32.GetLastError()});
+        xfit.print_error("WARN RegisterDeviceNotificationA code : {d}\n", .{win32.GetLastError()});
         return raw_input.ERROR.SYSTEM_ERROR;
     }
     const dev = win32.SetupDiGetClassDevsA(_guid, null, null, win32.DIGCF_DEVICEINTERFACE | win32.DIGCF_PRESENT);
     if (dev == win32.INVALID_HANDLE_VALUE) {
-        system.print_error("WARN code {d} SetupDiGetClassDevsA\n", .{win32.GetLastError()});
+        xfit.print_error("WARN code {d} SetupDiGetClassDevsA\n", .{win32.GetLastError()});
         return raw_input.ERROR.SYSTEM_ERROR;
     }
     var idata: win32.SP_DEVICE_INTERFACE_DATA = .{};
@@ -102,13 +102,13 @@ pub fn init(_MAX_DEVICES: u32, _guid: *const raw_input.GUID, _change_fn: raw_inp
         var size: u32 = undefined;
         _ = win32.SetupDiGetDeviceInterfaceDetailA(dev, &idata, null, 0, &size, null);
 
-        const detail = std.heap.c_allocator.alignedAlloc(u8, 4, size) catch system.handle_error_msg2("rawinput init detail alloc");
+        const detail = std.heap.c_allocator.alignedAlloc(u8, 4, size) catch xfit.herrm("rawinput init detail alloc");
         const detailA: win32.PSP_DEVICE_INTERFACE_DETAIL_DATA_A = @ptrCast(detail.ptr);
         detailA.*.cbSize = @sizeOf(win32.SP_DEVICE_INTERFACE_DETAIL_DATA_A); // ! size변수가 아니다!
 
         var data: win32.SP_DEVINFO_DATA = .{};
         if (win32.SetupDiGetDeviceInterfaceDetailA(dev, &idata, detailA, size, &size, &data) == win32.FALSE) {
-            system.print_error("WARN code {d} SetupDiGetDeviceInterfaceDetailA 2\n", .{win32.GetLastError()});
+            xfit.print_error("WARN code {d} SetupDiGetDeviceInterfaceDetailA 2\n", .{win32.GetLastError()});
             self.*.deinit();
             std.heap.c_allocator.free(detail);
             return raw_input.ERROR.SYSTEM_ERROR;
@@ -121,11 +121,11 @@ pub fn init(_MAX_DEVICES: u32, _guid: *const raw_input.GUID, _change_fn: raw_inp
     }
 
     if (win32.FALSE == win32.SetupDiDestroyDeviceInfoList(dev)) {
-        system.print_error("WARN code {d} SetupDiDestroyDeviceInfoList\n", .{win32.GetLastError()});
+        xfit.print_error("WARN code {d} SetupDiDestroyDeviceInfoList\n", .{win32.GetLastError()});
     }
 
     mutex.lock();
-    list.append(self) catch system.handle_error_msg2("rawinput list append");
+    list.append(self) catch xfit.herrm("rawinput list append");
     mutex.unlock();
 
     return self;
@@ -176,12 +176,12 @@ pub fn deinit(self: *Self) void {
 
 pub fn get(self: *Self, idx: u32, ctl_code: u32, in: []const u8, out: []u8) bool {
     if (idx >= self.*.devices.len) {
-        system.print_error("WARN rawinput get idx outofrange\n", .{});
+        xfit.print_error("WARN rawinput get idx outofrange\n", .{});
         return false;
     }
     if (self.*.devices[idx].handle == null) return false;
 
-    const in_ = std.heap.c_allocator.alloc(u8, in.len) catch system.handle_error_msg2("rawinput get in_ alloc");
+    const in_ = std.heap.c_allocator.alloc(u8, in.len) catch xfit.herrm("rawinput get in_ alloc");
     defer std.heap.c_allocator.free(in_);
     @memcpy(in_, in);
 
@@ -202,7 +202,7 @@ pub fn get(self: *Self, idx: u32, ctl_code: u32, in: []const u8, out: []u8) bool
             _ = self.*.disconnect(self.*.devices[idx].path);
             return false;
         }
-        system.print("WARN DeviceIoControl ctrlCode: {d}, errorCode : {d}\nguid: {}\n", .{ ctl_code, win32.GetLastError(), self.*.guid.* });
+        xfit.print("WARN DeviceIoControl ctrlCode: {d}, errorCode : {d}\nguid: {}\n", .{ ctl_code, win32.GetLastError(), self.*.guid.* });
         return false;
     }
     return true;

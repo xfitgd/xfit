@@ -10,12 +10,7 @@ const xfit = @import("xfit");
 var gpa: std.heap.GeneralPurposeAllocator(.{}) = undefined;
 var allocator: std.mem.Allocator = undefined;
 
-pub fn xfit_init() !void {
-    xfit.print("hello world!\n", .{});
-    xfit.write("exit.\n");
-
-    xfit.console_pause();
-}
+pub fn xfit_init() !void {}
 
 pub fn xfit_update() !void {}
 

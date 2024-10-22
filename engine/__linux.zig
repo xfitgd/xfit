@@ -1,5 +1,6 @@
 const std = @import("std");
 const system = @import("system.zig");
+const xfit = @import("xfit.zig");
 const __system = @import("__system.zig");
 
 const c = @cImport({
@@ -31,10 +32,10 @@ pub var registry_listener: c.struct_wl_registry_listener = .{
 };
 
 pub fn system_linux_start() void {
-    display = c.wl_display_connect(null) orelse system.handle_error_msg2("wl_display_connect");
+    display = c.wl_display_connect(null) orelse xfit.herrm("wl_display_connect");
     const registry = c.wl_display_get_registry(display);
     c.wl_registry_add_listener(registry, &registry_listener, null);
-    if (c.wl_display_roundtrip(display) == -1) system.handle_error_msg2("wl_display_roundtrip");
+    if (c.wl_display_roundtrip(display) == -1) xfit.herrm("wl_display_roundtrip");
 
     screens = std.heap.c_allocator.alloc([*c]c.Screen, @max(0, c.ScreenCount(display))) catch unreachable;
     var i: usize = 0;

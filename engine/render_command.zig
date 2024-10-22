@@ -3,8 +3,9 @@ const ArrayList = std.ArrayList;
 
 const system = @import("system.zig");
 const __system = @import("__system.zig");
+const xfit = @import("xfit.zig");
 
-const dbg = system.dbg;
+const dbg = xfit.dbg;
 
 const __vulkan_allocator = @import("__vulkan_allocator.zig");
 
@@ -25,11 +26,11 @@ const Self = @This();
 
 pub fn init() *Self {
     const self = __system.allocator.create(Self) catch
-        system.handle_error_msg2("__system.allocator.create render_command");
+        xfit.herrm("__system.allocator.create render_command");
     self.* = .{};
     for (&self.*.__command_buffers) |*cmd| {
         cmd.* = __system.allocator.alloc(vk.VkCommandBuffer, __vulkan.get_swapchain_image_length()) catch
-            system.handle_error_msg2("render_command.__command_buffers.alloc");
+            xfit.herrm("render_command.__command_buffers.alloc");
 
         const allocInfo: vk.VkCommandBufferAllocateInfo = .{
             .commandPool = __vulkan.vkCommandPool,
@@ -43,10 +44,10 @@ pub fn init() *Self {
             &allocInfo,
             cmd.*.ptr,
         );
-        system.handle_error(result == vk.VK_SUCCESS, "render_command vkAllocateCommandBuffers vkCommandPool : {d}", .{result});
+        xfit.herr(result == vk.VK_SUCCESS, "render_command vkAllocateCommandBuffers vkCommandPool : {d}", .{result});
     }
     __render_command.mutex.lock();
-    __render_command.render_cmd_list.append(self) catch system.handle_error_msg2(" render_cmd_list.append(&self)");
+    __render_command.render_cmd_list.append(self) catch xfit.herrm(" render_cmd_list.append(&self)");
     __render_command.mutex.unlock();
     return self;
 }

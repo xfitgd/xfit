@@ -25,7 +25,7 @@ pub inline fn writer(self: *Self) std.fs.File.Writer {
 }
 pub inline fn close(self: *Self) void {
     if (self.hFile.handle == INVALID_FILE_HANDLE) {
-        system.print_error("WARN Can't close INVALID_FILE_HANDLE(not open file)\n", .{});
+        xfit.print_error("WARN Can't close INVALID_FILE_HANDLE(not open file)\n", .{});
         return;
     }
     self.hFile.close();
@@ -63,7 +63,7 @@ pub fn read_file(path: []const u8, allocator: std.mem.Allocator) ![]u8 {
 
     _ = try _file.readAll(buffer);
 
-    //system.print("size : {d}\n",.{size});
+    //xfit.print("size : {d}\n",.{size});
 
     return buffer;
 }

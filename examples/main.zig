@@ -109,7 +109,7 @@ pub fn xfit_init() !void {
         try luaT.lua_pcall(0, 0, 0);
     }
 
-    system.set_error_handling_func(error_func);
+    xfit.set_error_handling_func(error_func);
 
     font.start();
 
@@ -147,21 +147,21 @@ pub fn xfit_init() !void {
     img.* = .{ ._image = graphics.image.init() };
     anim_img.* = .{ ._anim_image = graphics.animate_image.init() };
 
-    const data = file_.read_file("test.webp", allocator) catch |e| system.handle_error3("test.webp read_file", e);
+    const data = file_.read_file("test.webp", allocator) catch |e| xfit.herr3("test.webp read_file", e);
     defer allocator.free(data);
     var img_decoder: webp = .{};
-    img_decoder.load_header(data) catch |e| system.handle_error3("test.webp loadheader fail", e);
+    img_decoder.load_header(data) catch |e| xfit.herr3("test.webp loadheader fail", e);
 
     image_src = graphics.texture.init();
     image_src.width = img_decoder.width();
     image_src.height = img_decoder.height();
     image_src.pixels = try allocator.alloc(u8, img_decoder.width() * img_decoder.height() * 4);
 
-    img_decoder.decode(.RGBA, data, image_src.pixels.?) catch |e| system.handle_error3("test.webp decode", e);
+    img_decoder.decode(.RGBA, data, image_src.pixels.?) catch |e| xfit.herr3("test.webp decode", e);
 
-    const anim_data = file_.read_file("wasp.webp", allocator) catch |e| system.handle_error3("wasp.webp read_file", e);
+    const anim_data = file_.read_file("wasp.webp", allocator) catch |e| xfit.herr3("wasp.webp read_file", e);
     defer allocator.free(anim_data);
-    img_decoder.load_anim_header(anim_data) catch |e| system.handle_error3("wasp.webp load_anim_header fail", e);
+    img_decoder.load_anim_header(anim_data) catch |e| xfit.herr3("wasp.webp load_anim_header fail", e);
 
     anim_image_src = graphics.texture_array.init();
     anim_image_src.sampler = graphics.texture_array.get_default_nearest_sampler();
@@ -170,7 +170,7 @@ pub fn xfit_init() !void {
     anim_image_src.frames = img_decoder.frame_count();
     anim_image_src.pixels = try allocator.alloc(u8, img_decoder.size(.RGBA));
 
-    img_decoder.decode(.RGBA, data, anim_image_src.pixels.?) catch |e| system.handle_error3("wasp.webp decode", e);
+    img_decoder.decode(.RGBA, data, anim_image_src.pixels.?) catch |e| xfit.herr3("wasp.webp decode", e);
 
     anim_image_src.build();
     image_src.build();
@@ -178,12 +178,12 @@ pub fn xfit_init() !void {
     img.*._image.src = &image_src;
     anim_img.*._anim_image.src = &anim_image_src;
 
-    font0_data = file_.read_file("Spoqa Han Sans Regular.woff", allocator) catch |e| system.handle_error3("read_file font0_data", e);
-    font0 = font.init(font0_data, 0) catch |e| system.handle_error3("font0.init", e);
+    font0_data = file_.read_file("Spoqa Han Sans Regular.woff", allocator) catch |e| xfit.herr3("read_file font0_data", e);
+    font0 = font.init(font0_data, 0) catch |e| xfit.herr3("font0.init", e);
 
     try font0.render_string("Hello World!\n안녕하세요. break;", .{}, &shape_src, allocator);
     // var t1 = std.time.Timer.start() catch unreachable;
-    // system.print("{d}", .{t1.lap()});
+    // xfit.print("{d}", .{t1.lap()});
     try font0.render_string("CONTINUE계속", .{}, &shape_src2, allocator);
 
     try font0.render_string("버튼", .{ .pivot = .{ 0.5, 0.3 }, .scale = .{ 4.5, 4.5 } }, &rect_button_text_src.src, allocator);
@@ -248,14 +248,14 @@ pub fn xfit_init() !void {
     input.set_touch_up_func(touch_up);
 
     move_callback_thread = try timer_callback.start(
-        system.sec_to_nano_sec2(0, 10, 0, 0),
+        xfit.sec_to_nano_sec2(0, 10, 0, 0),
         0,
         move_callback,
         .{},
     );
 
     // _ = try timer_callback.start(
-    //     system.sec_to_nano_sec2(0, 1, 0, 0),
+    //     xfit.sec_to_nano_sec2(0, 1, 0, 0),
     //     0,
     //     multi_execute_and_wait,
     //     .{},
@@ -286,7 +286,7 @@ var image_front: bool = false;
 fn key_down(_key: input.key) void {
     if (_key == input.key.F4) {
         if (window.get_screen_mode() == .WINDOW) {
-            const monitor = system.get_monitor_from_window();
+            const monitor = window.get_monitor_from_window();
             monitor.*.set_fullscreen_mode(monitor.*.primary_resolution.?);
             //monitor.*.set_borderlessscreen_mode();
         } else {
@@ -296,12 +296,12 @@ fn key_down(_key: input.key) void {
         switch (xfit.platform) {
             .android => {
                 if (_key == input.key.Back) {
-                    system.exit();
+                    xfit.exit();
                 }
             },
             else => {
                 if (_key == input.key.Esc) {
-                    system.exit();
+                    xfit.exit();
                 } else if (_key == input.key.Enter) {
                     img.*._image.transform.model = matrix.scaling(2, 2, 1.0).multiply(&matrix.translation(0, 0, if (image_front) 0.7 else 0.3));
                     image_front = !image_front;
@@ -325,7 +325,7 @@ var shape_alpha: f32 = 0.0;
 
 //다른 스레드에서 테스트 xfit_update에서 해도됨.
 fn move_callback() !bool {
-    if (system.exiting()) return false;
+    if (xfit.exiting()) return false;
 
     update_mutex.lock();
     shape_alpha += 0.005;
@@ -333,7 +333,7 @@ fn move_callback() !bool {
     dx += 1;
     if (dx >= 200) {
         dx = 0;
-        //system.print("{d}\n", .{system.dt()});
+        //xfit.print("{d}\n", .{system.dt()});
     }
     update_mutex.unlock();
 
@@ -349,7 +349,7 @@ pub fn xfit_update() !void {
     text_shape.*._shape.transform.copy_update();
     shape_src.copy_color_update();
 
-    anim.update(system.dt());
+    anim.update(xfit.dt());
 }
 
 pub fn xfit_size() !void {
@@ -396,7 +396,7 @@ pub fn xfit_clean() !void {
     vertices_mem_pool.deinit();
     objects_mem_pool.deinit();
     indices_mem_pool.deinit();
-    if (system.dbg and gpa.deinit() != .ok) unreachable;
+    if (xfit.dbg and gpa.deinit() != .ok) unreachable;
 }
 
 pub fn xfit_activate(is_activate: bool, is_pause: bool) !void {
@@ -409,12 +409,12 @@ pub fn xfit_closing() !bool {
 }
 
 pub fn main() void {
-    const init_setting: system.init_setting = .{
+    const init_setting: xfit.init_setting = .{
         .window_width = 640,
         .window_height = 480,
         .use_console = true,
     };
     gpa = .{};
-    allocator = gpa.allocator(); //반드시 할당자는 main에서 초기화
+    allocator = gpa.allocator(); //must init in main
     xfit.xfit_main(allocator, &init_setting);
 }

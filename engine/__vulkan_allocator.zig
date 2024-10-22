@@ -6,6 +6,7 @@ const DoublyLinkedList = std.DoublyLinkedList;
 const HashMap = std.AutoHashMap;
 
 const __vulkan = @import("__vulkan.zig");
+const xfit = @import("xfit.zig");
 const vk = __vulkan.vk;
 const __system = @import("__system.zig");
 const system = @import("system.zig");
@@ -92,7 +93,7 @@ var dataMutex: std.Thread.Mutex = .{};
 pub fn init() void {
     buffers = MemoryPoolExtra(vulkan_res, .{}).init(__system.allocator);
     buffer_ids = ArrayList(*vulkan_res).init(__system.allocator);
-    memory_idx_counts = __system.allocator.alloc(u16, __vulkan.mem_prop.memoryTypeCount) catch |e| system.handle_error3("__vulkan_allocator init alloc memory_idx_counts", e);
+    memory_idx_counts = __system.allocator.alloc(u16, __vulkan.mem_prop.memoryTypeCount) catch |e| xfit.herr3("__vulkan_allocator init alloc memory_idx_counts", e);
     op_queue = ArrayList(?operation_node).init(__system.allocator);
     op_save_queue = ArrayList(?operation_node).init(__system.allocator);
     op_map_queue = ArrayList(?operation_node).init(__system.allocator);
@@ -110,7 +111,7 @@ pub fn init() void {
         .queueFamilyIndex = __vulkan.graphicsFamilyIndex,
     };
     var result = vk.vkCreateCommandPool(__vulkan.vkDevice, &poolInfo, null, &cmd_pool);
-    system.handle_error(result == vk.VK_SUCCESS, "__vulkan_allocator.vkCreateCommandPool : {d}", .{result});
+    xfit.herr(result == vk.VK_SUCCESS, "__vulkan_allocator.vkCreateCommandPool : {d}", .{result});
 
     const alloc_info: vk.VkCommandBufferAllocateInfo = .{
         .commandBufferCount = 1,
@@ -118,7 +119,7 @@ pub fn init() void {
         .commandPool = cmd_pool,
     };
     result = vk.vkAllocateCommandBuffers(__vulkan.vkDevice, &alloc_info, &cmd);
-    system.handle_error(result == vk.VK_SUCCESS, "__vulkan_allocator.vkAllocateCommandBuffers : {d}", .{result});
+    xfit.herr(result == vk.VK_SUCCESS, "__vulkan_allocator.vkAllocateCommandBuffers : {d}", .{result});
 
     g_thread = std.Thread.spawn(.{}, thread_func, .{}) catch unreachable;
 }
@@ -283,7 +284,7 @@ pub const frame_buffer = struct {
     res: vk.VkFramebuffer = null,
 
     pub fn create_no_async(self: *frame_buffer, texs: []*vulkan_res_node(.texture), __renderPass: vk.VkRenderPass) void {
-        const attachments = __system.allocator.alloc(vk.VkImageView, texs.len) catch system.handle_error_msg2("create_no_async vk.VkImageView alloc");
+        const attachments = __system.allocator.alloc(vk.VkImageView, texs.len) catch xfit.herrm("create_no_async vk.VkImageView alloc");
         defer __system.allocator.free(attachments);
         for (attachments, texs) |*v, t| {
             v.* = t.*.__image_view;
@@ -300,7 +301,7 @@ pub const frame_buffer = struct {
         };
 
         const result = vk.vkCreateFramebuffer(__vulkan.vkDevice, &frameBufferInfo, null, &self.*.res);
-        system.handle_error(result == vk.VK_SUCCESS, "execute_create_frame_buffer vkCreateFramebuffer : {d}", .{result});
+        xfit.herr(result == vk.VK_SUCCESS, "execute_create_frame_buffer vkCreateFramebuffer : {d}", .{result});
     }
     pub fn destroy_no_async(self: *frame_buffer) void {
         vk.vkDestroyFramebuffer(__vulkan.vkDevice, self.*.res, null);
@@ -335,7 +336,7 @@ fn execute_create_buffer(buf: *vulkan_res_node(.buffer), _data: ?[]const u8) voi
     if (_data != null and buf.*.buffer_option.use == .gpu) {
         buf_info.usage |= vk.VK_BUFFER_USAGE_TRANSFER_DST_BIT;
         if (buf.*.buffer_option.len > _data.?.len) {
-            system.handle_error2("create_buffer _data not enough size. {d} {d} {}", .{ buf.*.buffer_option.len, _data.?.len, buf.*.builded });
+            xfit.herr2("create_buffer _data not enough size. {d} {d} {}", .{ buf.*.buffer_option.len, _data.?.len, buf.*.builded });
         }
         last = staging_buf_queue.create() catch unreachable;
         last.* = .{};
@@ -346,10 +347,10 @@ fn execute_create_buffer(buf: *vulkan_res_node(.buffer), _data: ?[]const u8) voi
             .single = false,
         }, _data);
     } else if (buf.*.buffer_option.typ == .staging) {
-        if (_data == null) system.handle_error_msg2("staging buffer data can't null");
+        if (_data == null) xfit.herrm("staging buffer data can't null");
     }
     result = vk.vkCreateBuffer(__vulkan.vkDevice, &buf_info, null, &buf.*.res);
-    system.handle_error(result == vk.VK_SUCCESS, "execute_create_buffer vkCreateBuffer {d}", .{result});
+    xfit.herr(result == vk.VK_SUCCESS, "execute_create_buffer vkCreateBuffer {d}", .{result});
 
     var out_idx: *res_range = undefined;
     const res = if (buf.*.buffer_option.single) create_allocator_and_bind_single(buf.*.res) else create_allocator_and_bind(buf.*.res, prop, &out_idx, 0);
@@ -474,7 +475,7 @@ fn execute_create_texture(buf: *vulkan_res_node(.texture), _data: ?[]const u8) v
     if (_data != null and buf.*.texture_option.use == .gpu) {
         img_info.usage |= vk.VK_IMAGE_USAGE_TRANSFER_DST_BIT;
         if (img_info.extent.width * img_info.extent.width * img_info.extent.depth * img_info.arrayLayers * bit > _data.?.len) {
-            system.handle_error_msg2("create_texture _data not enough size.");
+            xfit.herrm("create_texture _data not enough size.");
         }
 
         last = staging_buf_queue.create() catch unreachable;
@@ -487,7 +488,7 @@ fn execute_create_texture(buf: *vulkan_res_node(.texture), _data: ?[]const u8) v
         }, _data);
     }
     result = vk.vkCreateImage(__vulkan.vkDevice, &img_info, null, &buf.*.res);
-    system.handle_error(result == vk.VK_SUCCESS, "execute_create_texture vkCreateImage {d}", .{result});
+    xfit.herr(result == vk.VK_SUCCESS, "execute_create_texture vkCreateImage {d}", .{result});
 
     var out_idx: *res_range = undefined;
     const res = if (buf.*.texture_option.single) create_allocator_and_bind_single(buf.*.res) else create_allocator_and_bind(buf.*.res, prop, &out_idx, 0);
@@ -508,7 +509,7 @@ fn execute_create_texture(buf: *vulkan_res_node(.texture), _data: ?[]const u8) v
         },
     };
     result = vk.vkCreateImageView(__vulkan.vkDevice, &image_view_create_info, null, &buf.*.__image_view);
-    system.handle_error(result == vk.VK_SUCCESS, "__vulkan_allocator.execute_create_texture.vkCreateImageView : {d}", .{result});
+    xfit.herr(result == vk.VK_SUCCESS, "__vulkan_allocator.execute_create_texture.vkCreateImageView : {d}", .{result});
 
     if (_data != null) {
         if (buf.*.texture_option.use != .gpu) {
@@ -544,7 +545,7 @@ fn execute_register_descriptor_pool(__size: []descriptor_pool_size) void {
     //TODO execute_register_descriptor_pool
 }
 fn __create_descriptor_pool(size: []const descriptor_pool_size, out: *descriptor_pool_memory) void {
-    const pool_size = __system.allocator.alloc(vk.VkDescriptorPoolSize, size.len) catch system.handle_error_msg2("execute_update_descriptor_sets vk.VkDescriptorPoolSize alloc");
+    const pool_size = __system.allocator.alloc(vk.VkDescriptorPoolSize, size.len) catch xfit.herrm("execute_update_descriptor_sets vk.VkDescriptorPoolSize alloc");
     defer __system.allocator.free(pool_size);
     for (size, pool_size) |e, *p| {
         p.*.descriptorCount = e.cnt * POOL_BLOCK;
@@ -557,7 +558,7 @@ fn __create_descriptor_pool(size: []const descriptor_pool_size, out: *descriptor
         .maxSets = POOL_BLOCK,
     };
     const result = vk.vkCreateDescriptorPool(__vulkan.vkDevice, &pool_info, null, &out.*.pool);
-    system.handle_error(result == vk.VK_SUCCESS, "execute_update_descriptor_sets.vkCreateDescriptorPool : {d}", .{result});
+    xfit.herr(result == vk.VK_SUCCESS, "execute_update_descriptor_sets.vkCreateDescriptorPool : {d}", .{result});
 }
 fn execute_update_descriptor_sets(sets: []descriptor_set) void {
     var result: c_int = undefined;
@@ -587,7 +588,7 @@ fn execute_update_descriptor_sets(sets: []descriptor_set) void {
                 .pSetLayouts = &v.*.layout,
             };
             result = vk.vkAllocateDescriptorSets(__vulkan.vkDevice, &alloc_info, &v.*.__set);
-            system.handle_error(result == vk.VK_SUCCESS, "execute_update_descriptor_sets.vkAllocateDescriptorSets : {d}", .{result});
+            xfit.herr(result == vk.VK_SUCCESS, "execute_update_descriptor_sets.vkAllocateDescriptorSets : {d}", .{result});
         }
 
         var buf_cnt: usize = 0;
@@ -747,7 +748,7 @@ fn thread_func() void {
 
             const begin: vk.VkCommandBufferBeginInfo = .{ .flags = vk.VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT };
             var result = vk.vkBeginCommandBuffer(cmd, &begin);
-            system.handle_error(result == vk.VK_SUCCESS, "begin_single_time_commands.vkBeginCommandBuffer : {d}", .{result});
+            xfit.herr(result == vk.VK_SUCCESS, "begin_single_time_commands.vkBeginCommandBuffer : {d}", .{result});
 
             for (op_save_queue.items) |*v| {
                 if (v.* != null) {
@@ -770,7 +771,7 @@ fn thread_func() void {
                 set_list_res.resize(0) catch unreachable;
             }
             result = vk.vkEndCommandBuffer(cmd);
-            system.handle_error(result == vk.VK_SUCCESS, "end_single_time_commands.vkEndCommandBuffer : {d}", .{result});
+            xfit.herr(result == vk.VK_SUCCESS, "end_single_time_commands.vkEndCommandBuffer : {d}", .{result});
             const submitInfo: vk.VkSubmitInfo = .{
                 .sType = vk.VK_STRUCTURE_TYPE_SUBMIT_INFO,
                 .commandBufferCount = 1,
@@ -778,10 +779,10 @@ fn thread_func() void {
             };
 
             result = vk.vkQueueSubmit(__vulkan.vkGraphicsQueue, 1, &submitInfo, null);
-            system.handle_error(result == vk.VK_SUCCESS, "__vulkan.queue_submit_and_wait.vkQueueSubmit : {d}", .{result});
+            xfit.herr(result == vk.VK_SUCCESS, "__vulkan.queue_submit_and_wait.vkQueueSubmit : {d}", .{result});
             submit_mutex.unlock();
             result = vk.vkQueueWaitIdle(__vulkan.vkGraphicsQueue);
-            system.handle_error(result == vk.VK_SUCCESS, "__vulkan.queue_submit_and_wait.vkQueueWaitIdle : {d}", .{result});
+            xfit.herr(result == vk.VK_SUCCESS, "__vulkan.queue_submit_and_wait.vkQueueWaitIdle : {d}", .{result});
         }
 
         for (op_save_queue.items) |*v| {
@@ -860,13 +861,13 @@ fn find_memory_type(_type_filter: u32, _prop: vk.VkMemoryPropertyFlags) ?u32 {
 fn append_op(node: operation_node) void {
     mutex.lock();
     defer mutex.unlock();
-    op_queue.append(node) catch system.handle_error_msg2("self.op_queue.append");
+    op_queue.append(node) catch xfit.herrm("self.op_queue.append");
     // if (self.op_queue.items.len == 12) {
     //     unreachable;
     // }
 }
 fn append_op_save(node: operation_node) void {
-    op_save_queue.append(node) catch system.handle_error_msg2("self.op_save_queue.append");
+    op_save_queue.append(node) catch xfit.herrm("self.op_save_queue.append");
 }
 
 pub fn vulkan_res_node(_res_type: res_type) type {
@@ -1148,7 +1149,7 @@ const vulkan_res = struct {
             return null;
         }
 
-        res.list.append(res.pool.create() catch system.handle_error_msg2("vulkan_res.init.res.pool.create"));
+        res.list.append(res.pool.create() catch xfit.herrm("vulkan_res.init.res.pool.create"));
         res.list.first.?.*.data.free = true;
         res.list.first.?.*.data.size = res.len;
         res.list.first.?.*.data.idx = 0;
@@ -1176,11 +1177,11 @@ const vulkan_res = struct {
         switch (@TypeOf(_buf)) {
             vk.VkBuffer => {
                 const result = vk.vkBindBufferMemory(__vulkan.vkDevice, _buf, _mem, self.*.cell_size * _idx);
-                system.handle_error(result == vk.VK_SUCCESS, "vulkan_res.__bind_any.vkBindBufferMemory code : {d}", .{result});
+                xfit.herr(result == vk.VK_SUCCESS, "vulkan_res.__bind_any.vkBindBufferMemory code : {d}", .{result});
             },
             vk.VkImage => {
                 const result = vk.vkBindImageMemory(__vulkan.vkDevice, _buf, _mem, self.*.cell_size * _idx);
-                system.handle_error(result == vk.VK_SUCCESS, "vulkan_res.__bind_any.vkBindImageMemory code : {d}", .{result});
+                xfit.herr(result == vk.VK_SUCCESS, "vulkan_res.__bind_any.vkBindImageMemory code : {d}", .{result});
             },
             else => @compileError("__bind_any invaild res type."),
         }
@@ -1194,7 +1195,7 @@ const vulkan_res = struct {
             0,
             _out_data,
         );
-        system.handle_error(result == vk.VK_SUCCESS, "vulkan_res.map.vkMapMemory code : {d}", .{result});
+        xfit.herr(result == vk.VK_SUCCESS, "vulkan_res.map.vkMapMemory code : {d}", .{result});
     }
     pub fn unmap(self: *vulkan_res) void {
         self.*.map_size = 0;
@@ -1206,7 +1207,7 @@ const vulkan_res = struct {
             __bind_any(self, self.*.mem, _buf, 0);
             return null;
         }
-        //system.print("start:{d}, size:{d}, free:{}\n", .{ self.*.cur.*.data.idx, self.*.cur.*.data.size, self.*.cur.*.data.free });
+        //xfit.print("start:{d}, size:{d}, free:{}\n", .{ self.*.cur.*.data.idx, self.*.cur.*.data.size, self.*.cur.*.data.free });
         var cur = self.*.cur;
         while (true) {
             if (cur.*.data.free and _cell_count <= cur.*.data.size) break;
@@ -1215,7 +1216,7 @@ const vulkan_res = struct {
                 return ERROR.device_memory_limit;
             }
         }
-        //system.print("end:{d}, size:{d}, count:{d}\n", .{ cur.*.data.idx, cur.*.data.size, _cell_count });
+        //xfit.print("end:{d}, size:{d}, count:{d}\n", .{ cur.*.data.idx, cur.*.data.size, _cell_count });
         __bind_any(self, self.*.mem, _buf, cur.*.data.idx);
         cur.*.data.free = false;
         const remain = cur.*.data.size - _cell_count;
@@ -1224,7 +1225,7 @@ const vulkan_res = struct {
         const cur2 = cur.*.next orelse self.*.list.first.?;
         if (cur == cur2) {
             if (remain > 0) {
-                self.*.list.append(self.*.pool.create() catch system.handle_error_msg2("vulkan_res.bind_any.pool.create"));
+                self.*.list.append(self.*.pool.create() catch xfit.herrm("vulkan_res.bind_any.pool.create"));
                 self.*.list.last.?.*.data.free = true;
                 self.*.list.last.?.*.data.size = remain;
                 self.*.list.last.?.*.data.idx = _cell_count;
@@ -1233,7 +1234,7 @@ const vulkan_res = struct {
             if (remain > 0) {
                 if (cur2.*.data.free) {
                     if (cur2.*.data.idx < cur.*.data.idx) {
-                        self.*.list.insertAfter(cur, self.*.pool.create() catch system.handle_error_msg2("vulkan_res.bind_any.pool.create"));
+                        self.*.list.insertAfter(cur, self.*.pool.create() catch xfit.herrm("vulkan_res.bind_any.pool.create"));
                         cur.*.next.?.*.data.free = true;
                         cur.*.next.?.*.data.idx = cur.*.data.idx + _cell_count;
                         cur.*.next.?.*.data.size = remain;
@@ -1242,7 +1243,7 @@ const vulkan_res = struct {
                         cur2.*.data.size += remain;
                     }
                 } else {
-                    self.*.list.insertAfter(cur, self.*.pool.create() catch system.handle_error_msg2("vulkan_res.bind_any.pool.create"));
+                    self.*.list.insertAfter(cur, self.*.pool.create() catch xfit.herrm("vulkan_res.bind_any.pool.create"));
                     cur.*.next.?.*.data.free = true;
                     cur.*.next.?.*.data.idx = cur.*.data.idx + _cell_count;
                     cur.*.next.?.*.data.size = remain;
@@ -1332,17 +1333,17 @@ fn create_allocator_and_bind(_res: anytype, _prop: vk.VkMemoryPropertyFlags, _ou
         };
         if (value.*.info.memoryTypeIndex != tt) continue;
         _out_idx.* = value.*.bind_any(_res, cnt) catch continue orelse unreachable;
-        //system.print_debug("(1) {d} {d} {d} {d}", .{ max_size, value.*.cell_size, value.*.len, mem_require.alignment });
+        //xfit.print_debug("(1) {d} {d} {d} {d}", .{ max_size, value.*.cell_size, value.*.len, mem_require.alignment });
         res = value;
         break;
     }
     if (res == null) {
         res = buffers.create() catch |err| {
-            system.print_error("ERR {s} __vulkan_allocator.create_allocator_and_bind.self.*.buffers.create\n", .{@errorName(err)});
+            xfit.print_error("ERR {s} __vulkan_allocator.create_allocator_and_bind.self.*.buffers.create\n", .{@errorName(err)});
             unreachable;
         };
 
-        // system.print_debug("(2) {d} {d} {d}", .{
+        // xfit.print_debug("(2) {d} {d} {d}", .{
         //     max_size,
         //     std.math.divCeil(usize, BLOCK_LEN, std.math.divCeil(usize, cell, NODE_SIZE) catch 1) catch 1,
         //     _mem_require.*.alignment,
@@ -1390,7 +1391,7 @@ fn create_allocator_and_bind(_res: anytype, _prop: vk.VkMemoryPropertyFlags, _ou
 
         _out_idx.* = res.?.*.bind_any(_res, cnt) catch unreachable orelse unreachable; //발생할수 없는 오류
         buffer_ids.append(res.?) catch |err| {
-            system.print_error("ERR {s} __vulkan_allocator.create_allocator_and_bind.self.*.buffer_ids.append\n", .{@errorName(err)});
+            xfit.print_error("ERR {s} __vulkan_allocator.create_allocator_and_bind.self.*.buffer_ids.append\n", .{@errorName(err)});
             unreachable;
         };
     }
@@ -1411,14 +1412,14 @@ fn create_allocator_and_bind_single(_res: anytype) *vulkan_res {
 
     const max_size: usize = @intCast(mem_require.size);
     res = buffers.create() catch |err| {
-        system.handle_error3("__vulkan_allocator.create_allocator_and_bind.self.*.buffers.create", err);
+        xfit.herr3("__vulkan_allocator.create_allocator_and_bind.self.*.buffers.create", err);
     };
 
     res.?.* = vulkan_res.init_single(max_size, mem_require.memoryTypeBits);
 
     _ = res.?.*.bind_any(_res, 1) catch unreachable; //발생할수 없는 오류
     buffer_ids.append(res.?) catch |err| {
-        system.handle_error3("__vulkan_allocator.create_allocator_and_bind.buffer_ids.append", err);
+        xfit.herr3("__vulkan_allocator.create_allocator_and_bind.buffer_ids.append", err);
     };
     return res.?;
 }

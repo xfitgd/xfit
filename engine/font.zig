@@ -8,6 +8,7 @@ const graphics = @import("graphics.zig");
 const math = @import("math.zig");
 const point = math.point;
 const vector = math.vector;
+const xfit = @import("xfit.zig");
 
 const AutoHashMap = std.AutoHashMap;
 
@@ -31,20 +32,20 @@ __face: freetype.FT_Face = null,
 
 fn handle_error(code: freetype.FT_Error) void {
     if (code != freetype.FT_Err_Ok) {
-        system.handle_error2("freetype err Code : {d}\n", .{code});
+        xfit.herr2("freetype err Code : {d}\n", .{code});
     }
 }
 
 pub fn start() void {
-    if (system.dbg and __system.font_started) system.handle_error_msg2("font already started");
-    if (system.dbg) __system.font_started = true;
+    if (xfit.dbg and __system.font_started) xfit.herrm("font already started");
+    if (xfit.dbg) __system.font_started = true;
     handle_error(freetype.FT_Init_FreeType(&library));
 }
 
 pub fn destroy() void {
-    if (system.dbg and !__system.font_started) system.handle_error_msg2("font not started");
+    if (xfit.dbg and !__system.font_started) xfit.herrm("font not started");
     _ = freetype.FT_Done_FreeType(library);
-    if (system.dbg) __system.font_started = false;
+    if (xfit.dbg) __system.font_started = false;
 }
 
 pub fn init(_font_data: []const u8, _face_index: u32) !Self {
@@ -79,7 +80,7 @@ fn get_char_idx(self: *Self, _char: u21) font_error!u32 {
     const idx = freetype.FT_Get_Char_Index(self.*.__face, @intCast(_char));
     if (idx != 0) return idx;
 
-    system.print_debug("undefined character code (charcode) : {d}, (char) : {u}", .{ @as(u32, @intCast(_char)), _char });
+    xfit.print_debug("undefined character code (charcode) : {d}, (char) : {u}", .{ @as(u32, @intCast(_char)), _char });
     return font_error.undefined_char_code;
 }
 
@@ -153,10 +154,10 @@ fn _render_char(self: *Self, char: u21, out_shape_src: *graphics.shape.source, o
             allocator.free(poly.lines);
         }
 
-        // if (system.dbg) {
+        // if (xfit.dbg) {
         //     var d: usize = 0;
         //     while (d < self.__face.*.glyph.*.outline.n_points) : (d += 1) {
-        //         system.print_debug("[{d}] {d},{d} tag {d}", .{
+        //         xfit.print_debug("[{d}] {d},{d} tag {d}", .{
         //             d,
         //             @as(f32, @floatFromInt(self.*.__face.*.glyph.*.outline.points[d].x)) / 64.0,
         //             @as(f32, @floatFromInt(self.*.__face.*.glyph.*.outline.points[d].y)) / 64.0,

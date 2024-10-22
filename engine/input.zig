@@ -520,7 +520,7 @@ pub inline fn Rmouse_up() bool {
 ///false -> up, true -> down
 pub inline fn key_down_or_up(_key: key) bool {
     if (@intFromEnum(_key) >= __system.KEY_SIZE) {
-        system.print("WARN key_down_or_up out of range __system.keys[{d}] value : {d}\n", .{ __system.KEY_SIZE, @intFromEnum(_key) });
+        xfit.print("WARN key_down_or_up out of range __system.keys[{d}] value : {d}\n", .{ __system.KEY_SIZE, @intFromEnum(_key) });
         return false;
     }
     return __system.keys[@intFromEnum(_key)].load(std.builtin.AtomicOrder.monotonic);

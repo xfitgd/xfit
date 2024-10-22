@@ -6,7 +6,6 @@ comptime {
 
 const std = @import("std");
 const xfit = @import("xfit");
-const system = xfit.system;
 const window = xfit.window;
 const input = xfit.input;
 const xbox_pad_input = input.xbox_pad_input;
@@ -19,8 +18,8 @@ var gpa: std.heap.GeneralPurposeAllocator(.{}) = undefined;
 var allocator: std.mem.Allocator = undefined;
 
 fn xinput_callback(state: xbox_pad_input.XBOX_STATE) void {
-    system.print("XBOX PAD [{d}]\n", .{state.device_idx});
-    system.print("Buttons={s}{s}{s}{s} {s} {s} {s}\n", .{
+    xfit.print("XBOX PAD [{d}]\n", .{state.device_idx});
+    xfit.print("Buttons={s}{s}{s}{s} {s} {s} {s}\n", .{
         if (state.buttons.A) "A" else " ",
         if (state.buttons.B) "B" else " ",
         if (state.buttons.X) "X" else " ",
@@ -29,7 +28,7 @@ fn xinput_callback(state: xbox_pad_input.XBOX_STATE) void {
         if (state.buttons.START) "START" else " ",
         if (state.buttons.GUIDE) "GUIDE" else " ",
     });
-    system.print("Dpad={s}{s}{s}{s} Shoulders={s}{s}\n", .{
+    xfit.print("Dpad={s}{s}{s}{s} Shoulders={s}{s}\n", .{
         if (state.buttons.DPAD_UP) "U" else " ",
         if (state.buttons.DPAD_DOWN) "D" else " ",
         if (state.buttons.DPAD_LEFT) "L" else " ",
@@ -37,7 +36,7 @@ fn xinput_callback(state: xbox_pad_input.XBOX_STATE) void {
         if (state.buttons.LEFT_SHOULDER) "L" else " ",
         if (state.buttons.RIGHT_SHOULDER) "R" else " ",
     });
-    system.print("Thumb={s}{s} LeftThumb=({d},{d}) RightThumb=({d},{d})\n", .{
+    xfit.print("Thumb={s}{s} LeftThumb=({d},{d}) RightThumb=({d},{d})\n", .{
         if (state.buttons.LEFT_THUMB) "L" else " ",
         if (state.buttons.RIGHT_THUMB) "R" else " ",
         state.left_thumb_x,
@@ -45,14 +44,14 @@ fn xinput_callback(state: xbox_pad_input.XBOX_STATE) void {
         state.right_thumb_x,
         state.right_thumb_y,
     });
-    system.print("Trigger=({d},{d})\n", .{
+    xfit.print("Trigger=({d},{d})\n", .{
         state.left_trigger,
         state.right_trigger,
     });
 }
 fn general_input_callback(state: general_input.INPUT_STATE) void {
-    system.print("GENERAL [{}]\n", .{state.handle.?});
-    system.print("Buttons={s}{s}{s}{s} {s} {s}\n", .{
+    xfit.print("GENERAL [{}]\n", .{state.handle.?});
+    xfit.print("Buttons={s}{s}{s}{s} {s} {s}\n", .{
         if (state.buttons.A) "A" else " ",
         if (state.buttons.B) "B" else " ",
         if (state.buttons.X) "X" else " ",
@@ -60,7 +59,7 @@ fn general_input_callback(state: general_input.INPUT_STATE) void {
         if (state.buttons.BACK) "BACK" else " ",
         if (state.buttons.START) "START" else " ",
     });
-    system.print("Dpad={s}{s}{s}{s} Shoulders={s}{s} {s}{s}\n", .{
+    xfit.print("Dpad={s}{s}{s}{s} Shoulders={s}{s} {s}{s}\n", .{
         if (state.buttons.DPAD_UP) "U" else " ",
         if (state.buttons.DPAD_DOWN) "D" else " ",
         if (state.buttons.DPAD_LEFT) "L" else " ",
@@ -70,7 +69,7 @@ fn general_input_callback(state: general_input.INPUT_STATE) void {
         if (state.buttons.VOLUME_UP) "+" else " ",
         if (state.buttons.VOLUME_DOWN) "-" else " ",
     });
-    system.print("Thumb={s}{s} LeftThumb=({d},{d}) RightThumb=({d},{d})\n", .{
+    xfit.print("Thumb={s}{s} LeftThumb=({d},{d}) RightThumb=({d},{d})\n", .{
         if (state.buttons.LEFT_THUMB) "L" else " ",
         if (state.buttons.RIGHT_THUMB) "R" else " ",
         state.left_thumb_x,
@@ -78,7 +77,7 @@ fn general_input_callback(state: general_input.INPUT_STATE) void {
         state.right_thumb_x,
         state.right_thumb_y,
     });
-    system.print("Trigger=({d},{d})\n", .{
+    xfit.print("Trigger=({d},{d})\n", .{
         state.left_trigger,
         state.right_trigger,
     });
@@ -86,9 +85,9 @@ fn general_input_callback(state: general_input.INPUT_STATE) void {
 
 fn change_xbox(_device_idx: u32, add_or_remove: bool) void {
     if (add_or_remove) {
-        system.print("---------------------------------\nXBOX ADDED ({d})\n---------------------------------\n", .{_device_idx});
+        xfit.print("---------------------------------\nXBOX ADDED ({d})\n---------------------------------\n", .{_device_idx});
     } else {
-        system.print("---------------------------------\nXBOX REMOVED ({d})\n---------------------------------\n", .{_device_idx});
+        xfit.print("---------------------------------\nXBOX REMOVED ({d})\n---------------------------------\n", .{_device_idx});
     }
 }
 
@@ -98,7 +97,7 @@ pub fn xfit_init() !void {
     general_input.set_callback(general_input_callback);
     xbox_pad_input.set_callback(xinput_callback);
 
-    _ = try timer_callback.start(system.sec_to_nano_sec2(1, 0, 0, 0), 0, vib_callback, .{});
+    _ = try timer_callback.start(xfit.sec_to_nano_sec2(1, 0, 0, 0), 0, vib_callback, .{});
 }
 
 fn vib_callback() !void {
@@ -124,7 +123,7 @@ pub fn xfit_destroy() !void {
 
 ///after system clean
 pub fn xfit_clean() !void {
-    if (system.dbg and gpa.deinit() != .ok) unreachable;
+    if (xfit.dbg and gpa.deinit() != .ok) unreachable;
 }
 
 pub fn xfit_activate(is_activate: bool, is_pause: bool) !void {
@@ -137,12 +136,12 @@ pub fn xfit_closing() !bool {
 }
 
 pub fn main() void {
-    const init_setting: system.init_setting = .{
+    const init_setting: xfit.init_setting = .{
         .window_width = 640,
         .window_height = 480,
         .use_console = true,
     };
     gpa = .{};
-    allocator = gpa.allocator(); //반드시 할당자는 main에서 초기화
+    allocator = gpa.allocator(); //must init in main
     xfit.xfit_main(allocator, &init_setting);
 }

@@ -26,8 +26,10 @@ comptime {
     @export(&lua_writestringerror, .{ .name = "lua_writestringerror", .linkage = .strong });
 }
 
+pub const _system = @extern(*const fn ([*c]const u8) callconv(.C) c_int, .{ .name = "system", .linkage = .strong });
+
 fn lua_writestring(ptr: ?*const anyopaque, size: usize) callconv(.C) usize {
-    system.print("{s}", .{@as([*]const u8, @ptrCast(ptr.?))[0..size]});
+    xfit.print("{s}", .{@as([*]const u8, @ptrCast(ptr.?))[0..size]});
     return size;
 }
 fn lua_writestringerror(fmt: [*c]const u8, str: [*c]const u8) callconv(.C) void {
@@ -63,7 +65,7 @@ pub var prev_window: struct {
 
 pub var title: [:0]u8 = undefined;
 
-pub var init_set: system.init_setting = .{};
+pub var init_set: xfit.init_setting = .{};
 
 pub var delta_time: u64 = 0;
 pub var processor_core_len: u32 = 0;
@@ -120,7 +122,7 @@ pub var sound_started: bool = false;
 pub var font_started: bool = false;
 pub var general_input_callback: ?input.general_input.CallbackFn = null;
 
-pub fn init(_allocator: std.mem.Allocator, init_setting: *const system.init_setting) void {
+pub fn init(_allocator: std.mem.Allocator, init_setting: *const xfit.init_setting) void {
     allocator = _allocator;
 
     monitors = ArrayList(system.monitor_info).init(allocator);
@@ -134,7 +136,7 @@ pub fn init(_allocator: std.mem.Allocator, init_setting: *const system.init_sett
         init_set = init_setting.*;
     }
 
-    title = allocator.dupeZ(u8, init_set.window_title) catch |e| system.handle_error3("__system.init.title = allocator.dupeZ", e);
+    title = allocator.dupeZ(u8, init_set.window_title) catch |e| xfit.herr3("__system.init.title = allocator.dupeZ", e);
 }
 
 pub fn loop() void {
@@ -142,32 +144,32 @@ pub fn loop() void {
         var start = false;
         var now: Timer = undefined;
     };
-    const ispause = system.paused();
+    const ispause = xfit.paused();
     if (!S.start) {
-        S.now = Timer.start() catch |e| system.handle_error3("S.now = Timer.start()", e);
+        S.now = Timer.start() catch |e| xfit.herr3("S.now = Timer.start()", e);
         S.start = true;
     } else {
         delta_time = S.now.lap();
-        var maxframe: u64 = system.get_maxframe_u64();
+        var maxframe: u64 = xfit.get_maxframe_u64();
 
         if (ispause and maxframe == 0) {
-            maxframe = system.sec_to_nano_sec(60, 0);
+            maxframe = xfit.sec_to_nano_sec(60, 0);
         }
 
         if (maxframe > 0) {
-            const maxf: u64 = @divTrunc((system.sec_to_nano_sec(1, 0) * system.sec_to_nano_sec(1, 0)), maxframe); //1000000000 / (maxframe / 1000000000); 나눗셈을 한번 줄임
+            const maxf: u64 = @divTrunc((xfit.sec_to_nano_sec(1, 0) * xfit.sec_to_nano_sec(1, 0)), maxframe); //1000000000 / (maxframe / 1000000000); 나눗셈을 한번 줄임
             if (maxf > delta_time) {
                 if (ispause) {
                     std.time.sleep(maxf - delta_time); //대기상태라 정확도가 적어도 괜찮다.
                 } else {
-                    system.sleep(maxf - delta_time);
+                    xfit.sleep(maxf - delta_time);
                 }
             }
             delta_time = maxf;
         }
     }
     root.xfit_update() catch |e| {
-        system.handle_error3("xfit_clean", e);
+        xfit.herr3("xfit_clean", e);
     };
 
     if (__vulkan_allocator.execute_all_cmd_per_update.load(.monotonic)) {
@@ -178,7 +180,7 @@ pub fn loop() void {
         __vulkan.drawFrame();
     }
 
-    //system.print_debug("rendering {d}", .{system.delta_time()});
+    //xfit.print_debug("rendering {d}", .{system.delta_time()});
 }
 
 pub fn destroy() void {
@@ -190,6 +192,6 @@ pub fn destroy() void {
 }
 
 pub fn real_destroy() void {
-    if (sound_started) system.handle_error_msg2("sound not destroyed");
-    if (font_started) system.handle_error_msg2("font not destroyed");
+    if (sound_started) xfit.herrm("sound not destroyed");
+    if (font_started) xfit.herrm("font not destroyed");
 }

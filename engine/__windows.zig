@@ -2,6 +2,7 @@ const std = @import("std");
 
 const builtin = @import("builtin");
 const ArrayList = std.ArrayList;
+const xfit = @import("xfit.zig");
 
 const system = @import("system.zig");
 const input = @import("input.zig");
@@ -37,7 +38,7 @@ pub const BOOL = win32.BOOL;
 
 pub var hWnd: HWND = undefined;
 pub var hInstance: HINSTANCE = undefined;
-pub var screen_mode: system.screen_mode = system.screen_mode.WINDOW;
+pub var screen_mode: xfit.screen_mode = xfit.screen_mode.WINDOW;
 
 const xbox_guid = win32.GUID{
     .Data1 = 0xec87f1e3,
@@ -59,7 +60,7 @@ pub fn vulkan_windows_start(vkInstance: __vulkan.vk.VkInstance, vkSurface: *__vu
         .flags = 0,
     };
     const result = __vulkan.vk.vkCreateWin32SurfaceKHR(vkInstance, &win32SurfaceCreateInfo, null, vkSurface);
-    system.handle_error(result == __vulkan.vk.VK_SUCCESS, "vulkan_windows_start.vkCreateWin32SurfaceKHR {d}", .{result});
+    xfit.herr(result == __vulkan.vk.VK_SUCCESS, "vulkan_windows_start.vkCreateWin32SurfaceKHR {d}", .{result});
 }
 
 pub fn system_windows_start() void {
@@ -95,12 +96,12 @@ pub fn system_windows_start() void {
         __system.platform_ver.version.windows.version = if (serverOS) system.platform_version.windows_version.WindowsServer2016 else system.platform_version.windows_version.Windows10;
     } else {
         __system.platform_ver.version.windows.version = system.platform_version.windows_version.Unknown;
-        system.print_debug("WARN system_windows_start UNKNOWN platform.", .{});
+        xfit.print_debug("WARN system_windows_start UNKNOWN platform.", .{});
     }
 
     _ = win32.EnumDisplayMonitors(null, null, MonitorEnumProc, 0);
 
-    hInstance = win32.GetModuleHandleA(null) orelse system.handle_error2("windows_start.GetModuleHandleA {d}", .{win32.GetLastError()});
+    hInstance = win32.GetModuleHandleA(null) orelse xfit.herr2("windows_start.GetModuleHandleA {d}", .{win32.GetLastError()});
 
     __raw_input.start();
     return;
@@ -111,7 +112,7 @@ fn render_thread(param: win32.LPVOID) callconv(std.os.windows.WINAPI) DWORD {
     __vulkan.vulkan_start();
 
     root.xfit_init() catch |e| {
-        system.handle_error3("xfit_init", e);
+        xfit.herr3("xfit_init", e);
     };
 
     __vulkan_allocator.execute_and_wait_all_op();
@@ -124,7 +125,7 @@ fn render_thread(param: win32.LPVOID) callconv(std.os.windows.WINAPI) DWORD {
 
     __vulkan.wait_device_idle();
     root.xfit_destroy() catch |e| {
-        system.handle_error3("xfit_destroy", e);
+        xfit.herr3("xfit_destroy", e);
     };
     __vulkan.vulkan_destroy();
 
@@ -151,27 +152,27 @@ pub fn windows_start() void {
 
     _ = win32.RegisterClassA(&wc);
 
-    const window_style: DWORD = if (__system.init_set.screen_mode == system.screen_mode.WINDOW) (((((win32.WS_OVERLAPPED |
+    const window_style: DWORD = if (__system.init_set.screen_mode == xfit.screen_mode.WINDOW) (((((win32.WS_OVERLAPPED |
         win32.WS_CAPTION) |
         win32.WS_SYSMENU) |
         if (__system.init_set.can_resizewindow) win32.WS_THICKFRAME else 0) |
         if (__system.init_set.can_minimize) win32.WS_MINIMIZEBOX else 0) |
         if (__system.init_set.can_maximize) win32.WS_MAXIMIZEBOX else 0) else win32.WS_POPUP;
 
-    const ex_style: DWORD = if (__system.init_set.screen_mode != system.screen_mode.WINDOW) (win32.WS_EX_APPWINDOW | if (__system.init_set.screen_mode == system.screen_mode.FULLSCREEN) win32.WS_EX_TOPMOST else 0) else 0;
+    const ex_style: DWORD = if (__system.init_set.screen_mode != xfit.screen_mode.WINDOW) (win32.WS_EX_APPWINDOW | if (__system.init_set.screen_mode == xfit.screen_mode.FULLSCREEN) win32.WS_EX_TOPMOST else 0) else 0;
 
     var window_x: i32 = __system.init_set.window_x;
     var window_y: i32 = __system.init_set.window_y;
     var window_width: u32 = __system.init_set.window_width;
     var window_height: u32 = __system.init_set.window_height;
 
-    if (__system.init_set.screen_mode != system.screen_mode.WINDOW) {
-        if (__system.init_set.screen_index == system.init_setting.PRIMARY_SCREEN_INDEX) {
+    if (__system.init_set.screen_mode != xfit.screen_mode.WINDOW) {
+        if (__system.init_set.screen_index == xfit.init_setting.PRIMARY_SCREEN_INDEX) {
             window_x = __system.primary_monitor.*.rect.left;
             window_y = __system.primary_monitor.*.rect.top;
             window_width = @intCast(__system.primary_monitor.*.rect.width());
             window_height = @intCast(__system.primary_monitor.*.rect.height());
-            if (__system.init_set.screen_mode == system.screen_mode.FULLSCREEN) {
+            if (__system.init_set.screen_mode == xfit.screen_mode.FULLSCREEN) {
                 change_fullscreen(__system.primary_monitor, __system.primary_monitor.*.primary_resolution.?);
             }
         } else {
@@ -180,7 +181,7 @@ pub fn windows_start() void {
             window_y = __system.monitors.items[__system.init_set.screen_index].rect.top;
             window_width = @intCast(__system.monitors.items[__system.init_set.screen_index].rect.width());
             window_height = @intCast(__system.monitors.items[__system.init_set.screen_index].rect.height());
-            if (__system.init_set.screen_mode == system.screen_mode.FULLSCREEN) {
+            if (__system.init_set.screen_mode == xfit.screen_mode.FULLSCREEN) {
                 change_fullscreen(&__system.monitors.items[__system.init_set.screen_index], __system.monitors.items[__system.init_set.screen_index].primary_resolution.?);
             }
         }
@@ -188,7 +189,7 @@ pub fn windows_start() void {
 
     _ = win32.CreateThread(null, 0, render_thread, null, 0, &render_thread_id);
 
-    hWnd = win32.CreateWindowExA(ex_style, CLASS_NAME, @ptrCast(__system.init_set.window_title), window_style, window_x, window_y, @bitCast(window_width), @bitCast(window_height), null, null, hInstance, null) orelse system.handle_error2("windows_start.CreateWindowExA {d}", .{win32.GetLastError()});
+    hWnd = win32.CreateWindowExA(ex_style, CLASS_NAME, @ptrCast(__system.init_set.window_title), window_style, window_x, window_y, @bitCast(window_width), @bitCast(window_height), null, null, hInstance, null) orelse xfit.herr2("windows_start.CreateWindowExA {d}", .{win32.GetLastError()});
 
     const rid = [_]win32.RAWINPUTDEVICE{ .{
         .usUsagePage = 1,
@@ -202,11 +203,11 @@ pub fn windows_start() void {
         .hwndTarget = hWnd,
     } };
     if (FALSE == win32.RegisterRawInputDevices(&rid, 2, @sizeOf(win32.RAWINPUTDEVICE))) {
-        system.print_error("WARN RegisterRawInputDevices code : {d}\n", .{win32.GetLastError()});
+        xfit.print_error("WARN RegisterRawInputDevices code : {d}\n", .{win32.GetLastError()});
         return;
     }
 
-    _ = win32.ShowWindow(hWnd, if (__system.init_set.screen_mode == system.screen_mode.WINDOW) @intFromEnum(__system.init_set.window_show) else win32.SW_MAXIMIZE);
+    _ = win32.ShowWindow(hWnd, if (__system.init_set.screen_mode == xfit.screen_mode.WINDOW) @intFromEnum(__system.init_set.window_show) else win32.SW_MAXIMIZE);
 }
 
 pub fn windows_loop() void {
@@ -318,7 +319,7 @@ pub fn set_window_mode2(pos: math.point(i32), size: math.point(u32), state: wind
 pub fn set_window_title() void {
     //?window.set_window_title 참고
     if (FALSE == win32.SetWindowTextA(hWnd, __system.title)) {
-        system.print_error("WARN set_window_title.SetWindowTextA Failed Code : {d}\n", .{win32.GetLastError()});
+        xfit.print_error("WARN set_window_title.SetWindowTextA Failed Code : {d}\n", .{win32.GetLastError()});
     }
 }
 
@@ -340,7 +341,7 @@ pub fn set_borderlessscreen_mode(monitor: *system.monitor_info) void {
 pub fn get_window_state() window.window_state {
     var pwn: win32.WINDOWPLACEMENT = undefined;
     pwn.length = @sizeOf(win32.WINDOWPLACEMENT);
-    if (win32.GetWindowPlacement(hWnd, &pwn) == FALSE) system.handle_error2("get_window_state.GetWindowPlacement {d}", .{win32.GetLastError()});
+    if (win32.GetWindowPlacement(hWnd, &pwn) == FALSE) xfit.herr2("get_window_state.GetWindowPlacement {d}", .{win32.GetLastError()});
     if (pwn.showCmd == win32.SW_MAXIMIZE) {
         return .Maximized;
     }
@@ -356,7 +357,7 @@ var fullscreen_name: [32]u8 = std.mem.zeroes([32]u8);
 pub fn __change_fullscreen_mode() void {
     const res = win32.ChangeDisplaySettingsExA(@ptrCast(&fullscreen_name), &fullscreen_mode, null, win32.CDS_FULLSCREEN | win32.CDS_RESET, null);
     if (res != win32.DISP_CHANGE_SUCCESSFUL) {
-        system.print("WARN change_fullscreen.ChangeDisplaySettingsExA FAILED Code {d}\n", .{res});
+        xfit.print("WARN change_fullscreen.ChangeDisplaySettingsExA FAILED Code {d}\n", .{res});
         return;
     }
 }
@@ -379,7 +380,7 @@ fn change_fullscreen(monitor: *system.monitor_info, resolution: *system.screen_i
 }
 
 pub fn set_fullscreen_mode(monitor: *system.monitor_info, resolution: *system.screen_info) void {
-    screen_mode = system.screen_mode.FULLSCREEN;
+    screen_mode = xfit.screen_mode.FULLSCREEN;
     __vulkan.fullscreen_mutex.lock();
     _ = win32.SetWindowLongPtrA(hWnd, win32.GWL_STYLE, win32.WS_POPUP);
     _ = win32.SetWindowLongPtrA(hWnd, win32.GWL_EXSTYLE, win32.WS_EX_APPWINDOW | win32.WS_EX_TOPMOST);
@@ -393,18 +394,18 @@ pub fn set_fullscreen_mode(monitor: *system.monitor_info, resolution: *system.sc
 
 pub fn nanosleep(ns: u64) void {
     const timer = win32.CreateWaitableTimerA(null, TRUE, null) orelse {
-        system.print("WARN nanosleep.CreateWaitableTimerA FAILED Code {d}\n", .{win32.GetLastError()});
+        xfit.print("WARN nanosleep.CreateWaitableTimerA FAILED Code {d}\n", .{win32.GetLastError()});
         std.time.sleep(ns);
         return;
     };
 
     if (win32.SetWaitableTimer(timer, &win32.LARGE_INTEGER{ .QuadPart = -@as(i64, @intCast(@divTrunc(ns, 100))) }, 0, null, null, FALSE) == FALSE) {
-        system.print("WARN nanosleep.SetWaitableTimer FAILED Code {d}\n", .{win32.GetLastError()});
+        xfit.print("WARN nanosleep.SetWaitableTimer FAILED Code {d}\n", .{win32.GetLastError()});
         std.time.sleep(ns);
         return;
     }
     if (win32.WAIT_FAILED == win32.WaitForSingleObject(timer, win32.INFINITE)) {
-        system.print("WARN nanosleep.WaitForSingleObject FAILED Code {d}\n", .{win32.GetLastError()});
+        xfit.print("WARN nanosleep.WaitForSingleObject FAILED Code {d}\n", .{win32.GetLastError()});
         std.time.sleep(ns);
         return;
     }
@@ -454,20 +455,20 @@ fn WindowProc(hwnd: HWND, uMsg: u32, wParam: win32.WPARAM, lParam: win32.LPARAM)
             if (wParam < __system.KEY_SIZE) {
                 if (!__system.keys[wParam].load(std.builtin.AtomicOrder.monotonic)) {
                     __system.keys[wParam].store(true, std.builtin.AtomicOrder.monotonic);
-                    //system.print_debug("input key_down {d}", .{wParam});
+                    //xfit.print_debug("input key_down {d}", .{wParam});
                     if (system.a_fn(__system.key_down_func) != null) system.a_fn(__system.key_down_func).?(@enumFromInt(wParam));
                 }
             } else {
-                system.print("WARN WindowProc WM_KEYDOWN out of range __system.keys[{d}] value : {d}\n", .{ __system.KEY_SIZE, wParam });
+                xfit.print("WARN WindowProc WM_KEYDOWN out of range __system.keys[{d}] value : {d}\n", .{ __system.KEY_SIZE, wParam });
             }
         },
         win32.WM_KEYUP => {
             if (wParam < __system.KEY_SIZE) {
                 __system.keys[wParam].store(false, std.builtin.AtomicOrder.monotonic);
-                //system.print_debug("input key_up {d}", .{wParam});
+                //xfit.print_debug("input key_up {d}", .{wParam});
                 if (system.a_fn(__system.key_up_func) != null) system.a_fn(__system.key_up_func).?(@enumFromInt(wParam));
             } else {
-                system.print("WARN WindowProc WM_KEYUP out of range __system.keys[{d}] value : {d}\n", .{ __system.KEY_SIZE, wParam });
+                xfit.print("WARN WindowProc WM_KEYUP out of range __system.keys[{d}] value : {d}\n", .{ __system.KEY_SIZE, wParam });
             }
         },
         win32.WM_KILLFOCUS => {
@@ -494,7 +495,7 @@ fn WindowProc(hwnd: HWND, uMsg: u32, wParam: win32.WPARAM, lParam: win32.LPARAM)
             if (system.a_fn(__system.general_input_callback) != null) end: {
                 var size: u32 = undefined;
                 _ = win32.GetRawInputData(@ptrFromInt(@as(usize, @intCast(lParam))), win32.RID_INPUT, null, &size, @sizeOf(win32.RAWINPUTHEADER));
-                const inputT: []align(@alignOf(*win32.RAWINPUT)) u8 = std.heap.c_allocator.alignedAlloc(u8, @alignOf(*win32.RAWINPUT), size) catch |e| system.handle_error3("alignedAlloc RAWINPUT", e);
+                const inputT: []align(@alignOf(*win32.RAWINPUT)) u8 = std.heap.c_allocator.alignedAlloc(u8, @alignOf(*win32.RAWINPUT), size) catch |e| xfit.herr3("alignedAlloc RAWINPUT", e);
                 defer std.heap.c_allocator.free(inputT);
                 const input_: *win32.RAWINPUT = @ptrCast(inputT.ptr);
 
@@ -663,7 +664,7 @@ fn WindowProc(hwnd: HWND, uMsg: u32, wParam: win32.WPARAM, lParam: win32.LPARAM)
             __system.activated.store(activated, std.builtin.AtomicOrder.monotonic);
 
             root.xfit_activate(activated, pause) catch |e| {
-                system.handle_error3("xfit_activate", e);
+                xfit.herr3("xfit_activate", e);
             };
         },
         win32.WM_MOVE => {
@@ -677,7 +678,7 @@ fn WindowProc(hwnd: HWND, uMsg: u32, wParam: win32.WPARAM, lParam: win32.LPARAM)
         win32.WM_MOUSEMOVE => {
             var mouse_event: win32.TRACKMOUSEEVENT = .{ .cbSize = @sizeOf(win32.TRACKMOUSEEVENT), .dwFlags = win32.TME_HOVER | win32.TME_LEAVE, .hwndTrack = hWnd, .dwHoverTime = 10 };
             if (win32.TrackMouseEvent(&mouse_event) == FALSE) {
-                system.print_error("WARN WindowProc.TrackMouseEvent Failed Code : {}\n", .{win32.GetLastError()});
+                xfit.print_error("WARN WindowProc.TrackMouseEvent Failed Code : {}\n", .{win32.GetLastError()});
             }
             const mm = input.convert_set_mouse_pos(.{ @floatFromInt(win32.GET_X_LPARAM(lParam)), @floatFromInt(win32.GET_Y_LPARAM(lParam)) });
             if (system.a_fn(__system.mouse_move_func) != null) system.a_fn(__system.mouse_move_func).?(mm);
@@ -698,7 +699,7 @@ fn WindowProc(hwnd: HWND, uMsg: u32, wParam: win32.WPARAM, lParam: win32.LPARAM)
         },
         win32.WM_CLOSE => {
             if (root.xfit_closing() catch |e| {
-                system.handle_error3("xfit_closing", e);
+                xfit.herr3("xfit_closing", e);
             } == false) return 0;
         },
         win32.WM_ERASEBKGND => return 1,
@@ -731,7 +732,7 @@ fn MonitorEnumProc(hMonitor: win32.HMONITOR, hdcMonitor: win32.HDC, lprcMonitor:
         .rect = math.recti.init(0, 0, 0, 0),
         .resolutions = ArrayList(system.screen_info).init(std.heap.c_allocator),
         .__hmonitor = hMonitor,
-    }) catch |e| system.handle_error3("MonitorEnumProc __system.monitors.append", e);
+    }) catch |e| xfit.herr3("MonitorEnumProc __system.monitors.append", e);
     var last = &__system.monitors.items[__system.monitors.items.len - 1];
     last.*.is_primary = (monitor_info.monitorInfo.dwFlags & win32.MONITORINFOF_PRIMARY) != 0;
     if (last.*.is_primary) __system.primary_monitor = last;
@@ -745,7 +746,7 @@ fn MonitorEnumProc(hMonitor: win32.HMONITOR, hdcMonitor: win32.HDC, lprcMonitor:
             .monitor = last,
             .refleshrate = dm.dmDisplayFrequency,
             .size = .{ dm.dmPelsWidth, dm.dmPelsHeight },
-        }) catch |e| system.handle_error3("MonitorEnumProc last.*.resolutions.append", e);
+        }) catch |e| xfit.herr3("MonitorEnumProc last.*.resolutions.append", e);
     }
     _ = win32.EnumDisplaySettingsA(@ptrCast(&monitor_info.szDevice), win32.ENUM_CURRENT_SETTINGS, &dm);
     last.primary_resolution = null;
@@ -758,7 +759,7 @@ fn MonitorEnumProc(hMonitor: win32.HMONITOR, hdcMonitor: win32.HDC, lprcMonitor:
         }
     }
     if (last.*.primary_resolution == null) {
-        system.print("WARN can't find primary_resolution.\n", .{});
+        xfit.print("WARN can't find primary_resolution.\n", .{});
         last.*.primary_resolution = &last.*.resolutions.items[last.resolutions.items.len - 1];
     }
     std.mem.copyForwards(u8, &last.*.name, &monitor_info.szDevice);

@@ -248,7 +248,7 @@ fn chooseSwapSurfaceFormat(availableFormats: []vk.VkSurfaceFormatKHR) vk.VkSurfa
             else => {},
         }
     }
-    system.handle_error2("unsupported device format {any}", .{availableFormats});
+    xfit.herr2("unsupported device format {any}", .{availableFormats});
 }
 
 fn chooseSwapPresentMode(availablePresentModes: []vk.VkPresentModeKHR, _vSync: bool) vk.VkPresentModeKHR {
@@ -363,7 +363,7 @@ fn createShaderModule(code: []const u8) vk.VkShaderModule {
     var shaderModule: vk.VkShaderModule = undefined;
     const result = vk.vkCreateShaderModule(vkDevice, &createInfo, null, &shaderModule);
 
-    system.handle_error(result == vk.VK_SUCCESS, "__vulkan.createShaderModule.vkCreateShaderModule : {d}", .{result});
+    xfit.herr(result == vk.VK_SUCCESS, "__vulkan.createShaderModule.vkCreateShaderModule : {d}", .{result});
 
     return shaderModule;
 }
@@ -375,12 +375,12 @@ fn create_sync_object() void {
         const fenceInfo: vk.VkFenceCreateInfo = .{ .flags = vk.VK_FENCE_CREATE_SIGNALED_BIT, .sType = vk.VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
 
         var result = vk.vkCreateSemaphore(vkDevice, &semaphoreInfo, null, &vkImageAvailableSemaphore[i]);
-        system.handle_error(result == vk.VK_SUCCESS, "__vulkan.vulkan_start.vkCreateSemaphore vkImageAvailableSemaphore : {d}", .{result});
+        xfit.herr(result == vk.VK_SUCCESS, "__vulkan.vulkan_start.vkCreateSemaphore vkImageAvailableSemaphore : {d}", .{result});
         result = vk.vkCreateSemaphore(vkDevice, &semaphoreInfo, null, &vkRenderFinishedSemaphore[i]);
-        system.handle_error(result == vk.VK_SUCCESS, "__vulkan.vulkan_start.vkCreateSemaphore vkRenderFinishedSemaphore : {d}", .{result});
+        xfit.herr(result == vk.VK_SUCCESS, "__vulkan.vulkan_start.vkCreateSemaphore vkRenderFinishedSemaphore : {d}", .{result});
 
         result = vk.vkCreateFence(vkDevice, &fenceInfo, null, &vkInFlightFence[i]);
-        system.handle_error(result == vk.VK_SUCCESS, "__vulkan.vulkan_start.vkCreateFence vkInFlightFence : {d}", .{result});
+        xfit.herr(result == vk.VK_SUCCESS, "__vulkan.vulkan_start.vkCreateFence vkInFlightFence : {d}", .{result});
     }
 }
 
@@ -410,7 +410,7 @@ fn recordCommandBuffer(commandBuffer: **render_command, fr: u32) void {
             .pInheritanceInfo = null,
         };
         var result = vk.vkBeginCommandBuffer(cmd, &beginInfo);
-        system.handle_error(result == vk.VK_SUCCESS, "__vulkan.recordCommandBuffer.vkBeginCommandBuffer : {d}", .{result});
+        xfit.herr(result == vk.VK_SUCCESS, "__vulkan.recordCommandBuffer.vkBeginCommandBuffer : {d}", .{result});
 
         const clearColor: vk.VkClearValue = .{ .color = .{ .float32 = .{ 0, 0, 0, 0 } } };
         const clearDepthStencil: vk.VkClearValue = .{ .depthStencil = .{ .stencil = 0, .depth = 0 } };
@@ -444,7 +444,7 @@ fn recordCommandBuffer(commandBuffer: **render_command, fr: u32) void {
         vk.vkCmdEndRenderPass(cmd);
 
         result = vk.vkEndCommandBuffer(cmd);
-        system.handle_error(result == vk.VK_SUCCESS, "__vulkan.recordCommandBuffer.vkEndCommandBuffer : {d}", .{result});
+        xfit.herr(result == vk.VK_SUCCESS, "__vulkan.recordCommandBuffer.vkEndCommandBuffer : {d}", .{result});
     }
 }
 
@@ -458,11 +458,11 @@ fn debug_callback(messageSeverity: vk.VkDebugUtilsMessageSeverityFlagBitsEXT, me
         _ = __android.LOGE(pCallbackData.?.*.pMessage, .{});
     } else {
         const len = std.mem.len(pCallbackData.?.*.pMessage);
-        const msg = std.heap.c_allocator.alloc(u8, len) catch |e| system.handle_error3("debug_callback.alloc()", e);
+        const msg = std.heap.c_allocator.alloc(u8, len) catch |e| xfit.herr3("debug_callback.alloc()", e);
         @memcpy(msg, pCallbackData.?.*.pMessage[0..len]);
         defer std.heap.c_allocator.free(msg);
 
-        system.print("{s}\n\n", .{msg});
+        xfit.print("{s}\n\n", .{msg});
     }
 
     return vk.VK_FALSE;
@@ -536,7 +536,7 @@ fn create_pipelines() void {
         };
 
         const result = vk.vkCreateGraphicsPipelines(vkDevice, std.mem.zeroes(vk.VkPipelineCache), 1, &pipelineInfo, null, &quad_shape_2d_pipeline_set.pipeline);
-        system.handle_error(result == vk.VK_SUCCESS, "__vulkan.vulkan_start.vkCreateGraphicsPipelines quad_shape_2d_pipeline_set.pipeline : {d}", .{result});
+        xfit.herr(result == vk.VK_SUCCESS, "__vulkan.vulkan_start.vkCreateGraphicsPipelines quad_shape_2d_pipeline_set.pipeline : {d}", .{result});
     }
     {
         const bindingDescription: vk.VkVertexInputBindingDescription = .{
@@ -599,7 +599,7 @@ fn create_pipelines() void {
         };
 
         const result = vk.vkCreateGraphicsPipelines(vkDevice, std.mem.zeroes(vk.VkPipelineCache), 1, &pipelineInfo, null, &shape_color_2d_pipeline_set.pipeline);
-        system.handle_error(result == vk.VK_SUCCESS, "__vulkan.vulkan_start.vkCreateGraphicsPipelines shape_color_2d_pipeline_set.pipeline : {d}", .{result});
+        xfit.herr(result == vk.VK_SUCCESS, "__vulkan.vulkan_start.vkCreateGraphicsPipelines shape_color_2d_pipeline_set.pipeline : {d}", .{result});
     }
     {
         const bindingDescription: vk.VkVertexInputBindingDescription = .{
@@ -640,7 +640,7 @@ fn create_pipelines() void {
         };
 
         const result = vk.vkCreateGraphicsPipelines(vkDevice, null, 1, &pipelineInfo, null, &tex_2d_pipeline_set.pipeline);
-        system.handle_error(result == vk.VK_SUCCESS, "__vulkan.vulkan_start.vkCreateGraphicsPipelines tex_2d_pipeline_set.pipeline : {d}", .{result});
+        xfit.herr(result == vk.VK_SUCCESS, "__vulkan.vulkan_start.vkCreateGraphicsPipelines tex_2d_pipeline_set.pipeline : {d}", .{result});
     }
     {
         const bindingDescription: vk.VkVertexInputBindingDescription = .{
@@ -681,7 +681,7 @@ fn create_pipelines() void {
         };
 
         const result = vk.vkCreateGraphicsPipelines(vkDevice, null, 1, &pipelineInfo, null, &animate_tex_2d_pipeline_set.pipeline);
-        system.handle_error(result == vk.VK_SUCCESS, "__vulkan.vulkan_start.vkCreateGraphicsPipelines animate_tex_2d_pipeline_set.pipeline : {d}", .{result});
+        xfit.herr(result == vk.VK_SUCCESS, "__vulkan.vulkan_start.vkCreateGraphicsPipelines animate_tex_2d_pipeline_set.pipeline : {d}", .{result});
     }
 }
 //instance
@@ -719,13 +719,13 @@ pub fn vulkan_start() void {
         var layers_names = ArrayList([*:0]const u8).init(std.heap.c_allocator);
         defer layers_names.deinit();
 
-        extension_names.append(vk.VK_KHR_SURFACE_EXTENSION_NAME) catch |e| system.handle_error3("vulkan_start.extension_names.append(vk.VK_KHR_SURFACE_EXTENSION_NAME)", e);
+        extension_names.append(vk.VK_KHR_SURFACE_EXTENSION_NAME) catch |e| xfit.herr3("vulkan_start.extension_names.append(vk.VK_KHR_SURFACE_EXTENSION_NAME)", e);
 
         var count: u32 = undefined;
         _ = vk.vkEnumerateInstanceLayerProperties(&count, null);
 
         const available_layers = std.heap.c_allocator.alloc(vk.VkLayerProperties, count) catch
-            system.handle_error_msg2("vulkan_start.allocator.alloc(vk.VkLayerProperties) OutOfMemory");
+            xfit.herrm("vulkan_start.allocator.alloc(vk.VkLayerProperties) OutOfMemory");
         defer std.heap.c_allocator.free(available_layers);
 
         _ = vk.vkEnumerateInstanceLayerProperties(&count, available_layers.ptr);
@@ -733,7 +733,7 @@ pub fn vulkan_start() void {
         for (available_layers) |*value| {
             inline for (layers, checkedl) |t, b| {
                 if (!b.* and std.mem.eql(u8, t, value.*.layerName[0..t.len])) {
-                    layers_names.append(t) catch system.handle_error_msg2("__vulkan_start layer append");
+                    layers_names.append(t) catch xfit.herrm("__vulkan_start layer append");
                     b.* = true;
                 }
             }
@@ -742,7 +742,7 @@ pub fn vulkan_start() void {
         _ = vk.vkEnumerateInstanceExtensionProperties(null, &count, null);
 
         const available_ext = std.heap.c_allocator.alloc(vk.VkExtensionProperties, count) catch
-            system.handle_error_msg2("vulkan_start.allocator.alloc(vk.VkLayerProperties) OutOfMemory");
+            xfit.herrm("vulkan_start.allocator.alloc(vk.VkLayerProperties) OutOfMemory");
         defer std.heap.c_allocator.free(available_ext);
 
         _ = vk.vkEnumerateInstanceExtensionProperties(null, &count, available_ext.ptr);
@@ -750,22 +750,22 @@ pub fn vulkan_start() void {
         for (available_ext) |*value| {
             inline for (ext, checked) |t, b| {
                 if (!b.* and std.mem.eql(u8, t, value.*.extensionName[0..t.len])) {
-                    extension_names.append(t) catch system.handle_error_msg2("__vulkan_start ext append");
+                    extension_names.append(t) catch xfit.herrm("__vulkan_start ext append");
                     b.* = true;
                 }
             }
         }
 
-        if (validation_layer_support and system.dbg) {
-            extension_names.append(vk.VK_EXT_DEBUG_UTILS_EXTENSION_NAME) catch |e| system.handle_error3("vulkan_start.extension_names.append(vk.VK_EXT_DEBUG_UTILS_EXTENSION_NAME)", e);
+        if (validation_layer_support and xfit.dbg) {
+            extension_names.append(vk.VK_EXT_DEBUG_UTILS_EXTENSION_NAME) catch |e| xfit.herr3("vulkan_start.extension_names.append(vk.VK_EXT_DEBUG_UTILS_EXTENSION_NAME)", e);
         } else {
             validation_layer_support = false;
         }
 
         if (xfit.platform == .windows) {
-            extension_names.append(vk.VK_KHR_WIN32_SURFACE_EXTENSION_NAME) catch |e| system.handle_error3("vulkan_start.extension_names.append(vk.VK_KHR_WIN32_SURFACE_EXTENSION_NAME)", e);
+            extension_names.append(vk.VK_KHR_WIN32_SURFACE_EXTENSION_NAME) catch |e| xfit.herr3("vulkan_start.extension_names.append(vk.VK_KHR_WIN32_SURFACE_EXTENSION_NAME)", e);
         } else if (xfit.platform == .android) {
-            extension_names.append(vk.VK_KHR_ANDROID_SURFACE_EXTENSION_NAME) catch |e| system.handle_error3("vulkan_start.extension_names.append(vk.VK_KHR_ANDROID_SURFACE_EXTENSION_NAME)", e);
+            extension_names.append(vk.VK_KHR_ANDROID_SURFACE_EXTENSION_NAME) catch |e| xfit.herr3("vulkan_start.extension_names.append(vk.VK_KHR_ANDROID_SURFACE_EXTENSION_NAME)", e);
         } else {
             @compileError("not support platform");
         }
@@ -788,7 +788,7 @@ pub fn vulkan_start() void {
         };
 
         result = vk.vkCreateInstance(&createInfo, null, &vkInstance);
-        system.handle_error(result == vk.VK_SUCCESS, "__vulkan.vulkan_start.vkCreateInstance : {d}", .{result});
+        xfit.herr(result == vk.VK_SUCCESS, "__vulkan.vulkan_start.vkCreateInstance : {d}", .{result});
     }
 
     if (validation_layer_support) {
@@ -800,7 +800,7 @@ pub fn vulkan_start() void {
             .pUserData = null,
         };
         result = vk.vkCreateDebugUtilsMessengerEXT(vkInstance, &create_info, null, &vkDebugMessenger);
-        system.handle_error(result == vk.VK_SUCCESS, "__vulkan.vulkan_start.vkCreateDebugUtilsMessengerEXT : {d}", .{result});
+        xfit.herr(result == vk.VK_SUCCESS, "__vulkan.vulkan_start.vkCreateDebugUtilsMessengerEXT : {d}", .{result});
     }
 
     if (xfit.platform == .windows) {
@@ -813,23 +813,23 @@ pub fn vulkan_start() void {
 
     var deviceCount: u32 = 0;
     result = vk.vkEnumeratePhysicalDevices(vkInstance, &deviceCount, null);
-    system.handle_error(result == vk.VK_SUCCESS, "__vulkan.vulkan_start.vkEnumeratePhysicalDevices : {d}", .{result});
+    xfit.herr(result == vk.VK_SUCCESS, "__vulkan.vulkan_start.vkEnumeratePhysicalDevices : {d}", .{result});
 
-    //system.print_debug("deviceCount : {d}", .{deviceCount});
-    system.handle_error(deviceCount != 0, "__vulkan.vulkan_start.deviceCount 0", .{});
+    //xfit.print_debug("deviceCount : {d}", .{deviceCount});
+    xfit.herr(deviceCount != 0, "__vulkan.vulkan_start.deviceCount 0", .{});
     const vk_physical_devices = std.heap.c_allocator.alloc(vk.VkPhysicalDevice, deviceCount) catch
-        system.handle_error_msg2("vulkan_start.allocator.alloc(vk.VkPhysicalDevice) OutOfMemory");
+        xfit.herrm("vulkan_start.allocator.alloc(vk.VkPhysicalDevice) OutOfMemory");
     defer std.heap.c_allocator.free(vk_physical_devices);
 
     result = vk.vkEnumeratePhysicalDevices(vkInstance, &deviceCount, vk_physical_devices.ptr);
-    system.handle_error(result == vk.VK_SUCCESS, "__vulkan.vulkan_start.vkEnumeratePhysicalDevices vk_physical_devices.ptr : {d}", .{result});
+    xfit.herr(result == vk.VK_SUCCESS, "__vulkan.vulkan_start.vkEnumeratePhysicalDevices vk_physical_devices.ptr : {d}", .{result});
 
     out: for (vk_physical_devices) |pd| {
         vk.vkGetPhysicalDeviceQueueFamilyProperties(pd, &queueFamiliesCount, null);
-        system.handle_error(queueFamiliesCount != 0, "__vulkan.vulkan_start.queueFamiliesCount 0", .{});
+        xfit.herr(queueFamiliesCount != 0, "__vulkan.vulkan_start.queueFamiliesCount 0", .{});
 
         const queueFamilies = std.heap.c_allocator.alloc(vk.VkQueueFamilyProperties, queueFamiliesCount) catch
-            system.handle_error_msg2("vulkan_start.allocator.alloc(vk.VkQueueFamilyProperties) OutOfMemory");
+            xfit.herrm("vulkan_start.allocator.alloc(vk.VkQueueFamilyProperties) OutOfMemory");
         defer std.heap.c_allocator.free(queueFamilies);
 
         vk.vkGetPhysicalDeviceQueueFamilyProperties(pd, &queueFamiliesCount, queueFamilies.ptr);
@@ -841,7 +841,7 @@ pub fn vulkan_start() void {
             }
             var presentSupport: vk.VkBool32 = 0;
             result = vk.vkGetPhysicalDeviceSurfaceSupportKHR(pd, i, vkSurface, &presentSupport);
-            system.handle_error(result == vk.VK_SUCCESS, "__vulkan.vulkan_start.vkGetPhysicalDeviceSurfaceSupportKHR : {d}", .{result});
+            xfit.herr(result == vk.VK_SUCCESS, "__vulkan.vulkan_start.vkGetPhysicalDeviceSurfaceSupportKHR : {d}", .{result});
 
             if (presentSupport != 0) {
                 presentFamilyIndex = i;
@@ -877,13 +877,13 @@ pub fn vulkan_start() void {
     {
         var deviceExtensionCount: u32 = 0;
         _ = vk.vkEnumerateDeviceExtensionProperties(vk_physical_device, null, &deviceExtensionCount, null);
-        const extensions = std.heap.c_allocator.alloc(vk.VkExtensionProperties, deviceExtensionCount) catch system.handle_error_msg2("vulkan_start extensions alloc");
+        const extensions = std.heap.c_allocator.alloc(vk.VkExtensionProperties, deviceExtensionCount) catch xfit.herrm("vulkan_start extensions alloc");
         defer std.heap.c_allocator.free(extensions);
         _ = vk.vkEnumerateDeviceExtensionProperties(vk_physical_device, null, &deviceExtensionCount, extensions.ptr);
 
         var device_extension_names = ArrayList([*:0]const u8).init(std.heap.c_allocator);
         defer device_extension_names.deinit();
-        device_extension_names.append(vk.VK_KHR_SWAPCHAIN_EXTENSION_NAME) catch system.handle_error_msg2("vulkan_start dev ex append");
+        device_extension_names.append(vk.VK_KHR_SWAPCHAIN_EXTENSION_NAME) catch xfit.herrm("vulkan_start dev ex append");
         var i: u32 = 0;
 
         const ext = [_][:0]const u8{
@@ -900,7 +900,7 @@ pub fn vulkan_start() void {
         while (i < deviceExtensionCount) : (i += 1) {
             inline for (ext, checked) |t, b| {
                 if (!b.* and std.mem.eql(u8, t, extensions[i].extensionName[0..t.len])) {
-                    device_extension_names.append(t.ptr) catch system.handle_error_msg2("vulkan_start dev ex append");
+                    device_extension_names.append(t.ptr) catch xfit.herrm("vulkan_start dev ex append");
                     b.* = true;
                 }
             }
@@ -916,7 +916,7 @@ pub fn vulkan_start() void {
         };
 
         result = vk.vkCreateDevice(vk_physical_device, &deviceCreateInfo, null, &vkDevice);
-        system.handle_error(result == vk.VK_SUCCESS, "__vulkan.vulkan_start.vkCreateDevice : {d}", .{result});
+        xfit.herr(result == vk.VK_SUCCESS, "__vulkan.vulkan_start.vkCreateDevice : {d}", .{result});
     }
     if (xfit.platform == .android) VK_EXT_full_screen_exclusive_support = false;
 
@@ -955,13 +955,13 @@ pub fn vulkan_start() void {
         .borderColor = vk.VK_BORDER_COLOR_INT_OPAQUE_WHITE,
     };
     result = vk.vkCreateSampler(vkDevice, &sampler_info, null, &linear_sampler);
-    system.handle_error(result == vk.VK_SUCCESS, "__vulkan.vulkan_start.vkCreateSampler linear_sampler : {d}", .{result});
+    xfit.herr(result == vk.VK_SUCCESS, "__vulkan.vulkan_start.vkCreateSampler linear_sampler : {d}", .{result});
 
     sampler_info.mipmapMode = vk.VK_SAMPLER_MIPMAP_MODE_NEAREST;
     sampler_info.magFilter = vk.VK_FILTER_NEAREST;
     sampler_info.minFilter = vk.VK_FILTER_NEAREST;
     result = vk.vkCreateSampler(vkDevice, &sampler_info, null, &nearest_sampler);
-    system.handle_error(result == vk.VK_SUCCESS, "__vulkan.vulkan_start.vkCreateSampler nearest_sampler : {d}", .{result});
+    xfit.herr(result == vk.VK_SUCCESS, "__vulkan.vulkan_start.vkCreateSampler nearest_sampler : {d}", .{result});
 
     const depthAttachmentSample: vk.VkAttachmentDescription = .{
         .format = vk.VK_FORMAT_D24_UNORM_S8_UINT,
@@ -1050,14 +1050,14 @@ pub fn vulkan_start() void {
     };
 
     result = vk.vkCreateRenderPass(vkDevice, &renderPassInfo, null, &vkRenderPass);
-    system.handle_error(result == vk.VK_SUCCESS, "__vulkan.vulkan_start.vkCreateRenderPass vkRenderPass : {d}", .{result});
+    xfit.herr(result == vk.VK_SUCCESS, "__vulkan.vulkan_start.vkCreateRenderPass vkRenderPass : {d}", .{result});
 
     renderPassInfo.pAttachments = &[_]vk.VkAttachmentDescription{ colorAttachmentSampleClear, depthAttachmentSampleClear, colorAttachmentResolve };
     renderPassInfo.pDependencies = null;
     renderPassInfo.dependencyCount = 0;
 
     result = vk.vkCreateRenderPass(vkDevice, &renderPassInfo, null, &vkRenderPassSampleClear);
-    system.handle_error(result == vk.VK_SUCCESS, "__vulkan.vulkan_start.vkCreateRenderPass vkRenderPassSampleClear : {d}", .{result});
+    xfit.herr(result == vk.VK_SUCCESS, "__vulkan.vulkan_start.vkCreateRenderPass vkRenderPassSampleClear : {d}", .{result});
 
     //create_shader_stages
     shape_curve_vert_shader = createShaderModule(shape_curve_vert);
@@ -1091,7 +1091,7 @@ pub fn vulkan_start() void {
             .pBindings = &uboLayoutBinding,
         };
         result = vk.vkCreateDescriptorSetLayout(vkDevice, &set_layout_info, null, &quad_shape_2d_pipeline_set.descriptorSetLayout);
-        system.handle_error(result == vk.VK_SUCCESS, "__vulkan.vulkan_start.vkCreateDescriptorSetLayout quad_shape_shader_stages.descriptorSetLayout : {d}", .{result});
+        xfit.herr(result == vk.VK_SUCCESS, "__vulkan.vulkan_start.vkCreateDescriptorSetLayout quad_shape_shader_stages.descriptorSetLayout : {d}", .{result});
 
         const pipelineLayoutInfo: vk.VkPipelineLayoutCreateInfo = .{
             .sType = vk.VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
@@ -1102,7 +1102,7 @@ pub fn vulkan_start() void {
         };
 
         result = vk.vkCreatePipelineLayout(vkDevice, &pipelineLayoutInfo, null, &quad_shape_2d_pipeline_set.pipelineLayout);
-        system.handle_error(result == vk.VK_SUCCESS, "__vulkan.vulkan_start.vkCreatePipelineLayout quad_shape_shader_stages.pipelineLayout : {d}", .{result});
+        xfit.herr(result == vk.VK_SUCCESS, "__vulkan.vulkan_start.vkCreatePipelineLayout quad_shape_shader_stages.pipelineLayout : {d}", .{result});
     }
     //create_shape_color_2d_pipeline
     {
@@ -1137,7 +1137,7 @@ pub fn vulkan_start() void {
             .pBindings = &uboLayoutBinding,
         };
         result = vk.vkCreateDescriptorSetLayout(vkDevice, &set_layout_info, null, &shape_color_2d_pipeline_set.descriptorSetLayout);
-        system.handle_error(result == vk.VK_SUCCESS, "__vulkan.vulkan_start.vkCreateDescriptorSetLayout color_2d_pipeline_set.descriptorSetLayout : {d}", .{result});
+        xfit.herr(result == vk.VK_SUCCESS, "__vulkan.vulkan_start.vkCreateDescriptorSetLayout color_2d_pipeline_set.descriptorSetLayout : {d}", .{result});
 
         const pipelineLayoutInfo: vk.VkPipelineLayoutCreateInfo = .{
             .sType = vk.VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
@@ -1148,7 +1148,7 @@ pub fn vulkan_start() void {
         };
 
         result = vk.vkCreatePipelineLayout(vkDevice, &pipelineLayoutInfo, null, &shape_color_2d_pipeline_set.pipelineLayout);
-        system.handle_error(result == vk.VK_SUCCESS, "__vulkan.vulkan_start.vkCreatePipelineLayout color_2d_pipeline_set.pipelineLayout : {d}", .{result});
+        xfit.herr(result == vk.VK_SUCCESS, "__vulkan.vulkan_start.vkCreatePipelineLayout color_2d_pipeline_set.pipelineLayout : {d}", .{result});
     }
     //create_tex_2d_pipeline
     {
@@ -1195,7 +1195,7 @@ pub fn vulkan_start() void {
             .pBindings = &uboLayoutBinding,
         };
         result = vk.vkCreateDescriptorSetLayout(vkDevice, &set_layout_info, null, &tex_2d_pipeline_set.descriptorSetLayout);
-        system.handle_error(result == vk.VK_SUCCESS, "__vulkan.vulkan_start.vkCreateDescriptorSetLayout tex_2d_pipeline_set.descriptorSetLayout : {d}", .{result});
+        xfit.herr(result == vk.VK_SUCCESS, "__vulkan.vulkan_start.vkCreateDescriptorSetLayout tex_2d_pipeline_set.descriptorSetLayout : {d}", .{result});
 
         const uboLayoutBinding2 = [_]vk.VkDescriptorSetLayoutBinding{
             vk.VkDescriptorSetLayoutBinding{
@@ -1212,7 +1212,7 @@ pub fn vulkan_start() void {
             .pBindings = &uboLayoutBinding2,
         };
         result = vk.vkCreateDescriptorSetLayout(vkDevice, &set_layout_info2, null, &tex_2d_pipeline_set.descriptorSetLayout2);
-        system.handle_error(result == vk.VK_SUCCESS, "__vulkan.vulkan_start.vkCreateDescriptorSetLayout tex_2d_pipeline_set.descriptorSetLayout2 : {d}", .{result});
+        xfit.herr(result == vk.VK_SUCCESS, "__vulkan.vulkan_start.vkCreateDescriptorSetLayout tex_2d_pipeline_set.descriptorSetLayout2 : {d}", .{result});
 
         const pipelineLayoutInfo: vk.VkPipelineLayoutCreateInfo = .{
             .sType = vk.VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
@@ -1223,7 +1223,7 @@ pub fn vulkan_start() void {
         };
 
         result = vk.vkCreatePipelineLayout(vkDevice, &pipelineLayoutInfo, null, &tex_2d_pipeline_set.pipelineLayout);
-        system.handle_error(result == vk.VK_SUCCESS, "__vulkan.vulkan_start.vkCreatePipelineLayout tex_2d_pipeline_set.pipelineLayout : {d}", .{result});
+        xfit.herr(result == vk.VK_SUCCESS, "__vulkan.vulkan_start.vkCreatePipelineLayout tex_2d_pipeline_set.pipelineLayout : {d}", .{result});
     }
     //create_tex_2d_pipeline
     {
@@ -1277,7 +1277,7 @@ pub fn vulkan_start() void {
             .pBindings = &uboLayoutBinding,
         };
         result = vk.vkCreateDescriptorSetLayout(vkDevice, &set_layout_info, null, &animate_tex_2d_pipeline_set.descriptorSetLayout);
-        system.handle_error(result == vk.VK_SUCCESS, "__vulkan.vulkan_start.vkCreateDescriptorSetLayout animate_tex_2d_pipeline_set.descriptorSetLayout : {d}", .{result});
+        xfit.herr(result == vk.VK_SUCCESS, "__vulkan.vulkan_start.vkCreateDescriptorSetLayout animate_tex_2d_pipeline_set.descriptorSetLayout : {d}", .{result});
 
         const pipelineLayoutInfo: vk.VkPipelineLayoutCreateInfo = .{
             .sType = vk.VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
@@ -1288,7 +1288,7 @@ pub fn vulkan_start() void {
         };
 
         result = vk.vkCreatePipelineLayout(vkDevice, &pipelineLayoutInfo, null, &animate_tex_2d_pipeline_set.pipelineLayout);
-        system.handle_error(result == vk.VK_SUCCESS, "__vulkan.vulkan_start.vkCreatePipelineLayout animate_tex_2d_pipeline_set.pipelineLayout : {d}", .{result});
+        xfit.herr(result == vk.VK_SUCCESS, "__vulkan.vulkan_start.vkCreatePipelineLayout animate_tex_2d_pipeline_set.pipelineLayout : {d}", .{result});
     }
     create_pipelines();
 
@@ -1303,7 +1303,7 @@ pub fn vulkan_start() void {
     create_sync_object();
 
     result = vk.vkCreateCommandPool(vkDevice, &poolInfo, null, &vkCommandPool);
-    system.handle_error(result == vk.VK_SUCCESS, "__vulkan.vulkan_start.vkCreateCommandPool vkCommandPool : {d}", .{result});
+    xfit.herr(result == vk.VK_SUCCESS, "__vulkan.vulkan_start.vkCreateCommandPool vkCommandPool : {d}", .{result});
 
     const allocInfo: vk.VkCommandBufferAllocateInfo = .{
         .commandPool = vkCommandPool,
@@ -1313,7 +1313,7 @@ pub fn vulkan_start() void {
     };
 
     result = vk.vkAllocateCommandBuffers(vkDevice, &allocInfo, &vkCommandBuffer);
-    system.handle_error(result == vk.VK_SUCCESS, "vulkan_start vkAllocateCommandBuffers vkCommandPool : {d}", .{result});
+    xfit.herr(result == vk.VK_SUCCESS, "vulkan_start vkAllocateCommandBuffers vkCommandPool : {d}", .{result});
 
     __render_command.start();
 
@@ -1428,9 +1428,9 @@ fn cleanup_swapchain() void {
 
 fn create_framebuffer() void {
     vk_swapchain_frame_buffers = std.heap.c_allocator.alloc(__vulkan_allocator.frame_buffer, vk_swapchain_images.len) catch
-        system.handle_error_msg2("__vulkan.create_framebuffer.allocator.alloc(__vulkan_allocator.frame_buffer)");
+        xfit.herrm("__vulkan.create_framebuffer.allocator.alloc(__vulkan_allocator.frame_buffer)");
     vk_swapchain_frame_buffer_clears = std.heap.c_allocator.alloc(__vulkan_allocator.frame_buffer, vk_swapchain_images.len) catch
-        system.handle_error_msg2("__vulkan.create_framebuffer.allocator.alloc(__vulkan_allocator.frame_buffer)");
+        xfit.herrm("__vulkan.create_framebuffer.allocator.alloc(__vulkan_allocator.frame_buffer)");
 
     depth_stencil_image_sample.create_texture(.{
         .width = vkExtent_rotation.width,
@@ -1516,31 +1516,31 @@ fn create_swapchain_and_imageviews() void {
     var result: c_int = undefined;
     var formatCount: u32 = 0;
     result = vk.vkGetPhysicalDeviceSurfaceFormatsKHR(vk_physical_device, vkSurface, &formatCount, null);
-    system.handle_error(result == vk.VK_SUCCESS, "__vulkan.create_swapchain_and_imageviews.vkGetPhysicalDeviceSurfaceFormatsKHR : {d}", .{result});
-    system.handle_error_msg(formatCount != 0, "__vulkan.create_swapchain_and_imageviews.formatCount 0");
+    xfit.herr(result == vk.VK_SUCCESS, "__vulkan.create_swapchain_and_imageviews.vkGetPhysicalDeviceSurfaceFormatsKHR : {d}", .{result});
+    xfit.herrm2(formatCount != 0, "__vulkan.create_swapchain_and_imageviews.formatCount 0");
 
     formats = std.heap.c_allocator.alloc(vk.VkSurfaceFormatKHR, formatCount) catch
-        system.handle_error_msg2("create_swapchain_and_imageviews.allocator.alloc(vk.VkSurfaceFormatKHR) OutOfMemory");
+        xfit.herrm("create_swapchain_and_imageviews.allocator.alloc(vk.VkSurfaceFormatKHR) OutOfMemory");
 
     result = vk.vkGetPhysicalDeviceSurfaceFormatsKHR(vk_physical_device, vkSurface, &formatCount, formats.ptr);
-    system.handle_error(result == vk.VK_SUCCESS, "__vulkan.create_swapchain_and_imageviews.vkGetPhysicalDeviceSurfaceFormatsKHR formats.ptr : {d}", .{result});
-    system.handle_error_msg(formatCount != 0, "__vulkan.create_swapchain_and_imageviews.formatCount 0(2)");
+    xfit.herr(result == vk.VK_SUCCESS, "__vulkan.create_swapchain_and_imageviews.vkGetPhysicalDeviceSurfaceFormatsKHR formats.ptr : {d}", .{result});
+    xfit.herrm2(formatCount != 0, "__vulkan.create_swapchain_and_imageviews.formatCount 0(2)");
 
     var presentModeCount: u32 = 0;
     result = vk.vkGetPhysicalDeviceSurfacePresentModesKHR(vk_physical_device, vkSurface, &presentModeCount, null);
-    system.handle_error(result == vk.VK_SUCCESS, "__vulkan.create_swapchain_and_imageviews.vkGetPhysicalDeviceSurfacePresentModesKHR : {d}", .{result});
-    system.handle_error_msg(presentModeCount != 0, "__vulkan.create_swapchain_and_imageviews.vkGetPhysicalDeviceSurfacePresentModesKHR presentModeCount 0");
+    xfit.herr(result == vk.VK_SUCCESS, "__vulkan.create_swapchain_and_imageviews.vkGetPhysicalDeviceSurfacePresentModesKHR : {d}", .{result});
+    xfit.herrm2(presentModeCount != 0, "__vulkan.create_swapchain_and_imageviews.vkGetPhysicalDeviceSurfacePresentModesKHR presentModeCount 0");
 
     const presentModes = std.heap.c_allocator.alloc(vk.VkPresentModeKHR, presentModeCount) catch {
-        system.handle_error_msg2("create_swapchain_and_imageviews.allocator.alloc(vk.VkPresentModeKHR) OutOfMemory");
+        xfit.herrm("create_swapchain_and_imageviews.allocator.alloc(vk.VkPresentModeKHR) OutOfMemory");
     };
     defer std.heap.c_allocator.free(presentModes);
 
     result = vk.vkGetPhysicalDeviceSurfacePresentModesKHR(vk_physical_device, vkSurface, &presentModeCount, presentModes.ptr);
-    system.handle_error(result == vk.VK_SUCCESS, "__vulkan.create_swapchain_and_imageviews.vkGetPhysicalDeviceSurfacePresentModesKHR presentModes.ptr : {d}", .{result});
+    xfit.herr(result == vk.VK_SUCCESS, "__vulkan.create_swapchain_and_imageviews.vkGetPhysicalDeviceSurfacePresentModesKHR presentModes.ptr : {d}", .{result});
 
     result = vk.vkGetPhysicalDeviceSurfaceCapabilitiesKHR(vk_physical_device, vkSurface, @ptrCast(&surfaceCap));
-    system.handle_error(result == vk.VK_SUCCESS, "__vulkan.create_swapchain_and_imageviews.vkGetPhysicalDeviceSurfaceCapabilitiesKHR : {d}", .{result});
+    xfit.herr(result == vk.VK_SUCCESS, "__vulkan.create_swapchain_and_imageviews.vkGetPhysicalDeviceSurfaceCapabilitiesKHR : {d}", .{result});
 
     vkExtent = chooseSwapExtent(surfaceCap);
     if (vkExtent.width <= 0 or vkExtent.height <= 0) {
@@ -1617,21 +1617,21 @@ fn create_swapchain_and_imageviews() void {
     }
 
     result = vk.vkCreateSwapchainKHR(vkDevice, &swapChainCreateInfo, null, &vkSwapchain);
-    system.handle_error(result == vk.VK_SUCCESS, "__vulkan.create_swapchain_and_imageviews.vkCreateSwapchainKHR : {d}", .{result});
+    xfit.herr(result == vk.VK_SUCCESS, "__vulkan.create_swapchain_and_imageviews.vkCreateSwapchainKHR : {d}", .{result});
 
     var swapchain_image_count: u32 = 0;
 
     result = vk.vkGetSwapchainImagesKHR(vkDevice, vkSwapchain, &swapchain_image_count, null);
-    system.handle_error(result == vk.VK_SUCCESS, "__vulkan.create_swapchain_and_imageviews.vkGetSwapchainImagesKHR : {d}", .{result});
+    xfit.herr(result == vk.VK_SUCCESS, "__vulkan.create_swapchain_and_imageviews.vkGetSwapchainImagesKHR : {d}", .{result});
 
     const swapchain_images = std.heap.c_allocator.alloc(vk.VkImage, swapchain_image_count) catch
-        system.handle_error_msg2("__vulkan.create_swapchain_and_imageviews.allocator.alloc(vk.VkImage) OutOfMemory");
+        xfit.herrm("__vulkan.create_swapchain_and_imageviews.allocator.alloc(vk.VkImage) OutOfMemory");
     defer std.heap.c_allocator.free(swapchain_images);
 
     result = vk.vkGetSwapchainImagesKHR(vkDevice, vkSwapchain, &swapchain_image_count, swapchain_images.ptr);
-    system.handle_error(result == vk.VK_SUCCESS, "__vulkan.create_swapchain_and_imageviews.vkGetSwapchainImagesKHR swapchain_images.ptr : {d}", .{result});
+    xfit.herr(result == vk.VK_SUCCESS, "__vulkan.create_swapchain_and_imageviews.vkGetSwapchainImagesKHR swapchain_images.ptr : {d}", .{result});
 
-    vk_swapchain_images = std.heap.c_allocator.alloc(__vulkan_allocator.vulkan_res_node(.texture), swapchain_image_count) catch |e| system.handle_error3("vulkan_start.vk_swapchain_images alloc", e);
+    vk_swapchain_images = std.heap.c_allocator.alloc(__vulkan_allocator.vulkan_res_node(.texture), swapchain_image_count) catch |e| xfit.herr3("vulkan_start.vk_swapchain_images alloc", e);
 
     var i: usize = 0;
     while (i < swapchain_image_count) : (i += 1) {
@@ -1663,7 +1663,7 @@ fn create_swapchain_and_imageviews() void {
             },
         };
         result = vk.vkCreateImageView(vkDevice, &image_view_createInfo, null, &vk_swapchain_images[i].__image_view);
-        system.handle_error(result == vk.VK_SUCCESS, "__vulkan.create_swapchain_and_imageviews.vkCreateImageView({d}) : {d}", .{ i, result });
+        xfit.herr(result == vk.VK_SUCCESS, "__vulkan.create_swapchain_and_imageviews.vkCreateImageView({d}) : {d}", .{ i, result });
     }
 }
 
@@ -1678,7 +1678,7 @@ pub fn set_fullscreen_ex() void {
 
 ///rect는 Y가 작을수록 위
 // pub fn copy_buffer_to_image2(src_buf: vk.VkBuffer, dst_img: vk.VkImage, rect: math.recti, depth: c_uint) void {
-//     if (rect.left >= rect.right or rect.top >= rect.bottom) system.handle_error_msg2("copy_buffer_to_image2 invaild rect");
+//     if (rect.left >= rect.right or rect.top >= rect.bottom) xfit.herrm("copy_buffer_to_image2 invaild rect");
 //     const buf = begin_single_time_commands();
 
 //     const region: vk.VkBufferImageCopy = .{
@@ -1740,7 +1740,7 @@ pub fn recreate_swapchain() void {
 
     __render_command.refresh_all();
     root.xfit_size() catch |e| {
-        system.handle_error3("xfit_size", e);
+        xfit.herr3("xfit_size", e);
     };
 
     __vulkan_allocator.execute_and_wait_all_op();
@@ -1773,7 +1773,7 @@ pub fn drawFrame() void {
             return;
         }
 
-        const cmds = std.heap.c_allocator.alloc(vk.VkCommandBuffer, graphics.render_cmd.?.len + 1) catch system.handle_error_msg2("drawframe cmds alloc");
+        const cmds = std.heap.c_allocator.alloc(vk.VkCommandBuffer, graphics.render_cmd.?.len + 1) catch xfit.herrm("drawframe cmds alloc");
         defer std.heap.c_allocator.free(cmds);
 
         cmds[0] = vkCommandBuffer;
@@ -1813,21 +1813,21 @@ pub fn drawFrame() void {
             .pInheritanceInfo = null,
         };
         result = vk.vkBeginCommandBuffer(vkCommandBuffer, &beginInfo);
-        system.handle_error(result == vk.VK_SUCCESS, "__vulkan.drawFrame.vkBeginCommandBuffer : {d}", .{result});
+        xfit.herr(result == vk.VK_SUCCESS, "__vulkan.drawFrame.vkBeginCommandBuffer : {d}", .{result});
         vk.vkCmdBeginRenderPass(vkCommandBuffer, &renderPassInfo, vk.VK_SUBPASS_CONTENTS_INLINE);
         vk.vkCmdEndRenderPass(vkCommandBuffer);
         result = vk.vkEndCommandBuffer(vkCommandBuffer);
-        system.handle_error(result == vk.VK_SUCCESS, "__vulkan.drawFrame.vkEndCommandBuffer : {d}", .{result});
+        xfit.herr(result == vk.VK_SUCCESS, "__vulkan.drawFrame.vkEndCommandBuffer : {d}", .{result});
 
         result = vk.vkResetFences(vkDevice, 1, &vkInFlightFence[state.frame]);
-        system.handle_error(result == vk.VK_SUCCESS, "__vulkan.drawFrame.vkResetFences : {d}", .{result});
+        xfit.herr(result == vk.VK_SUCCESS, "__vulkan.drawFrame.vkResetFences : {d}", .{result});
 
         __vulkan_allocator.submit_mutex.lock();
         result = vk.vkQueueSubmit(vkGraphicsQueue, 1, &submitInfo, vkInFlightFence[state.frame]);
-        system.handle_error(result == vk.VK_SUCCESS, "__vulkan.drawFrame.vkQueueSubmit : {d}", .{result});
+        xfit.herr(result == vk.VK_SUCCESS, "__vulkan.drawFrame.vkQueueSubmit : {d}", .{result});
         __vulkan_allocator.submit_mutex.unlock();
         result = vk.vkWaitForFences(vkDevice, 1, &vkInFlightFence[state.frame], vk.VK_TRUE, std.math.maxInt(u64));
-        system.handle_error(result == vk.VK_SUCCESS, "__vulkan.wait_for_fences.vkWaitForFences : {d}", .{result});
+        xfit.herr(result == vk.VK_SUCCESS, "__vulkan.wait_for_fences.vkWaitForFences : {d}", .{result});
 
         const swapChains = [_]vk.VkSwapchainKHR{vkSwapchain};
 
@@ -1855,7 +1855,7 @@ pub fn drawFrame() void {
             recreateSurface();
             recreate_swapchain();
         } else {
-            system.handle_error(result == vk.VK_SUCCESS, "__vulkan.drawFrame.vkQueuePresentKHR : {d}", .{result});
+            xfit.herr(result == vk.VK_SUCCESS, "__vulkan.drawFrame.vkQueuePresentKHR : {d}", .{result});
         }
 
         state.frame = (state.frame + 1) % render_command.MAX_FRAME;
@@ -1864,7 +1864,7 @@ pub fn drawFrame() void {
 
 pub fn wait_device_idle() void {
     const result = vk.vkDeviceWaitIdle(vkDevice);
-    if (result != vk.VK_SUCCESS) system.print_error("__vulkan.vkDeviceWaitIdle : {d}", .{result});
+    if (result != vk.VK_SUCCESS) xfit.print_error("__vulkan.vkDeviceWaitIdle : {d}", .{result});
 }
 
 pub fn transition_image_layout(cmd: vk.VkCommandBuffer, image: vk.VkImage, mipLevels: u32, arrayStart: u32, arrayLayers: u32, old_layout: vk.VkImageLayout, new_layout: vk.VkImageLayout) void {
@@ -1899,7 +1899,7 @@ pub fn transition_image_layout(cmd: vk.VkCommandBuffer, image: vk.VkImage, mipLe
         source_stage = vk.VK_PIPELINE_STAGE_TRANSFER_BIT;
         destination_stage = vk.VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
     } else {
-        system.handle_error_msg2("__vulkan.transition_image_layout unsupported layout transition!");
+        xfit.herrm("__vulkan.transition_image_layout unsupported layout transition!");
     }
 
     vk.vkCmdPipelineBarrier(cmd, source_stage, destination_stage, 0, 0, null, 0, null, 1, &barrier);
