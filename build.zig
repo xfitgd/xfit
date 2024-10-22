@@ -6,8 +6,8 @@ pub const XfitPlatform = engine.XfitPlatform;
 //* User Setting
 //크로스 플랫폼 빌드시 zig build -Dtarget=aarch64-windows(linux)
 //x86_64-windows(linux)
-const PLATFORM = XfitPlatform.android;
-const OPTIMIZE = std.builtin.OptimizeMode.ReleaseFast;
+const PLATFORM = XfitPlatform.windows;
+const OPTIMIZE = std.builtin.OptimizeMode.Debug;
 
 const EXAMPLE: EXAMPLES = EXAMPLES.GRAPHICS2D;
 //*
