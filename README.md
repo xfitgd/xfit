@@ -10,4 +10,4 @@
 - [miniaudio](https://github.com/mackron/miniaudio)
 - [zig-datetime](https://github.com/frmdstryr/zig-datetime)
 - [lua](https://github.com/lua/lua)
-- [ini](https://github.com/ziglibs/ini)
+- [ini](https://github.com/ziglibs/ini), [zigini](https://github.com/Kawaii-Ash/zigini)
