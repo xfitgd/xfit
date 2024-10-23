@@ -50,10 +50,20 @@ pub fn init(
     is_console: bool, //ignores for target mobile
 ) void {
     if (builtin.os.tag == .windows) {
-        var pro = std.process.Child.init(&[_][]const u8{ engine_path ++ "/shader_compile.bat", engine_path }, b.allocator);
+        const path: []u8 = std.fmt.allocPrint(b.allocator, "{s}/shader_compile.bat", .{engine_path}) catch unreachable;
+        defer b.allocator.free(path);
+        const realpath: []u8 = std.fs.cwd().realpathAlloc(b.allocator, path) catch unreachable;
+        defer b.allocator.free(realpath);
+
+        var pro = std.process.Child.init(&[_][]const u8{ realpath, engine_path }, b.allocator);
         _ = pro.spawnAndWait() catch unreachable;
     } else {
-        var pro = std.process.Child.init(&[_][]const u8{ engine_path ++ "/shader_compile.sh", engine_path }, b.allocator);
+        const path: []u8 = std.fmt.allocPrint(b.allocator, "{s}/shader_compile.sh", .{engine_path}) catch unreachable;
+        defer b.allocator.free(path);
+        const realpath: []u8 = std.fs.cwd().realpathAlloc(b.allocator, path) catch unreachable;
+        defer b.allocator.free(realpath);
+
+        var pro = std.process.Child.init(&[_][]const u8{ realpath, engine_path }, b.allocator);
         _ = pro.spawnAndWait() catch unreachable;
     }
 

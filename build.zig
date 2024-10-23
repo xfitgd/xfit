@@ -1,5 +1,5 @@
 const std = @import("std");
-const engine = @import("engine/engine.zig");
+const engine = @import("engine.zig");
 pub const XfitPlatform = engine.XfitPlatform;
 
 //* User Setting
