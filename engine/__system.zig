@@ -139,15 +139,16 @@ pub fn init(_allocator: std.mem.Allocator, init_setting: *const xfit.init_settin
     title = allocator.dupeZ(u8, init_set.window_title) catch |e| xfit.herr3("__system.init.title = allocator.dupeZ", e);
 }
 
+pub var loop_start: std.atomic.Value(bool) = std.atomic.Value(bool).init(false);
+
 pub fn loop() void {
     const S = struct {
-        var start = false;
         var now: Timer = undefined;
     };
     const ispause = xfit.paused();
-    if (!S.start) {
+    if (!loop_start.load(.monotonic)) {
         S.now = Timer.start() catch |e| xfit.herr3("S.now = Timer.start()", e);
-        S.start = true;
+        loop_start.store(true, .monotonic);
     } else {
         delta_time = S.now.lap();
         var maxframe: u64 = xfit.get_maxframe_u64();
