@@ -264,13 +264,14 @@ pub fn exit() void {
 pub const screen_mode = enum { WINDOW, BORDERLESSSCREEN, FULLSCREEN };
 
 pub const init_setting = struct {
-    pub const DEF_POS_SIZE = @as(u32, @bitCast(__windows.CW_USEDEFAULT));
+    pub const DEF_SIZE = @as(u32, @bitCast(__windows.CW_USEDEFAULT));
+    pub const DEF_POS = __windows.CW_USEDEFAULT;
     pub const PRIMARY_SCREEN_INDEX = std.math.maxInt(u32);
     //*ignore field mobile
-    window_width: u32 = @bitCast(DEF_POS_SIZE),
-    window_height: u32 = @bitCast(DEF_POS_SIZE),
-    window_x: i32 = DEF_POS_SIZE,
-    window_y: i32 = DEF_POS_SIZE,
+    window_width: u32 = DEF_SIZE,
+    window_height: u32 = DEF_SIZE,
+    window_x: i32 = DEF_POS,
+    window_y: i32 = DEF_POS,
 
     window_show: window.window_show = window.window_show.DEFAULT,
     screen_mode: screen_mode = screen_mode.WINDOW,
@@ -318,3 +319,4 @@ pub inline fn sec_to_nano_sec(_int: anytype, _dec: anytype) u64 {
 pub inline fn sec_to_nano_sec2(_sec: anytype, _milisec: anytype, _usec: anytype, _nsec: anytype) u64 {
     return @intCast(_sec * 1000000000 + _milisec * 1000000 + _usec * 1000 + _nsec);
 }
+
