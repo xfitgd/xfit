@@ -51,6 +51,9 @@ pub inline fn getPos(self: *Self) !u64 {
 pub inline fn size(self: *Self) !u64 {
     return try self.hFile.getEndPos();
 }
+pub inline fn reader(self: *Self) std.fs.File.Reader {
+    return self.hFile.reader();
+}
 
 pub fn read_file(path: []const u8, allocator: std.mem.Allocator) ![]u8 {
     var buffer: []u8 = undefined;
