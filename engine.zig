@@ -231,7 +231,7 @@ pub fn init(
 
         result.root_module.addImport("build_options", build_options_module);
 
-        const xfit = b.addModule("xfit", .{ .root_source_file = b.path(engine_path ++ "/xfit.zig") });
+        const xfit = b.addModule("xfit", .{ .root_source_file = get_lazypath(b, engine_path ++ "/xfit.zig") });
         xfit.addImport("build_options", build_options_module);
         result.root_module.addImport("xfit", xfit);
 
