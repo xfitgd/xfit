@@ -264,7 +264,7 @@ pub fn exit() void {
 pub const screen_mode = enum { WINDOW, BORDERLESSSCREEN, FULLSCREEN };
 
 pub const init_setting = struct {
-    pub const DEF_POS_SIZE = __windows.CW_USEDEFAULT;
+    pub const DEF_POS_SIZE = @as(u32, @bitCast(__windows.CW_USEDEFAULT));
     pub const PRIMARY_SCREEN_INDEX = std.math.maxInt(u32);
     //*ignore field mobile
     window_width: u32 = @bitCast(DEF_POS_SIZE),
