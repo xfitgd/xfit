@@ -25,7 +25,7 @@
             <!-- Tell NativeActivity the name of our .so -->
             <!-- build.zig, engine.zig의 'name'과 같게 -->
             <meta-data android:name="android.app.lib_name"
-                android:value="XfitTest" />
+                android:value="@string/app_name" />
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
