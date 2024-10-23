@@ -30,7 +30,7 @@ pub const screen_orientation = enum {
     vertical360,
 };
 
-pub inline fn get_monitor_from_window() *system.monitor_info {
+pub inline fn get_monitor_from_window() *const system.monitor_info {
     if (xfit.platform == .windows) return __windows.get_monitor_from_window();
     return system.primary_monitor();
 }

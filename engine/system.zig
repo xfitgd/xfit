@@ -102,32 +102,32 @@ pub const monitor_info = struct {
         }
     }
 
-    pub fn set_fullscreen_mode(self: *Self, resolution: *screen_info) void {
+    pub fn set_fullscreen_mode(self: Self, resolution: *const screen_info) void {
         save_prev_window_state();
         if (xfit.platform == .windows) {
-            __windows.set_fullscreen_mode(self, resolution);
+            __windows.set_fullscreen_mode(&self, resolution);
             @atomicStore(xfit.screen_mode, &__system.init_set.screen_mode, xfit.screen_mode.FULLSCREEN, std.builtin.AtomicOrder.monotonic);
         } else {}
     }
-    pub fn set_borderlessscreen_mode(self: *Self) void {
+    pub fn set_borderlessscreen_mode(self: Self) void {
         save_prev_window_state();
         if (xfit.platform == .windows) {
-            __windows.set_borderlessscreen_mode(self);
+            __windows.set_borderlessscreen_mode(&self);
             @atomicStore(xfit.screen_mode, &__system.init_set.screen_mode, xfit.screen_mode.BORDERLESSSCREEN, std.builtin.AtomicOrder.monotonic);
         } else {}
     }
 };
 
-pub inline fn monitors() []monitor_info {
+pub inline fn monitors() []const monitor_info {
     return __system.monitors.items;
 }
-pub inline fn primary_monitor() *monitor_info {
+pub inline fn primary_monitor() *const monitor_info {
     return __system.primary_monitor;
 }
-pub inline fn current_monitor() ?*monitor_info {
+pub inline fn current_monitor() ?*const monitor_info {
     return __system.current_monitor;
 }
-pub inline fn current_resolution() ?*screen_info {
+pub inline fn current_resolution() ?*const screen_info {
     return __system.current_resolution;
 }
 

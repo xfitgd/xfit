@@ -16,11 +16,11 @@ fn getDefaultValue(comptime field: anytype) !field.type {
 }
 
 fn RemoveOptional(comptime T: type) type {
-    if (@typeInfo(T) == .Optional) return Child(T);
+    if (@typeInfo(T) == .optional) return Child(T);
     return T;
 }
 
 pub fn unwrapIfOptional(comptime T: type, val: T) RemoveOptional(T) {
-    if (@typeInfo(T) == .Optional) return val.?;
+    if (@typeInfo(T) == .optional) return val.?;
     return val;
 }

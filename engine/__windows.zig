@@ -280,7 +280,7 @@ pub fn set_window_pos(x: i32, y: i32) void {
     __system.prev_window.y = @intCast(y);
 }
 
-pub fn get_monitor_from_window() *system.monitor_info {
+pub fn get_monitor_from_window() *const system.monitor_info {
     const hMonitor = win32.MonitorFromWindow(hWnd, win32.MONITOR_DEFAULTTONEAREST);
     if (hMonitor == null) return system.primary_monitor();
 
@@ -323,7 +323,7 @@ pub fn set_window_title() void {
     }
 }
 
-pub fn set_borderlessscreen_mode(monitor: *system.monitor_info) void {
+pub fn set_borderlessscreen_mode(monitor: *const system.monitor_info) void {
     __vulkan.fullscreen_mutex.lock();
     _ = win32.SetWindowLongPtrA(hWnd, win32.GWL_STYLE, win32.WS_POPUP);
     _ = win32.SetWindowLongPtrA(hWnd, win32.GWL_EXSTYLE, win32.WS_EX_APPWINDOW);
@@ -362,7 +362,7 @@ pub fn __change_fullscreen_mode() void {
     }
 }
 
-fn change_fullscreen(monitor: *system.monitor_info, resolution: *system.screen_info) void {
+fn change_fullscreen(monitor: *const system.monitor_info, resolution: *const system.screen_info) void {
     fullscreen_mode.dmSize = @sizeOf(win32.DEVMODEA);
     fullscreen_mode.dmFields = win32.DM_PELSWIDTH | win32.DM_PELSHEIGHT | win32.DM_DISPLAYFREQUENCY;
     fullscreen_mode.dmPelsWidth = resolution.size[0];
@@ -379,7 +379,7 @@ fn change_fullscreen(monitor: *system.monitor_info, resolution: *system.screen_i
     }
 }
 
-pub fn set_fullscreen_mode(monitor: *system.monitor_info, resolution: *system.screen_info) void {
+pub fn set_fullscreen_mode(monitor: *const system.monitor_info, resolution: *const system.screen_info) void {
     screen_mode = xfit.screen_mode.FULLSCREEN;
     __vulkan.fullscreen_mutex.lock();
     _ = win32.SetWindowLongPtrA(hWnd, win32.GWL_STYLE, win32.WS_POPUP);
@@ -675,6 +675,16 @@ fn WindowProc(hwnd: HWND, uMsg: u32, wParam: win32.WPARAM, lParam: win32.LPARAM)
 
             if (system.a_fn(__system.window_move_func) != null) system.a_fn(__system.window_move_func).?();
         },
+        win32.WM_SIZE => {
+            @atomicStore(u32, &__system.init_set.window_width, win32.LOWORD(lParam), std.builtin.AtomicOrder.monotonic);
+            @atomicStore(u32, &__system.init_set.window_height, win32.HIWORD(lParam), std.builtin.AtomicOrder.monotonic);
+
+            if (__vulkan.vkSwapchain != null) {
+                root.xfit_size() catch |e| {
+                    xfit.herr3("xfit_size", e);
+                };
+            }
+        },
         win32.WM_MOUSEMOVE => {
             var mouse_event: win32.TRACKMOUSEEVENT = .{ .cbSize = @sizeOf(win32.TRACKMOUSEEVENT), .dwFlags = win32.TME_HOVER | win32.TME_LEAVE, .hwndTrack = hWnd, .dwHoverTime = 10 };
             if (win32.TrackMouseEvent(&mouse_event) == FALSE) {
@@ -700,7 +710,7 @@ fn WindowProc(hwnd: HWND, uMsg: u32, wParam: win32.WPARAM, lParam: win32.LPARAM)
         win32.WM_CLOSE => {
             if (root.xfit_closing() catch |e| {
                 xfit.herr3("xfit_closing", e);
-            } == false) return 0;
+            } == true) return win32.DefWindowProcA(hwnd, uMsg, wParam, lParam);
         },
         win32.WM_ERASEBKGND => return 1,
         win32.WM_DESTROY => {
@@ -709,12 +719,10 @@ fn WindowProc(hwnd: HWND, uMsg: u32, wParam: win32.WPARAM, lParam: win32.LPARAM)
             render_thread_sem.wait();
 
             __raw_input.destroy();
-            return 0;
         },
-        else => {},
+        else => return win32.DefWindowProcA(hwnd, uMsg, wParam, lParam),
     }
-
-    return win32.DefWindowProcA(hwnd, uMsg, wParam, lParam);
+    return 0;
 }
 
 fn MonitorEnumProc(hMonitor: win32.HMONITOR, hdcMonitor: win32.HDC, lprcMonitor: win32.LPRECT, dwData: win32.LPARAM) callconv(WINAPI) BOOL {

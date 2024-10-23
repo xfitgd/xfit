@@ -1567,8 +1567,10 @@ fn create_swapchain_and_imageviews() void {
     } else {
         vkExtent_rotation = vkExtent;
     }
-    @atomicStore(u32, &__system.init_set.window_width, @intCast(vkExtent.width), std.builtin.AtomicOrder.monotonic);
-    @atomicStore(u32, &__system.init_set.window_height, @intCast(vkExtent.height), std.builtin.AtomicOrder.monotonic);
+    if (xfit.platform == .android) { //if mobile
+        @atomicStore(u32, &__system.init_set.window_width, @intCast(vkExtent.width), std.builtin.AtomicOrder.monotonic);
+        @atomicStore(u32, &__system.init_set.window_height, @intCast(vkExtent.height), std.builtin.AtomicOrder.monotonic);
+    }
 
     format = chooseSwapSurfaceFormat(formats);
     const presentMode = chooseSwapPresentMode(presentModes, __system.init_set.vSync);
@@ -1739,9 +1741,11 @@ pub fn recreate_swapchain() void {
     fullscreen_mutex.unlock();
 
     __render_command.refresh_all();
-    root.xfit_size() catch |e| {
-        xfit.herr3("xfit_size", e);
-    };
+    if (xfit.platform == .android) { //if mobile
+        root.xfit_size() catch |e| {
+            xfit.herr3("xfit_size", e);
+        };
+    }
 
     __vulkan_allocator.execute_and_wait_all_op();
 }
