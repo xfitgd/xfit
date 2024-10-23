@@ -319,4 +319,3 @@ pub inline fn sec_to_nano_sec(_int: anytype, _dec: anytype) u64 {
 pub inline fn sec_to_nano_sec2(_sec: anytype, _milisec: anytype, _usec: anytype, _nsec: anytype) u64 {
     return @intCast(_sec * 1000000000 + _milisec * 1000000 + _usec * 1000 + _nsec);
 }
-

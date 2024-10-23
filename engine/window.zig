@@ -9,10 +9,10 @@ const __android = @import("__android.zig");
 const math = @import("math.zig");
 const xfit = @import("xfit.zig");
 
-pub const window_state = enum {
-    Restore,
-    Maximized,
-    Minimized,
+pub const window_state = enum(i32) {
+    Restore = __windows.win32.SW_NORMAL,
+    Maximized = __windows.win32.SW_MAXIMIZE,
+    Minimized = __windows.win32.SW_MINIMIZE,
 };
 
 pub const window_show = enum(i32) {
@@ -183,4 +183,13 @@ pub inline fn set_window_move_func(_func: *const fn () void) void {
 }
 pub inline fn set_window_size_func(_func: *const fn () void) void {
     @atomicStore(@TypeOf(__system.window_size_func), &__system.window_size_func, _func, std.builtin.AtomicOrder.monotonic);
+}
+
+pub fn get_window_state() window_state {
+    if (xfit.platform == .windows) {
+        return __windows.get_window_state();
+    } else {
+        return .Restore;
+    }
+    return __system.prev_window.state;
 }
