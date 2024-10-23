@@ -46,10 +46,10 @@ pub inline fn writeCurrentStackTrace(self: *Self) void {
     std.debug.writeCurrentStackTrace(self.*.writer(), debug_info, std.io.tty.detectConfig(self.*.hFile), @returnAddress()) catch unreachable;
 }
 pub inline fn getPos(self: *Self) !u64 {
-    try self.hFile.getPos();
+    return try self.hFile.getPos();
 }
 pub inline fn size(self: *Self) !u64 {
-    try self.hFile.getEndPos();
+    return try self.hFile.getEndPos();
 }
 
 pub fn read_file(path: []const u8, allocator: std.mem.Allocator) ![]u8 {
