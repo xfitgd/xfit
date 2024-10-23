@@ -251,13 +251,13 @@ pub fn init(
     var cmd: *std.Build.Step.Run = undefined;
     if (builtin.os.tag == .windows) {
         if (PLATFORM == XfitPlatform.android) {
-            cmd = b.addSystemCommand(&.{ engine_path ++ "/compile.bat", engine_path, b.install_path, "android", ANDROID_PATH, std.fmt.comptimePrint("{d}", .{ANDROID_VER}), ANDROID_BUILD_TOOL_VER });
+            cmd = b.addSystemCommand(&.{ engine_path ++ "/compile.bat", engine_path, b.install_path, "android", ANDROID_PATH, std.fmt.comptimePrint("{d}", .{ANDROID_VER}), ANDROID_BUILD_TOOL_VER, b.build_root.path.? });
         } else {
             cmd = b.addSystemCommand(&.{engine_path ++ "/compile.bat"});
         }
     } else {
         if (PLATFORM == XfitPlatform.android) {
-            cmd = b.addSystemCommand(&.{ engine_path ++ "/compile.bat", engine_path, b.install_path, "android", ANDROID_PATH, std.fmt.comptimePrint("{d}", .{ANDROID_VER}), ANDROID_BUILD_TOOL_VER });
+            cmd = b.addSystemCommand(&.{ engine_path ++ "/compile.sh", engine_path, b.install_path, "android", ANDROID_PATH, std.fmt.comptimePrint("{d}", .{ANDROID_VER}), ANDROID_BUILD_TOOL_VER, b.build_root.path.? });
         } else {
             cmd = b.addSystemCommand(&.{engine_path ++ "/compile.sh"});
         }
