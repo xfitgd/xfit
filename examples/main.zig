@@ -408,7 +408,7 @@ pub fn xfit_closing() !bool {
     return true;
 }
 
-pub fn main() void {
+pub fn main() !void {
     const init_setting: xfit.init_setting = .{
         .window_width = 640,
         .window_height = 480,

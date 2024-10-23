@@ -38,7 +38,7 @@ pub fn xfit_closing() !bool {
     return true;
 }
 
-pub fn main() void {
+pub fn main() !void {
     const init_setting: xfit.init_setting = .{};
     gpa = .{};
     allocator = gpa.allocator(); //must init in main

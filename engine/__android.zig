@@ -464,7 +464,9 @@ fn engine_handle_cmd(_cmd: AppEvent) void {
             if (app.window != null) {
                 if (!app.inited) {
                     //세로일 경우 원래대로?
-                    root.main();
+                    root.main() catch |e| {
+                        xfit.herr3("root.main", e);
+                    };
 
                     __vulkan_allocator.execute_and_wait_all_op();
                     app.inited = true;
