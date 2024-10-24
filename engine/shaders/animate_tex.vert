@@ -14,12 +14,20 @@ layout(set = 0, binding = 3) uniform UniformBufferObject3 {
 } pre;
 
 //#extension GL_EXT_debug_printf : enable
-layout(location = 0) in vec2 inPosition;
-layout(location = 1) in vec2 inTexCoord;
 layout(location = 0) out vec2 fragTexCoord;
 
+layout(set = 1, binding = 0) uniform sampler2DArray texSampler;
+
+vec2 quad[6] = {
+    vec2(-0.5,-0.5),
+    vec2(0.5, -0.5),
+    vec2(-0.5, 0.5),
+    vec2(0.5, -0.5),
+    vec2(0.5, 0.5),
+    vec2(-0.5, 0.5)
+};
 
 void main() {
-    gl_Position = pre.pre * proj.proj * view.view * model.model * vec4(inPosition, 0.0, 1.0);
-    fragTexCoord = inTexCoord;
+    gl_Position = pre.pre * proj.proj * view.view * model.model * vec4(quad[gl_VertexIndex] * vec2(textureSize(texSampler, 0)), 0.0, 1.0);
+    fragTexCoord = (quad[gl_VertexIndex] + vec2(0.5,0.5)) * vec2(1,-1);
 }

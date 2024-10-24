@@ -130,6 +130,4 @@ pub fn decode(self: *Self, out_fmt: image_util.color_format, data: []const u8, o
             @memcpy(out_data[idx .. idx + frame_size], buf[0..frame_size]);
         }
     }
-
-    self.*.deinit();
 }

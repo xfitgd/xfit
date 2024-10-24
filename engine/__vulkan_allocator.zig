@@ -273,10 +273,13 @@ pub const descriptor_set = struct {
     __set: vk.VkDescriptorSet = null,
     size: []const descriptor_pool_size,
     bindings: []const c_uint,
-    res: []res_union = undefined,
+    __res: []res_union = undefined,
 };
 
 pub fn update_descriptor_sets(sets: []descriptor_set) void {
+    for (sets) |*v| {
+        v.*.__res = __system.allocator.dupe(res_union, v.*.__res) catch unreachable;
+    }
     append_op(.{ .__update_descriptor_sets = .{ .sets = sets } });
 }
 
@@ -474,14 +477,14 @@ fn execute_create_texture(buf: *vulkan_res_node(.texture), _data: ?[]const u8) v
     var last: *vulkan_res_node(.buffer) = undefined;
     if (_data != null and buf.*.texture_option.use == .gpu) {
         img_info.usage |= vk.VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-        if (img_info.extent.width * img_info.extent.width * img_info.extent.depth * img_info.arrayLayers * bit > _data.?.len) {
+        if (img_info.extent.width * img_info.extent.height * img_info.extent.depth * img_info.arrayLayers * bit > _data.?.len) {
             xfit.herrm("create_texture _data not enough size.");
         }
 
         last = staging_buf_queue.create() catch unreachable;
         last.* = .{};
         last.*.__create_buffer(.{
-            .len = img_info.extent.width * img_info.extent.width * img_info.extent.depth * img_info.arrayLayers * bit,
+            .len = img_info.extent.width * img_info.extent.height * img_info.extent.depth * img_info.arrayLayers * bit,
             .use = .cpu,
             .typ = .staging,
             .single = false,
@@ -594,7 +597,7 @@ fn execute_update_descriptor_sets(sets: []descriptor_set) void {
         var buf_cnt: usize = 0;
         var img_cnt: usize = 0;
         //v.res 배열이 v.size 구성에 맞아야 한다.
-        for (v.res) |r| {
+        for (v.__res) |r| {
             if (r == .buf) {
                 buf_cnt += 1;
             } else if (r == .tex) {
@@ -605,7 +608,7 @@ fn execute_update_descriptor_sets(sets: []descriptor_set) void {
         const imgs = __system.allocator.alloc(vk.VkDescriptorImageInfo, img_cnt) catch unreachable;
         buf_cnt = 0;
         img_cnt = 0;
-        for (v.res) |r| {
+        for (v.__res) |r| {
             if (r == .buf) {
                 bufs[buf_cnt] = .{
                     .buffer = r.buf.*.res,
@@ -755,7 +758,10 @@ fn thread_func() void {
                     switch (v.*.?) {
                         .copy_buffer => execute_copy_buffer(v.*.?.copy_buffer.src, v.*.?.copy_buffer.target),
                         .copy_buffer_to_image => execute_copy_buffer_to_image(v.*.?.copy_buffer_to_image.src, v.*.?.copy_buffer_to_image.target),
-                        .__update_descriptor_sets => execute_update_descriptor_sets(v.*.?.__update_descriptor_sets.sets),
+                        .__update_descriptor_sets => {
+                            execute_update_descriptor_sets(v.*.?.__update_descriptor_sets.sets);
+                            continue;
+                        },
                         else => continue,
                     }
                     v.* = null;
@@ -781,6 +787,21 @@ fn thread_func() void {
             result = vk.vkQueueSubmit(__vulkan.vkGraphicsQueue, 1, &submitInfo, null);
             xfit.herr(result == vk.VK_SUCCESS, "__vulkan.queue_submit_and_wait.vkQueueSubmit : {d}", .{result});
             submit_mutex.unlock();
+
+            for (op_save_queue.items) |*v| {
+                if (v.* != null) {
+                    switch (v.*.?) {
+                        .__update_descriptor_sets => {
+                            for (v.*.?.__update_descriptor_sets.sets) |e| {
+                                __system.allocator.free(e.__res);
+                            }
+                        },
+                        else => continue,
+                    }
+                    v.* = null;
+                }
+            }
+
             result = vk.vkQueueWaitIdle(__vulkan.vkGraphicsQueue);
             xfit.herr(result == vk.VK_SUCCESS, "__vulkan.queue_submit_and_wait.vkQueueWaitIdle : {d}", .{result});
         }

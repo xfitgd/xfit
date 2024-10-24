@@ -39,10 +39,10 @@ pub const animate_object = struct {
         }
         return 0;
     }
-    pub inline fn get_frame_count_build(self: *animate_object) u32 {
+    pub inline fn get_tex_count_build(self: *animate_object) u32 {
         switch (self.obj.*) {
-            inline ._anim_image => |*case| return case.*.src.*.get_frame_count_build(),
-            else => xfit.print_error("WARN animate_object.get_frame_count_build not support\n", .{}),
+            inline ._anim_image => |*case| return case.*.src.*.get_tex_count_build(),
+            else => xfit.print_error("WARN animate_object.get_tex_count_build not support\n", .{}),
         }
         return 0;
     }
@@ -77,7 +77,7 @@ pub const multi_player = struct {
             while (self.*.__playing_dt >= 1 / self.*.target_fps) : (self.*.__playing_dt -= 1 / self.*.target_fps) {
                 var isp: bool = false;
                 for (self.*.objs) |v| {
-                    if (self.*.loop or v.cur_frame() < v.get_frame_count_build() - 1) {
+                    if (self.*.loop or v.cur_frame() < v.get_tex_count_build() - 1) {
                         v.next_frame();
                         isp = true;
                     }
@@ -125,7 +125,7 @@ pub const player = struct {
             const dt: f32 = @floatCast(_dt);
             self.*.__playing_dt += dt;
             while (self.*.__playing_dt >= 1 / self.*.target_fps) : (self.*.__playing_dt -= 1 / self.*.target_fps) {
-                if (self.*.loop or self.*.obj.cur_frame() < self.*.obj.get_frame_count_build() - 1) {
+                if (self.*.loop or self.*.obj.cur_frame() < self.*.obj.get_tex_count_build() - 1) {
                     self.*.obj.next_frame();
                 } else {
                     self.*.stop();

@@ -61,7 +61,6 @@ pub const button = struct {
     area: iarea,
     state: button_state = .UP,
     __set: descriptor_set,
-    __set_res: [4]res_union = .{undefined} ** 4,
     on_over: ?*const fn (self: *Self, _mouse_pos: point) void = null,
     on_down: ?*const fn (self: *Self, _mouse_pos: point) void = null,
     on_up: ?*const fn (self: *Self, _mouse_pos: ?point) void = null,
@@ -216,11 +215,13 @@ pub const button = struct {
     }
 
     pub fn update(self: *Self) void {
-        self.*.__set_res[0] = .{ .buf = &self.*.transform.__model_uniform };
-        self.*.__set_res[1] = .{ .buf = &self.*.transform.camera.?.*.__uniform };
-        self.*.__set_res[2] = .{ .buf = &self.*.transform.projection.?.*.__uniform };
-        self.*.__set_res[3] = .{ .buf = &__vulkan.__pre_mat_uniform };
-        self.*.__set.res = self.*.__set_res[0..4];
+        var __set_res: [4]res_union = .{
+            .{ .buf = &self.*.transform.__model_uniform },
+            .{ .buf = &self.*.transform.camera.?.*.__uniform },
+            .{ .buf = &self.*.transform.projection.?.*.__uniform },
+            .{ .buf = &__vulkan.__pre_mat_uniform },
+        };
+        self.*.__set.__res = __set_res[0..4];
         __vulkan_allocator.update_descriptor_sets((&self.*.__set)[0..1]);
     }
     pub fn build(self: *Self) void {

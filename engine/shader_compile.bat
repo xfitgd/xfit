@@ -11,4 +11,4 @@ for %%a in (%shader_list%) do (
     glslc %ENGINE_DIR%/shaders/%%a.frag -O -o %ENGINE_DIR%/shaders/out/%%a_frag.spv
 )
 
- glslc %ENGINE_DIR%/shaders/screen_copy.frag -O -o %ENGINE_DIR%/shaders/out/screen_copy_frag.spv
+glslc %ENGINE_DIR%/shaders/screen_copy.frag -O -o %ENGINE_DIR%/shaders/out/screen_copy_frag.spv

@@ -144,39 +144,29 @@ pub fn xfit_init() !void {
 
     rect_button_text_src = components.button.source.init_for_alloc(allocator);
 
-    img.* = .{ ._image = graphics.image.init() };
-    anim_img.* = .{ ._anim_image = graphics.animate_image.init() };
-
     const data = file_.read_file("test.webp", allocator) catch |e| xfit.herr3("test.webp read_file", e);
     defer allocator.free(data);
     var img_decoder: webp = .{};
+    defer img_decoder.deinit();
     img_decoder.load_header(data) catch |e| xfit.herr3("test.webp loadheader fail", e);
 
     image_src = graphics.texture.init();
-    image_src.width = img_decoder.width();
-    image_src.height = img_decoder.height();
-    image_src.pixels = try allocator.alloc(u8, img_decoder.width() * img_decoder.height() * 4);
-
-    img_decoder.decode(.RGBA, data, image_src.pixels.?) catch |e| xfit.herr3("test.webp decode", e);
+    const image_pixels = try allocator.alloc(u8, img_decoder.width() * img_decoder.height() * 4);
+    img_decoder.decode(.RGBA, data, image_pixels) catch |e| xfit.herr3("test.webp decode", e);
+    image_src.build(img_decoder.width(), img_decoder.height(), image_pixels);
 
     const anim_data = file_.read_file("wasp.webp", allocator) catch |e| xfit.herr3("wasp.webp read_file", e);
     defer allocator.free(anim_data);
     img_decoder.load_anim_header(anim_data) catch |e| xfit.herr3("wasp.webp load_anim_header fail", e);
 
     anim_image_src = graphics.texture_array.init();
-    anim_image_src.sampler = graphics.texture_array.get_default_nearest_sampler();
-    anim_image_src.width = img_decoder.width();
-    anim_image_src.height = img_decoder.height();
-    anim_image_src.frames = img_decoder.frame_count();
-    anim_image_src.pixels = try allocator.alloc(u8, img_decoder.size(.RGBA));
+    anim_image_src.sampler = graphics.get_default_nearest_sampler();
+    const anim_pixels = try allocator.alloc(u8, img_decoder.size(.RGBA));
+    img_decoder.decode(.RGBA, data, anim_pixels) catch |e| xfit.herr3("wasp.webp decode", e);
+    anim_image_src.build(img_decoder.width(), img_decoder.height(), img_decoder.frame_count(), anim_pixels);
 
-    img_decoder.decode(.RGBA, data, anim_image_src.pixels.?) catch |e| xfit.herr3("wasp.webp decode", e);
-
-    anim_image_src.build();
-    image_src.build();
-
-    img.*._image.src = &image_src;
-    anim_img.*._anim_image.src = &anim_image_src;
+    img.* = .{ ._image = graphics.image.init(&image_src) };
+    anim_img.* = .{ ._anim_image = graphics.animate_image.init(&anim_image_src) };
 
     font0_data = file_.read_file("Spoqa Han Sans Regular.woff", allocator) catch |e| xfit.herr3("read_file font0_data", e);
     font0 = font.init(font0_data, 0) catch |e| xfit.herr3("font0.init", e);
@@ -302,11 +292,12 @@ fn key_down(_key: input.key) void {
             else => {
                 if (_key == input.key.Esc) {
                     xfit.exit();
-                } else if (_key == input.key.Enter) {
-                    img.*._image.transform.model = matrix.scaling(2, 2, 1.0).multiply(&matrix.translation(0, 0, if (image_front) 0.7 else 0.3));
-                    image_front = !image_front;
-                    img.*._image.transform.copy_update();
                 }
+                //  else if (_key == input.key.Enter) {
+                //     img.*._image.transform.model = matrix.scaling(2, 2, 1.0).multiply(&matrix.translation(0, 0, if (image_front) 0.7 else 0.3));
+                //     image_front = !image_front;
+                //     img.*._image.transform.copy_update();
+                // } 이제 shape와 image의 정렬을 위해서는 renderCommand를 여러개 만들어 따로 렌더링해야 합니다.
             },
         }
     }
