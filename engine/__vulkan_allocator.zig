@@ -161,6 +161,8 @@ pub fn deinit() void {
     arena_allocator.deinit();
 
     vk.vkDestroyCommandPool(__vulkan.vkDevice, cmd_pool, null);
+
+    if (xfit.dbg and gpa.deinit() != .ok) unreachable;
 }
 
 pub var POOL_BLOCK: c_uint = 256;
