@@ -994,7 +994,6 @@ pub fn vulkan_res_node(_res_type: res_type) type {
         //     @memcpy(@as([*]u8, @ptrCast(data.?))[0..u8data.len], u8data);
         //     self.*.pvulkan_buffer.?.*.unmap();
         // }
-        ///copy_update와 달리 _data는 임시변수이면 안됩니다.
         fn alloc_map(self: *vulkan_res_node_Self) void {
             if (self.*.map_data == null) {
                 if (_res_type == .buffer) {
@@ -1004,6 +1003,7 @@ pub fn vulkan_res_node(_res_type: res_type) type {
                 }
             }
         }
+        ///copy_update와 달리 _data는 임시변수이면 안됩니다.
         pub fn map_update(self: *vulkan_res_node_Self, _data: anytype) void {
             const u8data = mem.obj_to_u8arrC(_data);
             self.*.map_copy(u8data);
