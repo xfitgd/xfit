@@ -94,7 +94,7 @@ fn load_glyph(self: *Self, _char: u21) u21 {
     return _char;
 }
 
-fn init_shape_src(out_shape_src: *graphics.shape.source, allocator: std.mem.Allocator) !void {
+fn init_shape_src(out_shape_src: anytype, allocator: std.mem.Allocator) !void {
     if (out_shape_src.vertices.array != null) allocator.free(out_shape_src.*.vertices.array.?);
     if (out_shape_src.indices.array != null) allocator.free(out_shape_src.*.indices.array.?);
     out_shape_src.*.vertices.array = try allocator.alloc(graphics.shape_color_vertex_2d, 0);
@@ -107,8 +107,8 @@ pub const render_option = struct {
     pivot: point = .{ 0, 0 },
     area: ?point = null,
 };
-
-pub fn render_string(self: *Self, _str: []const u8, _render_option: render_option, out_shape_src: *graphics.shape.source, allocator: std.mem.Allocator) !void {
+///out_shape_src is *shape, *pixel_shape
+pub fn render_string(self: *Self, _str: []const u8, _render_option: render_option, out_shape_src: anytype, allocator: std.mem.Allocator) !void {
     try init_shape_src(out_shape_src, allocator);
     const start_ = out_shape_src.*.vertices.array.?.len;
     var maxP: point = .{ std.math.floatMin(f32), std.math.floatMin(f32) };
@@ -135,7 +135,7 @@ pub fn render_string(self: *Self, _str: []const u8, _render_option: render_optio
     }
 }
 
-fn _render_char(self: *Self, char: u21, out_shape_src: *graphics.shape.source, offset: *point, area: ?math.point, scale: point, allocator: std.mem.Allocator) !void {
+fn _render_char(self: *Self, char: u21, out_shape_src: anytype, offset: *point, area: ?math.point, scale: point, allocator: std.mem.Allocator) !void {
     var char_d: ?*char_data = self.*.__char_array.getPtr(char);
 
     if (char_d != null) {} else blk: {

@@ -144,6 +144,7 @@ const iobject_type = enum {
     _anim_image,
     _button,
     _tile_image,
+    _pixel_shape,
     //_sprite_image,
 };
 pub const iobject = union(iobject_type) {
@@ -153,6 +154,7 @@ pub const iobject = union(iobject_type) {
     _anim_image: animate_image,
     _button: components.button,
     _tile_image: tile_image,
+    _pixel_shape: pixel_shape,
 
     pub inline fn deinit(self: *Self) void {
         switch (self.*) {
@@ -616,126 +618,131 @@ pub const tile_texture_array = struct {
     }
 };
 
-pub const shape = struct {
-    const Self = @This();
+pub const shape = shape_(true);
+pub const pixel_shape = shape_(false);
 
-    pub const source = struct {
-        vertices: vertices(shape_color_vertex_2d),
-        indices: indices32,
-        color: vector = .{ 1, 1, 1, 1 },
-        __uniform: vulkan_res_node(.buffer) = .{},
+pub fn shape_(_msaa: bool) type {
+    return struct {
+        const Self = @This();
+
+        pub const source = struct {
+            vertices: vertices(shape_color_vertex_2d),
+            indices: indices32,
+            color: vector = .{ 1, 1, 1, 1 },
+            __uniform: vulkan_res_node(.buffer) = .{},
+            __set: descriptor_set,
+
+            pub fn init() source {
+                return .{
+                    .vertices = vertices(shape_color_vertex_2d).init(),
+                    .indices = indices32.init(),
+                    .__set = .{
+                        .bindings = single_pool_binding[0..1],
+                        .size = single_uniform_pool_sizes[0..1],
+                        .layout = __vulkan.quad_shape_2d_pipeline_set.descriptorSetLayout,
+                    },
+                };
+            }
+            pub fn init_for_alloc(__allocator: std.mem.Allocator) source {
+                return .{
+                    .vertices = vertices(shape_color_vertex_2d).init_for_alloc(__allocator),
+                    .indices = indices32.init_for_alloc(__allocator),
+                    .__set = .{
+                        .bindings = single_pool_binding[0..1],
+                        .size = single_uniform_pool_sizes[0..1],
+                        .layout = __vulkan.quad_shape_2d_pipeline_set.descriptorSetLayout,
+                    },
+                };
+            }
+            pub fn build(self: *source, _flag: write_flag, _color_flag: write_flag) void {
+                if (self.*.vertices.array == null or self.*.vertices.array.?.len == 0) return;
+                self.*.vertices.build(_flag) catch return;
+                self.*.indices.build(_flag);
+
+                self.*.__uniform.create_buffer(.{
+                    .len = @sizeOf(vector),
+                    .typ = .uniform,
+                    .use = _color_flag,
+                }, mem.obj_to_u8arrC(&self.*.color));
+
+                var __set_res: [1]res_union = .{
+                    .{ .buf = &self.*.__uniform },
+                };
+                self.*.__set.__res = __set_res[0..1];
+                __vulkan_allocator.update_descriptor_sets((&self.*.__set)[0..1]);
+            }
+            pub fn deinit(self: *source) void {
+                self.*.vertices.deinit();
+                self.*.indices.deinit();
+                self.*.__uniform.clean();
+            }
+            pub fn deinit_for_alloc(self: *source) void {
+                self.*.vertices.deinit_for_alloc();
+                self.*.indices.deinit_for_alloc();
+                self.*.__uniform.clean();
+            }
+            ///write_flag가 cpu일때만 호출
+            pub fn copy_color_update(self: *source) void {
+                self.*.__uniform.copy_update(&self.*.color);
+            }
+        };
+
+        transform: transform = .{ .parent_type = if (_msaa) ._shape else ._pixel_shape },
+        src: *source,
+        extra_src: ?[]*source = null,
         __set: descriptor_set,
 
-        pub fn init() source {
+        pub fn init(_src: *source) Self {
             return .{
-                .vertices = vertices(shape_color_vertex_2d).init(),
-                .indices = indices32.init(),
                 .__set = .{
                     .bindings = single_pool_binding[0..1],
-                    .size = single_uniform_pool_sizes[0..1],
-                    .layout = __vulkan.quad_shape_2d_pipeline_set.descriptorSetLayout,
+                    .size = transform_uniform_pool_sizes[0..1],
+                    .layout = __vulkan.shape_color_2d_pipeline_set.descriptorSetLayout,
                 },
+                .src = _src,
             };
         }
-        pub fn init_for_alloc(__allocator: std.mem.Allocator) source {
-            return .{
-                .vertices = vertices(shape_color_vertex_2d).init_for_alloc(__allocator),
-                .indices = indices32.init_for_alloc(__allocator),
-                .__set = .{
-                    .bindings = single_pool_binding[0..1],
-                    .size = single_uniform_pool_sizes[0..1],
-                    .layout = __vulkan.quad_shape_2d_pipeline_set.descriptorSetLayout,
-                },
+        pub fn update(self: *Self) void {
+            var __set_res: [4]res_union = .{
+                .{ .buf = &self.*.transform.__model_uniform },
+                .{ .buf = &self.*.transform.camera.?.*.__uniform },
+                .{ .buf = &self.*.transform.projection.?.*.__uniform },
+                .{ .buf = &__vulkan.__pre_mat_uniform },
             };
-        }
-        pub fn build(self: *source, _flag: write_flag, _color_flag: write_flag) void {
-            if (self.*.vertices.array == null or self.*.vertices.array.?.len == 0) return;
-            self.*.vertices.build(_flag) catch return;
-            self.*.indices.build(_flag);
-
-            self.*.__uniform.create_buffer(.{
-                .len = @sizeOf(vector),
-                .typ = .uniform,
-                .use = _color_flag,
-            }, mem.obj_to_u8arrC(&self.*.color));
-
-            var __set_res: [1]res_union = .{
-                .{ .buf = &self.*.__uniform },
-            };
-            self.*.__set.__res = __set_res[0..1];
+            self.*.__set.__res = __set_res[0..4];
             __vulkan_allocator.update_descriptor_sets((&self.*.__set)[0..1]);
         }
-        pub fn deinit(self: *source) void {
-            self.*.vertices.deinit();
-            self.*.indices.deinit();
-            self.*.__uniform.clean();
+        pub fn build(self: *Self) void {
+            self.*.transform.__build();
+            self.*.update();
         }
-        pub fn deinit_for_alloc(self: *source) void {
-            self.*.vertices.deinit_for_alloc();
-            self.*.indices.deinit_for_alloc();
-            self.*.__uniform.clean();
+        pub fn deinit(self: *Self) void {
+            self.*.transform.__deinit();
         }
-        ///write_flag가 cpu일때만 호출
-        pub fn copy_color_update(self: *source) void {
-            self.*.__uniform.copy_update(&self.*.color);
-        }
-    };
+        pub fn __draw(self: *Self, cmd: vk.VkCommandBuffer) void {
+            self.*.transform.__check_init.check_inited();
+            for (&[_][]const *source{ &[_]*source{self.*.src}, self.*.extra_src orelse &[_]*source{} }) |srcs| {
+                for (srcs) |src| {
+                    if (src.*.vertices.node.res == null or src.*.indices.node.res == null) continue;
+                    vk.vkCmdBindPipeline(cmd, vk.VK_PIPELINE_BIND_POINT_GRAPHICS, if (_msaa) __vulkan.shape_color_2d_pipeline_set.pipeline else __vulkan.pixel_shape_color_2d_pipeline_set.pipeline);
 
-    transform: transform = .{ .parent_type = ._shape },
-    src: *source,
-    extra_src: ?[]*source = null,
-    __set: descriptor_set,
+                    vk.vkCmdBindDescriptorSets(cmd, vk.VK_PIPELINE_BIND_POINT_GRAPHICS, __vulkan.shape_color_2d_pipeline_set.pipelineLayout, 0, 1, &self.*.__set.__set, 0, null);
 
-    pub fn init(_src: *source) Self {
-        return .{
-            .__set = .{
-                .bindings = single_pool_binding[0..1],
-                .size = transform_uniform_pool_sizes[0..1],
-                .layout = __vulkan.shape_color_2d_pipeline_set.descriptorSetLayout,
-            },
-            .src = _src,
-        };
-    }
-    pub fn update(self: *Self) void {
-        var __set_res: [4]res_union = .{
-            .{ .buf = &self.*.transform.__model_uniform },
-            .{ .buf = &self.*.transform.camera.?.*.__uniform },
-            .{ .buf = &self.*.transform.projection.?.*.__uniform },
-            .{ .buf = &__vulkan.__pre_mat_uniform },
-        };
-        self.*.__set.__res = __set_res[0..4];
-        __vulkan_allocator.update_descriptor_sets((&self.*.__set)[0..1]);
-    }
-    pub fn build(self: *Self) void {
-        self.*.transform.__build();
-        self.*.update();
-    }
-    pub fn deinit(self: *Self) void {
-        self.*.transform.__deinit();
-    }
-    pub fn __draw(self: *Self, cmd: vk.VkCommandBuffer) void {
-        self.*.transform.__check_init.check_inited();
-        for (&[_][]const *source{ &[_]*source{self.*.src}, self.*.extra_src orelse &[_]*source{} }) |srcs| {
-            for (srcs) |src| {
-                if (src.*.vertices.node.res == null or src.*.indices.node.res == null) continue;
-                vk.vkCmdBindPipeline(cmd, vk.VK_PIPELINE_BIND_POINT_GRAPHICS, __vulkan.shape_color_2d_pipeline_set.pipeline);
+                    const offsets: vk.VkDeviceSize = 0;
+                    vk.vkCmdBindVertexBuffers(cmd, 0, 1, &src.*.vertices.node.res, &offsets);
 
-                vk.vkCmdBindDescriptorSets(cmd, vk.VK_PIPELINE_BIND_POINT_GRAPHICS, __vulkan.shape_color_2d_pipeline_set.pipelineLayout, 0, 1, &self.*.__set.__set, 0, null);
+                    vk.vkCmdBindIndexBuffer(cmd, src.*.indices.node.res, 0, vk.VK_INDEX_TYPE_UINT32);
+                    vk.vkCmdDrawIndexed(cmd, src.*.indices.node.buffer_option.len / get_idx_type_size(self.*.src.*.indices.idx_type), 1, 0, 0, 0);
 
-                const offsets: vk.VkDeviceSize = 0;
-                vk.vkCmdBindVertexBuffers(cmd, 0, 1, &src.*.vertices.node.res, &offsets);
+                    vk.vkCmdBindPipeline(cmd, vk.VK_PIPELINE_BIND_POINT_GRAPHICS, if (_msaa) __vulkan.quad_shape_2d_pipeline_set.pipeline else __vulkan.pixel_quad_shape_2d_pipeline_set.pipeline);
 
-                vk.vkCmdBindIndexBuffer(cmd, src.*.indices.node.res, 0, vk.VK_INDEX_TYPE_UINT32);
-                vk.vkCmdDrawIndexed(cmd, src.*.indices.node.buffer_option.len / get_idx_type_size(self.*.src.*.indices.idx_type), 1, 0, 0, 0);
-
-                vk.vkCmdBindPipeline(cmd, vk.VK_PIPELINE_BIND_POINT_GRAPHICS, __vulkan.quad_shape_2d_pipeline_set.pipeline);
-
-                vk.vkCmdBindDescriptorSets(cmd, vk.VK_PIPELINE_BIND_POINT_GRAPHICS, __vulkan.quad_shape_2d_pipeline_set.pipelineLayout, 0, 1, &src.*.__set.__set, 0, null);
-                vk.vkCmdDraw(cmd, 6, 1, 0, 0);
+                    vk.vkCmdBindDescriptorSets(cmd, vk.VK_PIPELINE_BIND_POINT_GRAPHICS, __vulkan.quad_shape_2d_pipeline_set.pipelineLayout, 0, 1, &src.*.__set.__set, 0, null);
+                    vk.vkCmdDraw(cmd, 6, 1, 0, 0);
+                }
             }
         }
-    }
-};
+    };
+}
 
 pub const center_pt_pos = enum {
     center,
