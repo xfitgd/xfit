@@ -683,6 +683,7 @@ fn WindowProc(hwnd: HWND, uMsg: u32, wParam: win32.WPARAM, lParam: win32.LPARAM)
                 root.xfit_size() catch |e| {
                     xfit.herr3("xfit_size", e);
                 };
+                __system.size_update.store(true, .monotonic);
             }
         },
         win32.WM_MOUSEMOVE => {

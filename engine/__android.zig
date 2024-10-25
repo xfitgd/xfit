@@ -19,8 +19,6 @@ pub const c_allocator = std.heap.c_allocator;
 
 pub const android = @import("include/android.zig");
 
-pub var orientationChanged: bool = false;
-
 inline fn LOGI(fmt: [*c]const u8, args: anytype) c_int {
     return @call(.auto, android.__android_log_print, .{ android.ANDROID_LOG_INFO, "xfit", fmt } ++ args);
 }
@@ -103,9 +101,6 @@ const android_app = struct {
     sensor_manager: ?*android.ASensorManager = null,
     accelerometer_sensor: ?*const android.ASensor = null,
     sensor_event_queue: ?*android.ASensorEventQueue = null,
-
-    width: i32 = 0,
-    height: i32 = 0,
 
     inited: bool = false,
     paused: bool = false,
@@ -471,7 +466,7 @@ fn engine_handle_cmd(_cmd: AppEvent) void {
                     __vulkan_allocator.execute_and_wait_all_op();
                     app.inited = true;
                 } else {
-                    orientationChanged = true;
+                    __system.size_update.store(true, .monotonic);
                 }
             }
         },
@@ -503,7 +498,7 @@ fn engine_handle_cmd(_cmd: AppEvent) void {
             var prop: vk.VkSurfaceCapabilitiesKHR = undefined;
             _ = vk.vkGetPhysicalDeviceSurfaceCapabilitiesKHR(__vulkan.vk_physical_device, __vulkan.vkSurface, &prop);
             if (prop.currentExtent.width != __vulkan.vkExtent.width or prop.currentExtent.height != __vulkan.vkExtent.height) {
-                orientationChanged = true;
+                __system.size_update.store(true, .monotonic);
             }
         },
         else => {},

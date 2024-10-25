@@ -2008,11 +2008,9 @@ pub fn drawFrame() void {
     if (vkExtent.width <= 0 or vkExtent.height <= 0) {
         recreate_swapchain();
         return;
-    } else if (xfit.platform == .android) {
-        if (__android.orientationChanged) {
-            recreate_swapchain();
-            __android.orientationChanged = false;
-        }
+    } else if (__system.size_update.load(.monotonic)) {
+        recreate_swapchain();
+        __system.size_update.store(false, .monotonic);
     }
 
     if (graphics.render_cmd != null) {
