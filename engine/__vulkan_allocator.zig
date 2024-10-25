@@ -790,11 +790,11 @@ fn thread_func() void {
             xfit.herr(result == vk.VK_SUCCESS, "__vulkan.queue_submit_and_wait.vkQueueSubmit : {d}", .{result});
             submit_mutex.unlock();
 
-            if (!arena_allocator.reset(.retain_capacity)) unreachable;
-
             result = vk.vkQueueWaitIdle(__vulkan.vkGraphicsQueue);
             xfit.herr(result == vk.VK_SUCCESS, "__vulkan.queue_submit_and_wait.vkQueueWaitIdle : {d}", .{result});
         }
+
+        if (!arena_allocator.reset(.retain_capacity)) unreachable;
 
         for (op_save_queue.items) |*v| {
             if (v.* != null) {
