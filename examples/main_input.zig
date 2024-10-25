@@ -141,7 +141,7 @@ pub fn main() !void {
         .window_height = 480,
         .use_console = true,
     };
-    gpa = .{};
+    gpa = std.heap.GeneralPurposeAllocator(.{}).init;
     allocator = gpa.allocator(); //must init in main
     xfit.xfit_main(allocator, &init_setting);
 }

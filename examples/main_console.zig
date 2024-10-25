@@ -40,7 +40,7 @@ pub fn xfit_closing() !bool {
 
 pub fn main() !void {
     const init_setting: xfit.init_setting = .{};
-    gpa = .{};
+    gpa = std.heap.GeneralPurposeAllocator(.{}).init;
     allocator = gpa.allocator(); //must init in main
     xfit.xfit_main(allocator, &init_setting);
 }

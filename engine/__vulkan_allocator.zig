@@ -24,6 +24,8 @@ pub var supported_noncache_local: bool = false;
 
 pub var execute_all_cmd_per_update: std.atomic.Value(bool) = std.atomic.Value(bool).init(true);
 var arena_allocator: std.heap.ArenaAllocator = undefined;
+var gpa: std.heap.GeneralPurposeAllocator(.{ .thread_safe = false }) = undefined;
+var single_allocator: std.mem.Allocator = undefined;
 
 pub fn init_block_len() void {
     var i: u32 = 0;
@@ -88,24 +90,25 @@ var cmd: vk.VkCommandBuffer = undefined;
 var cmd_pool: vk.VkCommandPool = undefined;
 var descriptor_pools: HashMap([*]const descriptor_pool_size, ArrayList(descriptor_pool_memory)) = undefined;
 var set_list: ArrayList(vk.VkWriteDescriptorSet) = undefined;
-var set_list_res: ArrayList(struct { []vk.VkDescriptorBufferInfo, []vk.VkDescriptorImageInfo }) = undefined;
 var dataMutex: std.Thread.Mutex = .{};
 
 pub fn init() void {
-    buffers = MemoryPoolExtra(vulkan_res, .{}).init(__system.allocator);
-    buffer_ids = ArrayList(*vulkan_res).init(__system.allocator);
-    memory_idx_counts = __system.allocator.alloc(u16, __vulkan.mem_prop.memoryTypeCount) catch |e| xfit.herr3("__vulkan_allocator init alloc memory_idx_counts", e);
-    op_queue = ArrayList(?operation_node).init(__system.allocator);
-    op_save_queue = ArrayList(?operation_node).init(__system.allocator);
-    op_map_queue = ArrayList(?operation_node).init(__system.allocator);
-    staging_buf_queue = MemoryPoolExtra(vulkan_res_node(.buffer), .{}).init(__system.allocator);
-    descriptor_pools = HashMap([*]const descriptor_pool_size, ArrayList(descriptor_pool_memory)).init(__system.allocator);
-    set_list = ArrayList(vk.VkWriteDescriptorSet).init(__system.allocator);
-    set_list_res = @TypeOf(set_list_res).init(__system.allocator);
+    gpa = std.heap.GeneralPurposeAllocator(.{ .thread_safe = false }).init;
+    single_allocator = gpa.allocator(); //must init in main
+
+    buffers = MemoryPoolExtra(vulkan_res, .{}).init(single_allocator);
+    buffer_ids = ArrayList(*vulkan_res).init(single_allocator);
+    memory_idx_counts = single_allocator.alloc(u16, __vulkan.mem_prop.memoryTypeCount) catch |e| xfit.herr3("__vulkan_allocator init alloc memory_idx_counts", e);
+    op_queue = ArrayList(?operation_node).init(single_allocator);
+    op_save_queue = ArrayList(?operation_node).init(single_allocator);
+    op_map_queue = ArrayList(?operation_node).init(single_allocator);
+    staging_buf_queue = MemoryPoolExtra(vulkan_res_node(.buffer), .{}).init(single_allocator);
+    descriptor_pools = HashMap([*]const descriptor_pool_size, ArrayList(descriptor_pool_memory)).init(single_allocator);
+    set_list = ArrayList(vk.VkWriteDescriptorSet).init(single_allocator);
 
     @memset(memory_idx_counts, 0);
 
-    arena_allocator = std.heap.ArenaAllocator.init(__system.allocator);
+    arena_allocator = std.heap.ArenaAllocator.init(single_allocator);
 
     // ! vk.VK_COMMAND_POOL_CREATE_TRANSIENT_BIT 쓰면 안드로이드 에서 팅김
     const poolInfo: vk.VkCommandPoolCreateInfo = .{
@@ -140,7 +143,7 @@ pub fn deinit() void {
     }
     buffers.deinit();
     buffer_ids.deinit();
-    __system.allocator.free(memory_idx_counts);
+    single_allocator.free(memory_idx_counts);
     op_queue.deinit();
     op_save_queue.deinit();
     op_map_queue.deinit();
@@ -154,7 +157,6 @@ pub fn deinit() void {
         v.*.deinit();
     }
     set_list.deinit();
-    set_list_res.deinit();
     descriptor_pools.deinit();
     arena_allocator.deinit();
 
@@ -552,8 +554,8 @@ fn execute_register_descriptor_pool(__size: []descriptor_pool_size) void {
     //TODO execute_register_descriptor_pool
 }
 fn __create_descriptor_pool(size: []const descriptor_pool_size, out: *descriptor_pool_memory) void {
-    const pool_size = __system.allocator.alloc(vk.VkDescriptorPoolSize, size.len) catch xfit.herrm("execute_update_descriptor_sets vk.VkDescriptorPoolSize alloc");
-    defer __system.allocator.free(pool_size);
+    const pool_size = single_allocator.alloc(vk.VkDescriptorPoolSize, size.len) catch xfit.herrm("execute_update_descriptor_sets vk.VkDescriptorPoolSize alloc");
+    defer single_allocator.free(pool_size);
     for (size, pool_size) |e, *p| {
         p.*.descriptorCount = e.cnt * POOL_BLOCK;
         p.*.type = @intFromEnum(e.typ);
@@ -574,7 +576,7 @@ fn execute_update_descriptor_sets(sets: []descriptor_set) void {
         if (v.*.__set == null) {
             const pool = descriptor_pools.getPtr(v.*.size.ptr) orelse blk: {
                 const res = descriptor_pools.getOrPut(v.*.size.ptr) catch unreachable;
-                res.value_ptr.* = ArrayList(descriptor_pool_memory).init(__system.allocator);
+                res.value_ptr.* = ArrayList(descriptor_pool_memory).init(single_allocator);
                 res.value_ptr.*.append(.{ .pool = undefined, .cnt = 0 }) catch unreachable;
                 const last = &res.value_ptr.*.items[0];
                 __create_descriptor_pool(v.*.size, last);
@@ -608,8 +610,8 @@ fn execute_update_descriptor_sets(sets: []descriptor_set) void {
                 img_cnt += 1;
             }
         }
-        const bufs = __system.allocator.alloc(vk.VkDescriptorBufferInfo, buf_cnt) catch unreachable;
-        const imgs = __system.allocator.alloc(vk.VkDescriptorImageInfo, img_cnt) catch unreachable;
+        const bufs = arena_allocator.allocator().alloc(vk.VkDescriptorBufferInfo, buf_cnt) catch unreachable;
+        const imgs = arena_allocator.allocator().alloc(vk.VkDescriptorImageInfo, img_cnt) catch unreachable;
         buf_cnt = 0;
         img_cnt = 0;
         for (v.__res) |r| {
@@ -661,7 +663,6 @@ fn execute_update_descriptor_sets(sets: []descriptor_set) void {
                 },
             }
         }
-        set_list_res.append(.{ bufs, imgs }) catch unreachable;
     }
 }
 
@@ -773,12 +774,7 @@ fn thread_func() void {
             }
             if (set_list.items.len > 0) {
                 vk.vkUpdateDescriptorSets(__vulkan.vkDevice, @intCast(set_list.items.len), set_list.items.ptr, 0, null);
-                for (set_list_res.items) |v| {
-                    __system.allocator.free(v[0]);
-                    __system.allocator.free(v[1]);
-                }
                 set_list.resize(0) catch unreachable;
-                set_list_res.resize(0) catch unreachable;
             }
             result = vk.vkEndCommandBuffer(cmd);
             xfit.herr(result == vk.VK_SUCCESS, "end_single_time_commands.vkEndCommandBuffer : {d}", .{result});
@@ -1072,7 +1068,7 @@ const vulkan_res = struct {
         var end: usize = std.math.minInt(usize);
         var ranges: []vk.VkMappedMemoryRange = undefined;
         if (self.*.cached) {
-            ranges = __system.allocator.alignedAlloc(vk.VkMappedMemoryRange, @alignOf(vk.VkMappedMemoryRange), nodes.len) catch unreachable;
+            ranges = arena_allocator.allocator().alignedAlloc(vk.VkMappedMemoryRange, @alignOf(vk.VkMappedMemoryRange), nodes.len) catch unreachable;
 
             for (nodes, ranges) |v, *r| {
                 const copy = v.?.map_copy;
@@ -1120,7 +1116,6 @@ const vulkan_res = struct {
         }
         if (self.*.cached) {
             _ = vk.vkFlushMappedMemoryRanges(__vulkan.vkDevice, @intCast(ranges.len), ranges.ptr);
-            __system.allocator.free(ranges);
         }
     }
     pub fn is_empty(self: *vulkan_res) bool {
@@ -1155,7 +1150,7 @@ const vulkan_res = struct {
                 .memoryTypeIndex = find_memory_type(type_filter, _prop) orelse return null,
             },
             .list = .{},
-            .pool = MemoryPoolExtra(DoublyLinkedList(node).Node, .{}).init(__system.allocator),
+            .pool = MemoryPoolExtra(DoublyLinkedList(node).Node, .{}).init(single_allocator),
             .cached = (_prop & vk.VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT != 0) and (_prop & vk.VK_MEMORY_PROPERTY_HOST_CACHED_BIT != 0),
         };
         if (!allocate_memory(&res.info, &res.mem)) {
