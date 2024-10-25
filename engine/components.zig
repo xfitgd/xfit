@@ -57,7 +57,7 @@ pub const button = struct {
     const Self = @This();
 
     transform: transform = .{ .parent_type = ._button },
-    src: []*source = undefined,
+    srcs: []*source,
     area: iarea,
     state: button_state = .UP,
     __set: descriptor_set,
@@ -66,7 +66,7 @@ pub const button = struct {
     on_up: ?*const fn (self: *Self, _mouse_pos: ?point) void = null,
     _touch_idx: ?u32 = null,
 
-    pub fn init(_area: iarea) Self {
+    pub fn init(_srcs: []*source, _area: iarea) Self {
         return .{
             .__set = .{
                 .bindings = graphics.single_pool_binding[0..1],
@@ -74,12 +74,13 @@ pub const button = struct {
                 .layout = __vulkan.shape_color_2d_pipeline_set.descriptorSetLayout,
             },
             .area = _area,
+            .srcs = _srcs,
         };
     }
 
     fn update_color(self: *Self) void {
-        for (self.*.src) |v| {
-            if (v.*.up_color == null) continue;
+        for (self.*.srcs) |v| {
+            if (v.*.up_color == null or v.*.src.vertices.node.res == null or v.*.src.indices.node.res == null) continue;
             if (self.*.state == .UP) {
                 v.*.src.color = v.*.up_color.?;
                 v.*.src.copy_color_update();
@@ -232,8 +233,9 @@ pub const button = struct {
         self.*.transform.__deinit();
     }
     pub fn __draw(self: *Self, cmd: vk.VkCommandBuffer) void {
-        for (self.*.src) |_src| {
+        for (self.*.srcs) |_src| {
             const src = &_src.*.src;
+            if (src.*.vertices.node.res == null or src.*.indices.node.res == null) continue;
             vk.vkCmdBindPipeline(cmd, vk.VK_PIPELINE_BIND_POINT_GRAPHICS, __vulkan.shape_color_2d_pipeline_set.pipeline);
 
             vk.vkCmdBindDescriptorSets(cmd, vk.VK_PIPELINE_BIND_POINT_GRAPHICS, __vulkan.shape_color_2d_pipeline_set.pipelineLayout, 0, 1, &self.*.__set.__set, 0, null);

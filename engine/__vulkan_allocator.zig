@@ -23,6 +23,7 @@ pub var supported_cache_local: bool = false;
 pub var supported_noncache_local: bool = false;
 
 pub var execute_all_cmd_per_update: std.atomic.Value(bool) = std.atomic.Value(bool).init(true);
+var arena_allocator: std.heap.ArenaAllocator = undefined;
 
 pub fn init_block_len() void {
     var i: u32 = 0;
@@ -104,6 +105,8 @@ pub fn init() void {
 
     @memset(memory_idx_counts, 0);
 
+    arena_allocator = std.heap.ArenaAllocator.init(__system.allocator);
+
     // ! vk.VK_COMMAND_POOL_CREATE_TRANSIENT_BIT 쓰면 안드로이드 에서 팅김
     const poolInfo: vk.VkCommandPoolCreateInfo = .{
         .sType = vk.VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
@@ -153,6 +156,7 @@ pub fn deinit() void {
     set_list.deinit();
     set_list_res.deinit();
     descriptor_pools.deinit();
+    arena_allocator.deinit();
 
     vk.vkDestroyCommandPool(__vulkan.vkDevice, cmd_pool, null);
 }
@@ -278,7 +282,7 @@ pub const descriptor_set = struct {
 
 pub fn update_descriptor_sets(sets: []descriptor_set) void {
     for (sets) |*v| {
-        v.*.__res = __system.allocator.dupe(res_union, v.*.__res) catch unreachable;
+        v.*.__res = arena_allocator.allocator().dupe(res_union, v.*.__res) catch unreachable;
     }
     append_op(.{ .__update_descriptor_sets = .{ .sets = sets } });
 }
@@ -788,19 +792,7 @@ fn thread_func() void {
             xfit.herr(result == vk.VK_SUCCESS, "__vulkan.queue_submit_and_wait.vkQueueSubmit : {d}", .{result});
             submit_mutex.unlock();
 
-            for (op_save_queue.items) |*v| {
-                if (v.* != null) {
-                    switch (v.*.?) {
-                        .__update_descriptor_sets => {
-                            for (v.*.?.__update_descriptor_sets.sets) |e| {
-                                __system.allocator.free(e.__res);
-                            }
-                        },
-                        else => continue,
-                    }
-                    v.* = null;
-                }
-            }
+            if (!arena_allocator.reset(.retain_capacity)) unreachable;
 
             result = vk.vkQueueWaitIdle(__vulkan.vkGraphicsQueue);
             xfit.herr(result == vk.VK_SUCCESS, "__vulkan.queue_submit_and_wait.vkQueueWaitIdle : {d}", .{result});
@@ -827,7 +819,7 @@ fn thread_func() void {
         finish_cond.broadcast();
         mutex.unlock();
 
-        _ = staging_buf_queue.reset(.free_all);
+        if (!staging_buf_queue.reset(.retain_capacity)) unreachable;
         op_save_queue.resize(0) catch unreachable;
     }
 }

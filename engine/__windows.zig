@@ -712,6 +712,25 @@ fn WindowProc(hwnd: HWND, uMsg: u32, wParam: win32.WPARAM, lParam: win32.LPARAM)
                 xfit.herr3("xfit_closing", e);
             } == true) return win32.DefWindowProcA(hwnd, uMsg, wParam, lParam);
         },
+        win32.WM_GETMINMAXINFO => {
+            const info: [*c]win32.MINMAXINFO = @ptrFromInt(@as(usize, @bitCast(lParam)));
+            const maxw = window.get_max_window_width();
+            const maxh = window.get_max_window_height();
+            const minw = window.get_min_window_width();
+            const minh = window.get_min_window_height();
+            if (maxw != 0 and maxw != xfit.init_setting.DEF_SIZE) {
+                info.*.ptMaxTrackSize.x = @intCast(maxw);
+            }
+            if (maxh != 0 and maxh != xfit.init_setting.DEF_SIZE) {
+                info.*.ptMaxTrackSize.y = @intCast(maxh);
+            }
+            if (minw != 0 and minw != xfit.init_setting.DEF_SIZE) {
+                info.*.ptMinTrackSize.x = @intCast(minw);
+            }
+            if (minh != 0 and minh != xfit.init_setting.DEF_SIZE) {
+                info.*.ptMinTrackSize.y = @intCast(minh);
+            }
+        },
         win32.WM_ERASEBKGND => return 1,
         win32.WM_DESTROY => {
             win32.PostQuitMessage(0);

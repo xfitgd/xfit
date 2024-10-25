@@ -26,7 +26,7 @@ var resourceManager: miniaudio.ma_resource_manager = undefined;
 var g_mutex: std.Thread.Mutex = .{};
 var g_mutex2: std.Thread.Mutex = .{};
 var g_sem: std.Thread.Semaphore = .{};
-var sounds: AutoHashMap(*Self, *Self) = undefined;
+var sounds: AutoHashMap(*Self, void) = undefined;
 
 __sound: ?miniaudio.ma_sound = null,
 __audio_buf: miniaudio.ma_audio_buffer = undefined,
@@ -36,7 +36,7 @@ pub fn start() void {
     if (xfit.dbg and __system.sound_started) xfit.herrm("sound already started");
     __system.sound_started = true;
 
-    sounds = AutoHashMap(*Self, *Self).init(std.heap.c_allocator);
+    sounds = AutoHashMap(*Self, void).init(std.heap.c_allocator);
     g_ends = ArrayList(*Self).init(std.heap.c_allocator);
 
     var resourceManagerConfig = miniaudio.ma_resource_manager_config_init();
@@ -147,7 +147,7 @@ pub const sound_source = struct {
             return std.posix.UnexpectedError.Unexpected;
         }
         g_mutex.lock();
-        try sounds.put(result_sound, result_sound);
+        try sounds.put(result_sound, {});
         g_mutex.unlock();
         return result_sound;
     }
@@ -228,7 +228,7 @@ pub fn play_sound(path: []const u8, volume: f32, loop: bool) !?*Self {
         return std.posix.UnexpectedError.Unexpected;
     }
     g_mutex.lock();
-    try sounds.put(self, self);
+    try sounds.put(self, {});
     g_mutex.unlock();
     return self;
 }

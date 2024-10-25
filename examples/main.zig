@@ -129,20 +129,17 @@ pub fn xfit_init() !void {
     img = try objects_mem_pool.create();
     anim_img = try objects_mem_pool.create();
 
-    rect_button.* = .{ ._button = components.button.init(.{ .rect = math.rect.calc_with_canvas(button_area_rect, CANVAS_W, CANVAS_H) }) };
-    try components.button.make_square_button(rect_button_srcs[0..2], .{ 100, 50 }, allocator);
-    rect_button.*._button.transform.camera = &g_camera;
-    rect_button.*._button.transform.projection = &g_proj;
-    rect_button.*.build();
-
-    text_shape.* = .{ ._shape = graphics.shape.init() };
     shape_src = graphics.shape.source.init_for_alloc(allocator);
     shape_src.color = .{ 1, 1, 1, 0.5 };
+
+    text_shape.* = .{ ._shape = graphics.shape.init(&shape_src) };
 
     shape_src2 = graphics.shape.source.init_for_alloc(allocator);
     shape_src2.color = .{ 1, 0, 1, 1 };
 
     rect_button_text_src = components.button.source.init_for_alloc(allocator);
+
+    try components.button.make_square_button(rect_button_srcs[0..2], .{ 100, 50 }, allocator);
 
     const data = file_.read_file("test.webp", allocator) catch |e| xfit.herr3("test.webp read_file", e);
     defer allocator.free(data);
@@ -183,11 +180,13 @@ pub fn xfit_init() !void {
     rect_button_text_src.src.color = .{ 0, 0, 0, 1 };
     rect_button_text_src.src.build(.gpu, .cpu);
 
-    rect_button.*._button.src = rect_button_srcs[0..3];
+    rect_button.* = .{ ._button = components.button.init(rect_button_srcs[0..3], .{ .rect = math.rect.calc_with_canvas(button_area_rect, CANVAS_W, CANVAS_H) }) };
+    rect_button.*._button.transform.camera = &g_camera;
+    rect_button.*._button.transform.projection = &g_proj;
+    rect_button.*.build();
 
     text_shape.*._shape.transform.camera = &g_camera;
     text_shape.*._shape.transform.projection = &g_proj;
-    text_shape.*._shape.src = &shape_src;
     text_shape.*._shape.extra_src = extra_src[0..1];
 
     text_shape.*._shape.transform.model = matrix.scaling(5, 5, 1.0).multiply(&matrix.translation(-200, 0, 0.5));

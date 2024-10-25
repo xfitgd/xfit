@@ -272,6 +272,10 @@ pub const init_setting = struct {
     window_height: u32 = DEF_SIZE,
     window_x: i32 = DEF_POS,
     window_y: i32 = DEF_POS,
+    max_window_width: u32 = DEF_SIZE, //or 0
+    max_window_height: u32 = DEF_SIZE,
+    min_window_width: u32 = DEF_SIZE,
+    min_window_height: u32 = DEF_SIZE,
 
     window_show: window.window_show = window.window_show.DEFAULT,
     screen_mode: screen_mode = screen_mode.WINDOW,
@@ -306,12 +310,12 @@ pub inline fn get_maxframe_u64() u64 {
 pub inline fn get_maxframe() f64 {
     return @as(f64, @floatFromInt(get_maxframe_u64())) / 1000000000.0;
 }
-///nanosec 1 / 1000000000 sec
-pub inline fn set_maxframe_u64(_maxframe: u64) void {
-    @atomicStore(u64, &__system.init_set.maxframe, _maxframe, std.builtin.AtomicOrder.monotonic);
+//nanosec 1 / 1000000000 sec
+pub inline fn set_maxframe_64(_maxframe: u64) void {
+    @atomicStore(u64, &__system.init_set.maxframe, _maxframe, .monotonic);
 }
 
-///_int * 1000000000 + _dec
+//_int * 1000000000 + _dec
 pub inline fn sec_to_nano_sec(_int: anytype, _dec: anytype) u64 {
     return @intCast(_int * 1000000000 + _dec);
 }

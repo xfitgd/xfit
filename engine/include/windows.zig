@@ -3739,6 +3739,16 @@ pub const struct_tagDROPSTRUCT = extern struct {
     ptDrop: POINT = @import("std").mem.zeroes(POINT),
     dwControlData: DWORD = @import("std").mem.zeroes(DWORD),
 };
+pub const MINMAXINFO = extern struct {
+    ptReserved: POINT,
+    ptMaxSize: POINT,
+    ptMaxPosition: POINT,
+    ptMinTrackSize: POINT,
+    ptMaxTrackSize: POINT,
+};
+pub const PMINMAXINFO = [*c]MINMAXINFO;
+pub const LPMINMAXINFO = [*c]MINMAXINFO;
+
 pub const DROPSTRUCT = struct_tagDROPSTRUCT;
 pub const PDROPSTRUCT = [*c]struct_tagDROPSTRUCT;
 pub const LPDROPSTRUCT = [*c]struct_tagDROPSTRUCT;

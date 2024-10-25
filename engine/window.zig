@@ -193,3 +193,28 @@ pub fn get_window_state() window_state {
     }
     return __system.prev_window.state;
 }
+
+pub fn get_min_window_width() u32 {
+    return @atomicLoad(u32, &__system.init_set.min_window_width, .monotonic);
+}
+pub fn get_min_window_height() u32 {
+    return @atomicLoad(u32, &__system.init_set.min_window_height, .monotonic);
+}
+pub fn get_max_window_width() u32 {
+    return @atomicLoad(u32, &__system.init_set.max_window_width, .monotonic);
+}
+pub fn get_max_window_height() u32 {
+    return @atomicLoad(u32, &__system.init_set.max_window_height, .monotonic);
+}
+pub fn set_min_window_width(v: u32) void {
+    @atomicStore(u32, &__system.init_set.min_window_width, v, .monotonic);
+}
+pub fn set_min_window_height(v: u32) void {
+    @atomicStore(u32, &__system.init_set.min_window_height, v, .monotonic);
+}
+pub fn set_max_window_width(v: u32) void {
+    @atomicStore(u32, &__system.init_set.max_window_width, v, .monotonic);
+}
+pub fn set_max_window_height(v: u32) void {
+    @atomicStore(u32, &__system.init_set.max_window_height, v, .monotonic);
+}

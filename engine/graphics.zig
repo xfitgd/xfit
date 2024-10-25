@@ -682,17 +682,18 @@ pub const shape = struct {
     };
 
     transform: transform = .{ .parent_type = ._shape },
-    src: *source = undefined,
+    src: *source,
     extra_src: ?[]*source = null,
     __set: descriptor_set,
 
-    pub fn init() Self {
+    pub fn init(_src: *source) Self {
         return .{
             .__set = .{
                 .bindings = single_pool_binding[0..1],
                 .size = transform_uniform_pool_sizes[0..1],
                 .layout = __vulkan.shape_color_2d_pipeline_set.descriptorSetLayout,
             },
+            .src = _src,
         };
     }
     pub fn update(self: *Self) void {
@@ -714,39 +715,22 @@ pub const shape = struct {
     }
     pub fn __draw(self: *Self, cmd: vk.VkCommandBuffer) void {
         self.*.transform.__check_init.check_inited();
-        self.*.src.*.vertices.__check_init.check_inited();
-        self.*.src.*.indices.__check_init.check_inited();
-
-        vk.vkCmdBindPipeline(cmd, vk.VK_PIPELINE_BIND_POINT_GRAPHICS, __vulkan.shape_color_2d_pipeline_set.pipeline);
-
-        vk.vkCmdBindDescriptorSets(cmd, vk.VK_PIPELINE_BIND_POINT_GRAPHICS, __vulkan.shape_color_2d_pipeline_set.pipelineLayout, 0, 1, &self.*.__set.__set, 0, null);
-
-        const offsets: vk.VkDeviceSize = 0;
-        vk.vkCmdBindVertexBuffers(cmd, 0, 1, &self.*.src.*.vertices.node.res, &offsets);
-
-        vk.vkCmdBindIndexBuffer(cmd, self.*.src.*.indices.node.res, 0, vk.VK_INDEX_TYPE_UINT32);
-        vk.vkCmdDrawIndexed(cmd, self.*.src.*.indices.node.buffer_option.len / get_idx_type_size(self.*.src.*.indices.idx_type), 1, 0, 0, 0);
-
-        vk.vkCmdBindPipeline(cmd, vk.VK_PIPELINE_BIND_POINT_GRAPHICS, __vulkan.quad_shape_2d_pipeline_set.pipeline);
-
-        vk.vkCmdBindDescriptorSets(cmd, vk.VK_PIPELINE_BIND_POINT_GRAPHICS, __vulkan.quad_shape_2d_pipeline_set.pipelineLayout, 0, 1, &self.*.src.*.__set.__set, 0, null);
-        vk.vkCmdDraw(cmd, 6, 1, 0, 0);
-
-        if (self.*.extra_src != null and self.*.extra_src.?.len > 0) {
-            for (self.*.extra_src.?) |src| {
-                src.*.vertices.__check_init.check_inited();
-                src.*.indices.__check_init.check_inited();
-
+        for (&[_][]const *source{ &[_]*source{self.*.src}, self.*.extra_src orelse &[_]*source{} }) |srcs| {
+            for (srcs) |src| {
+                if (src.*.vertices.node.res == null or src.*.indices.node.res == null) continue;
                 vk.vkCmdBindPipeline(cmd, vk.VK_PIPELINE_BIND_POINT_GRAPHICS, __vulkan.shape_color_2d_pipeline_set.pipeline);
+
                 vk.vkCmdBindDescriptorSets(cmd, vk.VK_PIPELINE_BIND_POINT_GRAPHICS, __vulkan.shape_color_2d_pipeline_set.pipelineLayout, 0, 1, &self.*.__set.__set, 0, null);
+
+                const offsets: vk.VkDeviceSize = 0;
                 vk.vkCmdBindVertexBuffers(cmd, 0, 1, &src.*.vertices.node.res, &offsets);
 
                 vk.vkCmdBindIndexBuffer(cmd, src.*.indices.node.res, 0, vk.VK_INDEX_TYPE_UINT32);
-                vk.vkCmdDrawIndexed(cmd, src.*.indices.node.buffer_option.len / get_idx_type_size(src.*.indices.idx_type), 1, 0, 0, 0);
+                vk.vkCmdDrawIndexed(cmd, src.*.indices.node.buffer_option.len / get_idx_type_size(self.*.src.*.indices.idx_type), 1, 0, 0, 0);
 
                 vk.vkCmdBindPipeline(cmd, vk.VK_PIPELINE_BIND_POINT_GRAPHICS, __vulkan.quad_shape_2d_pipeline_set.pipeline);
-                vk.vkCmdBindDescriptorSets(cmd, vk.VK_PIPELINE_BIND_POINT_GRAPHICS, __vulkan.quad_shape_2d_pipeline_set.pipelineLayout, 0, 1, &src.*.__set.__set, 0, null);
 
+                vk.vkCmdBindDescriptorSets(cmd, vk.VK_PIPELINE_BIND_POINT_GRAPHICS, __vulkan.quad_shape_2d_pipeline_set.pipelineLayout, 0, 1, &src.*.__set.__set, 0, null);
                 vk.vkCmdDraw(cmd, 6, 1, 0, 0);
             }
         }
