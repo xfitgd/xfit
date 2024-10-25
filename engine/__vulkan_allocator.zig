@@ -23,7 +23,8 @@ pub var supported_cache_local: bool = false;
 pub var supported_noncache_local: bool = false;
 
 pub var execute_all_cmd_per_update: std.atomic.Value(bool) = std.atomic.Value(bool).init(true);
-var arena_allocator: std.heap.ArenaAllocator = undefined;
+//var arena_allocator: std.heap.ArenaAllocator = undefined;
+var single_arena_allocator: std.heap.ArenaAllocator = undefined;
 var gpa: std.heap.GeneralPurposeAllocator(.{ .thread_safe = false }) = undefined;
 var single_allocator: std.mem.Allocator = undefined;
 
@@ -108,7 +109,8 @@ pub fn init() void {
 
     @memset(memory_idx_counts, 0);
 
-    arena_allocator = std.heap.ArenaAllocator.init(single_allocator);
+    //arena_allocator = std.heap.ArenaAllocator.init(__system.allocator);
+    single_arena_allocator = std.heap.ArenaAllocator.init(single_allocator);
 
     // ! vk.VK_COMMAND_POOL_CREATE_TRANSIENT_BIT 쓰면 안드로이드 에서 팅김
     const poolInfo: vk.VkCommandPoolCreateInfo = .{
@@ -158,7 +160,8 @@ pub fn deinit() void {
     }
     set_list.deinit();
     descriptor_pools.deinit();
-    arena_allocator.deinit();
+    //arena_allocator.deinit();
+    single_arena_allocator.deinit();
 
     vk.vkDestroyCommandPool(__vulkan.vkDevice, cmd_pool, null);
 
@@ -285,9 +288,6 @@ pub const descriptor_set = struct {
 };
 
 pub fn update_descriptor_sets(sets: []descriptor_set) void {
-    for (sets) |*v| {
-        v.*.__res = arena_allocator.allocator().dupe(res_union, v.*.__res) catch unreachable;
-    }
     append_op(.{ .__update_descriptor_sets = .{ .sets = sets } });
 }
 
@@ -612,8 +612,8 @@ fn execute_update_descriptor_sets(sets: []descriptor_set) void {
                 img_cnt += 1;
             }
         }
-        const bufs = arena_allocator.allocator().alloc(vk.VkDescriptorBufferInfo, buf_cnt) catch unreachable;
-        const imgs = arena_allocator.allocator().alloc(vk.VkDescriptorImageInfo, img_cnt) catch unreachable;
+        const bufs = single_arena_allocator.allocator().alloc(vk.VkDescriptorBufferInfo, buf_cnt) catch unreachable;
+        const imgs = single_arena_allocator.allocator().alloc(vk.VkDescriptorImageInfo, img_cnt) catch unreachable;
         buf_cnt = 0;
         img_cnt = 0;
         for (v.__res) |r| {
@@ -794,7 +794,7 @@ fn thread_func() void {
             xfit.herr(result == vk.VK_SUCCESS, "__vulkan.queue_submit_and_wait.vkQueueWaitIdle : {d}", .{result});
         }
 
-        if (!arena_allocator.reset(.retain_capacity)) unreachable;
+        if (!single_arena_allocator.reset(.retain_capacity)) unreachable;
 
         for (op_save_queue.items) |*v| {
             if (v.* != null) {
@@ -872,6 +872,12 @@ fn find_memory_type(_type_filter: u32, _prop: vk.VkMemoryPropertyFlags) ?u32 {
 fn append_op(node: operation_node) void {
     mutex.lock();
     defer mutex.unlock();
+
+    if (node == .__update_descriptor_sets) {
+        for (node.__update_descriptor_sets.sets) |*v| {
+            v.*.__res = single_arena_allocator.allocator().dupe(res_union, v.*.__res) catch unreachable;
+        }
+    }
     op_queue.append(node) catch xfit.herrm("self.op_queue.append");
     // if (self.op_queue.items.len == 12) {
     //     unreachable;
@@ -1070,7 +1076,7 @@ const vulkan_res = struct {
         var end: usize = std.math.minInt(usize);
         var ranges: []vk.VkMappedMemoryRange = undefined;
         if (self.*.cached) {
-            ranges = arena_allocator.allocator().alignedAlloc(vk.VkMappedMemoryRange, @alignOf(vk.VkMappedMemoryRange), nodes.len) catch unreachable;
+            ranges = single_arena_allocator.allocator().alignedAlloc(vk.VkMappedMemoryRange, @alignOf(vk.VkMappedMemoryRange), nodes.len) catch unreachable;
 
             for (nodes, ranges) |v, *r| {
                 const copy = v.?.map_copy;
