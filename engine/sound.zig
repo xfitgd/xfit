@@ -141,7 +141,7 @@ pub const sound_source = struct {
         sound_config.endCallback = end_callback;
         sound_config.pEndCallbackUserData = @ptrCast(result_sound);
         sound_config.pDataSource = &result_sound.*.__audio_buf;
-        sound_config.isLooping = if (loop) 1 else 0;
+        sound_config.isLooping = if (loop) miniaudio.MA_TRUE else miniaudio.MA_FALSE;
 
         result_sound.*.__sound = undefined;
 
@@ -224,7 +224,7 @@ pub fn play_sound(path: []const u8, volume: f32, loop: bool) !?*Self {
     sound_config.endCallback = end_callback;
     sound_config.pEndCallbackUserData = @ptrCast(self);
     sound_config.pDataSource = &self.*.__audio_buf;
-    sound_config.isLooping = if (loop) 1 else 0;
+    sound_config.isLooping = if (loop) miniaudio.MA_TRUE else miniaudio.MA_FALSE;
 
     result = miniaudio.ma_sound_init_ex(&engine, &sound_config, &self.*.__sound.?);
     if (result != miniaudio.MA_SUCCESS) {
