@@ -105,7 +105,7 @@ pub const sound_source = struct {
     sampleRate: miniaudio.ma_uint32 = undefined,
     size_in_frames: miniaudio.ma_uint64 = undefined,
 
-    /////TODO 사용중인 경우 sound destroy 이후에 호출 -> 해당 사운드가 재생중일때 메모리를 해제할 수 없다.
+    ///// 사용중인 경우 sound destroy 이후에 호출 -> 해당 사운드가 재생중일때 메모리를 해제할 수 없다.
     ///먼저 연결된 sound들을 deinit 한 후 deinit 한다. -> 연결된 sound들을 deinit 하지 않아도 된다.
     pub fn deinit(self: *sound_source) void {
         g_mutex.lock();
