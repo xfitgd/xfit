@@ -31,10 +31,9 @@ fn lua_writestring(ptr: ?*const anyopaque, size: usize) callconv(.C) usize {
     xfit.print("{s}", .{@as([*]const u8, @ptrCast(ptr.?))[0..size]});
     return size;
 }
-fn lua_writestringerror(fmt: [*c]const u8, str: [*c]const u8) callconv(.C) void {
-    _ = fmt;
-    _ = str;
-    // ! disable temporarily TODO
+//only has one %s
+fn lua_writestringerror(fmt: [*c]const u8, _str: [*c]const u8) callconv(.C) void {
+    ///// ! disable temporarily
     // var ap = @cVaStart();
     // defer @cVaEnd(&ap);
 
@@ -52,6 +51,21 @@ fn lua_writestringerror(fmt: [*c]const u8, str: [*c]const u8) callconv(.C) void 
     //     }
     // }
     // _ = lua_writestring(@ptrCast(out.items.ptr), out.items.len);
+
+    var out: ArrayList(u8) = ArrayList(u8).init(std.heap.c_allocator);
+    defer out.deinit();
+
+    var i: usize = 0;
+    while (fmt[i] != 0) : (i += 1) {
+        if (fmt[i] == '%' and fmt[i + 1] == 's') {
+            const str = _str;
+            out.appendSlice(str[0..std.mem.len(str)]) catch unreachable;
+            i += 1;
+        } else {
+            out.append(fmt[i]) catch unreachable;
+        }
+    }
+    _ = lua_writestring(@ptrCast(out.items.ptr), out.items.len);
 }
 
 pub var prev_window: struct {
