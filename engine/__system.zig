@@ -2,7 +2,6 @@ const std = @import("std");
 
 const builtin = @import("builtin");
 const ArrayList = std.ArrayList;
-const Timer = std.time.Timer;
 
 pub var allocator: std.mem.Allocator = undefined;
 
@@ -68,6 +67,7 @@ pub var title: [:0]u8 = undefined;
 pub var init_set: xfit.init_setting = .{};
 
 pub var delta_time: u64 = 0;
+pub var program_time: u64 = 0;
 pub var processor_core_len: u32 = 0;
 pub var platform_ver: system.platform_version = undefined;
 pub var __screen_orientation: window.screen_orientation = .unknown;
@@ -120,8 +120,6 @@ pub var primary_monitor: *system.monitor_info = undefined;
 pub var current_monitor: ?*const system.monitor_info = null;
 pub var current_resolution: ?*const system.screen_info = null;
 
-pub var sound_started: bool = false;
-pub var font_started: bool = false;
 pub var general_input_callback: ?input.general_input.CallbackFn = null;
 
 pub fn init(_allocator: std.mem.Allocator, init_setting: *const xfit.init_setting) void {
@@ -145,14 +143,19 @@ pub var loop_start: std.atomic.Value(bool) = std.atomic.Value(bool).init(false);
 
 pub fn loop() void {
     const S = struct {
-        var now: Timer = undefined;
+        var start: std.time.Instant = undefined;
+        var now: std.time.Instant = undefined;
     };
     const ispause = xfit.paused();
     if (!loop_start.load(.monotonic)) {
-        S.now = Timer.start() catch |e| xfit.herr3("S.now = Timer.start()", e);
+        S.start = std.time.Instant.now() catch |e| xfit.herr3("S.start = std.time.Instant.now()", e);
+        S.now = S.start;
         loop_start.store(true, .monotonic);
     } else {
-        delta_time = S.now.lap();
+        const n = std.time.Instant.now() catch |e| xfit.herr3(" const n = std.time.Instant.now()", e);
+        var _delta_time = n.since(S.now);
+        S.now = n;
+        @atomicStore(u64, &program_time, n.since(S.start), .monotonic);
         var maxframe: u64 = xfit.get_maxframe_u64();
 
         if (ispause and maxframe == 0) {
@@ -161,15 +164,16 @@ pub fn loop() void {
 
         if (maxframe > 0) {
             const maxf: u64 = @divTrunc((xfit.sec_to_nano_sec(1, 0) * xfit.sec_to_nano_sec(1, 0)), maxframe); //1000000000 / (maxframe / 1000000000); 나눗셈을 한번 줄임
-            if (maxf > delta_time) {
+            if (maxf > _delta_time) {
                 if (ispause) {
-                    std.time.sleep(maxf - delta_time); //대기상태라 정확도가 적어도 괜찮다.
+                    std.time.sleep(maxf - _delta_time); //대기상태라 정확도가 적어도 괜찮다.
                 } else {
-                    xfit.sleep(maxf - delta_time);
+                    xfit.sleep(maxf - _delta_time);
                 }
             }
-            delta_time = maxf;
+            _delta_time = maxf;
         }
+        @atomicStore(u64, &delta_time, _delta_time, .monotonic);
     }
     root.xfit_update() catch |e| {
         xfit.herr3("xfit_clean", e);
@@ -182,8 +186,6 @@ pub fn loop() void {
     if (!ispause) {
         __vulkan.drawFrame();
     }
-
-    //xfit.print_debug("rendering {d}", .{system.delta_time()});
 }
 
 pub fn destroy() void {
@@ -195,6 +197,6 @@ pub fn destroy() void {
 }
 
 pub fn real_destroy() void {
-    if (sound_started) xfit.herrm("sound not destroyed");
-    if (font_started) xfit.herrm("font not destroyed");
+    xfit.font.__destroy();
+    xfit.sound.__destroy();
 }

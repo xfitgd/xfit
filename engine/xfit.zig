@@ -225,11 +225,18 @@ pub inline fn exiting() bool {
     return __system.exiting.load(std.builtin.AtomicOrder.acquire);
 }
 ///nanosec 1 / 1000000000 sec
-pub inline fn dt_i64() u64 {
-    return __system.delta_time;
+pub inline fn dt_u64() u64 {
+    return @atomicLoad(u64, &__system.delta_time, .monotonic);
 }
 pub inline fn dt() f64 {
-    return @as(f64, @floatFromInt(__system.delta_time)) / 1000000000.0;
+    return @as(f64, @floatFromInt(@atomicLoad(u64, &__system.delta_time, .monotonic))) / 1000000000.0;
+}
+///nanosec 1 / 1000000000 sec
+pub inline fn program_time_u64() u64 {
+    return @atomicLoad(u64, &__system.program_time, .monotonic);
+}
+pub inline fn program_time() f64 {
+    return @as(f64, @floatFromInt(@atomicLoad(u64, &__system.program_time, .monotonic))) / 1000000000.0;
 }
 pub inline fn set_error_handling_func(_func: *const fn (text: []u8, stack_trace: []u8) void) void {
     @atomicStore(@TypeOf(__system.error_handling_func), &__system.error_handling_func, _func, std.builtin.AtomicOrder.monotonic);

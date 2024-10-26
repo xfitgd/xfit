@@ -5,6 +5,7 @@ const graphics = @import("graphics.zig");
 
 inline fn loop(wait_nanosec: u64, comptime function: anytype, args: anytype) bool {
     xfit.sleep(wait_nanosec);
+    if (xfit.exiting()) return false;
     return callback_(function, args);
 }
 

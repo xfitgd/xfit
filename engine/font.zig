@@ -36,19 +36,20 @@ fn handle_error(code: freetype.FT_Error) void {
     }
 }
 
-pub fn start() void {
-    if (xfit.dbg and __system.font_started) xfit.herrm("font already started");
-    if (xfit.dbg) __system.font_started = true;
+fn start() void {
     handle_error(freetype.FT_Init_FreeType(&library));
 }
 
-pub fn destroy() void {
-    if (xfit.dbg and !__system.font_started) xfit.herrm("font not started");
+pub fn __destroy() void {
+    if (library == null) return;
     _ = freetype.FT_Done_FreeType(library);
-    if (xfit.dbg) __system.font_started = false;
+    library = null;
 }
 
 pub fn init(_font_data: []const u8, _face_index: u32) !Self {
+    if (library == null) {
+        start();
+    }
     var font: Self = .{
         .__char_array = AutoHashMap(u21, char_data).init(__system.allocator),
     };

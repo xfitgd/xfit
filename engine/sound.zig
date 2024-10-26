@@ -20,6 +20,8 @@ const Self = @This();
 
 var g_ends: ArrayList(*Self) = undefined;
 
+var sound_started: bool = false;
+
 var engine: miniaudio.ma_engine = undefined;
 var pCustomBackendVTables: [2][*c]miniaudio.ma_decoding_backend_vtable = .{ undefined, undefined };
 var resourceManager: miniaudio.ma_resource_manager = undefined;
@@ -27,15 +29,13 @@ var g_mutex: std.Thread.Mutex = .{};
 var g_mutex2: std.Thread.Mutex = .{};
 var g_sem: std.Thread.Semaphore = .{};
 var sounds: AutoHashMap(*Self, void) = undefined;
+var g_thread: std.Thread = undefined;
 
 __sound: ?miniaudio.ma_sound = null,
 __audio_buf: miniaudio.ma_audio_buffer = undefined,
 source: ?*sound_source = null,
 
-pub fn start() void {
-    if (xfit.dbg and __system.sound_started) xfit.herrm("sound already started");
-    __system.sound_started = true;
-
+fn start() void {
     sounds = AutoHashMap(*Self, void).init(std.heap.c_allocator);
     g_ends = ArrayList(*Self).init(std.heap.c_allocator);
 
@@ -55,7 +55,8 @@ pub fn start() void {
 
     if (result != miniaudio.MA_SUCCESS) xfit.herr2("miniaudio.ma_engine_init {d}", .{result});
 
-    _ = std.Thread.spawn(.{}, callback_thread, .{}) catch unreachable;
+    sound_started = true;
+    g_thread = std.Thread.spawn(.{}, callback_thread, .{}) catch unreachable;
 }
 
 // fn data_callback(pDevice: [*c]miniaudio.ma_device, pOutput: ?*anyopaque, pInput: ?*const anyopaque, frameCount: miniaudio.ma_uint32) callconv(.C) void {
@@ -77,9 +78,9 @@ fn end_callback(userdata: ?*anyopaque, sound: [*c]miniaudio.ma_sound) callconv(.
 }
 
 fn callback_thread() void {
-    while (@atomicLoad(bool, &__system.sound_started, .acquire)) {
+    while (@atomicLoad(bool, &sound_started, .acquire)) {
         g_sem.wait();
-        if (!@atomicLoad(bool, &__system.sound_started, .acquire)) break;
+        if (!@atomicLoad(bool, &sound_started, .acquire)) break;
 
         var this: ?*Self = null;
         g_mutex2.lock();
@@ -88,7 +89,11 @@ fn callback_thread() void {
         }
         g_mutex2.unlock();
         if (this != null) {
-            if (miniaudio.ma_sound_is_looping(&this.?.*.__sound.?) == 0) this.?.*.deinit();
+            g_mutex.lock();
+            if (miniaudio.ma_sound_is_looping(&this.?.*.__sound.?) == 0) {
+                g_mutex.unlock();
+                this.?.*.deinit();
+            } else g_mutex.unlock();
         }
     }
 }
@@ -100,14 +105,20 @@ pub const sound_source = struct {
     sampleRate: miniaudio.ma_uint32 = undefined,
     size_in_frames: miniaudio.ma_uint64 = undefined,
 
-    ///TODO 사용중인 경우 sound destroy 이후에 호출 -> 해당 사운드가 재생중일때 메모리를 해제할 수 없다.
+    /////TODO 사용중인 경우 sound destroy 이후에 호출 -> 해당 사운드가 재생중일때 메모리를 해제할 수 없다.
+    ///먼저 연결된 sound들을 deinit 한 후 deinit 한다. -> 연결된 sound들을 deinit 하지 않아도 된다.
     pub fn deinit(self: *sound_source) void {
-        if (xfit.dbg and self.*.out_data == null) xfit.herrm("sound_source not inited cant deinit");
+        g_mutex.lock();
+        var it = sounds.keyIterator();
+        while (it.next()) |v| {
+            if (v.*.*.source == self) v.*.*.deinit2();
+        }
+        g_mutex.unlock();
         std.c.free(self.*.out_data.?.ptr);
         std.heap.c_allocator.destroy(self);
     }
     pub fn play_sound_memory(self: *sound_source, volume: f32, loop: bool) !?*Self {
-        if (!@atomicLoad(bool, &__system.sound_started, .acquire)) return null;
+        if (!@atomicLoad(bool, &sound_started, .acquire)) return null;
 
         const result_sound: *Self = try std.heap.c_allocator.create(Self);
         errdefer std.heap.c_allocator.destroy(self);
@@ -154,7 +165,7 @@ pub const sound_source = struct {
 };
 
 pub fn play_sound(path: []const u8, volume: f32, loop: bool) !?*Self {
-    if (!@atomicLoad(bool, &__system.sound_started, .acquire)) return null;
+    if (!@atomicLoad(bool, &sound_started, .acquire)) start();
 
     var self: *Self = undefined;
     self = try std.heap.c_allocator.create(Self);
@@ -281,7 +292,7 @@ pub fn is_playing(self: *Self) bool {
 }
 
 pub fn decode_sound_memory(data: []const u8) !*sound_source {
-    if (!@atomicLoad(bool, &__system.sound_started, .acquire)) return std.posix.UnexpectedError.Unexpected;
+    if (!@atomicLoad(bool, &sound_started, .acquire)) start();
 
     const self: *sound_source = try std.heap.c_allocator.create(sound_source);
     errdefer std.heap.c_allocator.destroy(self);
@@ -318,26 +329,33 @@ pub fn decode_sound_memory(data: []const u8) !*sound_source {
 
 pub fn deinit(self: *Self) void {
     g_mutex.lock();
-    if (xfit.dbg and self.*.__sound == null) xfit.herrm("sound not inited cant deinit");
+    self.*.deinit2();
+    g_mutex.unlock();
+}
+pub fn deinit2(self: *Self) void {
+    if (self.*.__sound == null) return;
     miniaudio.ma_sound_uninit(&self.*.__sound.?);
     miniaudio.ma_audio_buffer_uninit(&self.*.__audio_buf);
     std.heap.c_allocator.destroy(self);
-    if (@atomicLoad(bool, &__system.sound_started, .acquire)) {
+    if (@atomicLoad(bool, &sound_started, .acquire)) {
         _ = sounds.remove(self);
     }
-    g_mutex.unlock();
 }
 
-pub fn destroy() void {
-    if (xfit.dbg and !__system.sound_started) xfit.herrm("sound not started");
-    @atomicStore(bool, &__system.sound_started, false, .release);
+pub fn __destroy() void {
+    if (!@atomicLoad(bool, &sound_started, .acquire)) return;
+    @atomicStore(bool, &sound_started, false, .release);
+    g_sem.post();
+    g_thread.join();
 
     miniaudio.ma_engine_uninit(&engine);
 
-    var it = sounds.valueIterator();
+    g_mutex.lock();
+    var it = sounds.keyIterator();
     while (it.next()) |v| {
-        v.*.*.deinit();
+        v.*.*.deinit2();
     }
+    g_mutex.unlock();
     g_ends.deinit();
     sounds.deinit();
 }

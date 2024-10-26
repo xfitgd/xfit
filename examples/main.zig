@@ -111,8 +111,6 @@ pub fn xfit_init() !void {
 
     xfit.set_error_handling_func(error_func);
 
-    font.start();
-
     objects = ArrayList(*graphics.iobject).init(allocator);
     vertices_mem_pool = MemoryPoolExtra(graphics.dummy_vertices, .{}).init(allocator);
     objects_mem_pool = MemoryPoolExtra(graphics.iobject, .{}).init(allocator);
@@ -374,7 +372,6 @@ pub fn xfit_destroy() !void {
 
     font0.deinit();
     allocator.free(font0_data);
-    font.destroy();
 
     cmd.deinit();
     color_trans.deinit();

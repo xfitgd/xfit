@@ -1,7 +1,12 @@
 const std = @import("std");
 const builtin = @import("builtin");
 
-pub const XfitPlatform = enum(u32) { windows, android, linux, mac, end };
+pub const XfitPlatform = enum(u32) {
+    windows,
+    android,
+    linux,
+    //mac,
+};
 
 // set(CMAKE_C_COMPILER zig cc -target aarch64-linux-android)
 // set(CMAKE_CXX_COMPILER zig c++ -target aarch64-linux-android)

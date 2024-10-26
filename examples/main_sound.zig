@@ -28,8 +28,6 @@ pub fn pl_callback() !void {
 }
 
 pub fn xfit_init() !void {
-    sound.start();
-
     const snd = sound.play_sound("BG.opus", 0.2, true) catch |e| xfit.herr3("bg.play_sound", e) orelse xfit.herrm("bg.play_sound null");
     bg_source = snd.*.source.?;
     bg_snd = snd;
@@ -49,7 +47,6 @@ pub fn xfit_size() !void {}
 
 ///before system clean
 pub fn xfit_destroy() !void {
-    sound.destroy();
     bg_source.*.deinit();
     sfx_source.*.deinit();
 }
