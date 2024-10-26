@@ -672,18 +672,20 @@ fn execute_update_descriptor_sets(sets: []descriptor_set) void {
 
 fn save_to_map_queue(nres: *?*vulkan_res) void {
     var i: usize = 0;
+    const slice = op_save_queue.slice();
+    const tags = slice.items(.tags);
+    const data = slice.items(.data);
     while (i < op_save_queue.len) : (i += 1) {
-        const t = op_save_queue.get(i);
-        switch (t) {
-            .map_copy => |e| {
+        switch (tags[i]) {
+            .map_copy => {
                 if (nres.* == null) {
-                    op_map_queue.append(single_allocator, t) catch unreachable;
-                    nres.* = e.res;
-                    op_save_queue.set(i, .void);
+                    op_map_queue.append(single_allocator, .{ .map_copy = data[i].map_copy }) catch unreachable;
+                    nres.* = data[i].map_copy.res;
+                    tags[i] = .void;
                 } else {
-                    if (e.res == nres.*.?) {
-                        op_map_queue.append(single_allocator, t) catch unreachable;
-                        op_save_queue.set(i, .void);
+                    if (data[i].map_copy.res == nres.*.?) {
+                        op_map_queue.append(single_allocator, .{ .map_copy = data[i].map_copy }) catch unreachable;
+                        tags[i] = .void;
                     }
                 }
             },
@@ -705,8 +707,8 @@ fn thread_func() void {
         }
         if (op_queue.len > 0) {
             op_save_queue.deinit(single_allocator);
-            op_save_queue = op_queue.clone(single_allocator) catch unreachable;
-            op_queue.resize(single_allocator, 0) catch unreachable;
+            op_save_queue = op_queue;
+            op_queue = .{};
         } else {
             mutex.unlock();
             continue;
@@ -717,17 +719,21 @@ fn thread_func() void {
         var nres: ?*vulkan_res = null;
         {
             var i: usize = 0;
+            var slice = op_save_queue.slice();
             while (i < op_save_queue.len) : (i += 1) {
-                switch (op_save_queue.get(i)) {
+                const tags = slice.items(.tags);
+                const data = slice.items(.data);
+                switch (tags[i]) {
                     //create.. 과정에서 map_copy 명령이 추가될 수 있음
-                    .create_buffer => |e| execute_create_buffer(e.buf, e.data),
-                    .create_texture => |e| execute_create_texture(e.buf, e.data),
-                    .__register_descriptor_pool => |e| execute_register_descriptor_pool(e.__size),
+                    .create_buffer => execute_create_buffer(data[i].create_buffer.buf, data[i].create_buffer.data),
+                    .create_texture => execute_create_texture(data[i].create_texture.buf, data[i].create_texture.data),
+                    .__register_descriptor_pool => execute_register_descriptor_pool(data[i].__register_descriptor_pool.__size),
                     else => {
                         continue;
                     },
                 }
-                op_save_queue.set(i, .void);
+                slice = op_save_queue.slice(); //execute 과정에서 element가 추가되면 메모리가 바뀔수도 있으므로
+                slice.set(i, .{ .void = {} });
             }
         }
         save_to_map_queue(&nres);
@@ -745,8 +751,11 @@ fn thread_func() void {
         var have_cmd: bool = false;
         {
             var i: usize = 0;
+            const slice = op_save_queue.slice();
+            const tags = slice.items(.tags);
+            //const data = slice.items(.data);
             while (i < op_save_queue.len) : (i += 1) {
-                switch (op_save_queue.get(i)) {
+                switch (tags[i]) {
                     .copy_buffer, .copy_buffer_to_image, .__update_descriptor_sets => {
                         have_cmd = true;
                         break;
@@ -764,17 +773,20 @@ fn thread_func() void {
             xfit.herr(result == vk.VK_SUCCESS, "begin_single_time_commands.vkBeginCommandBuffer : {d}", .{result});
 
             var i: usize = 0;
+            const slice = op_save_queue.slice();
+            const tags = slice.items(.tags);
+            const data = slice.items(.data);
             while (i < op_save_queue.len) : (i += 1) {
-                switch (op_save_queue.get(i)) {
-                    .copy_buffer => |e| execute_copy_buffer(e.src, e.target),
-                    .copy_buffer_to_image => |e| execute_copy_buffer_to_image(e.src, e.target),
-                    .__update_descriptor_sets => |e| {
-                        execute_update_descriptor_sets(e.sets);
+                switch (tags[i]) {
+                    .copy_buffer => execute_copy_buffer(data[i].copy_buffer.src, data[i].copy_buffer.target),
+                    .copy_buffer_to_image => execute_copy_buffer_to_image(data[i].copy_buffer_to_image.src, data[i].copy_buffer_to_image.target),
+                    .__update_descriptor_sets => {
+                        execute_update_descriptor_sets(data[i].__update_descriptor_sets.sets);
                         continue;
                     },
                     else => continue,
                 }
-                op_save_queue.set(i, .void);
+                tags[i] = .void;
             }
             if (set_list.items.len > 0) {
                 vk.vkUpdateDescriptorSets(__vulkan.vkDevice, @intCast(set_list.items.len), set_list.items.ptr, 0, null);
@@ -800,11 +812,14 @@ fn thread_func() void {
 
         {
             var i: usize = 0;
+            const slice = op_save_queue.slice();
+            const tags = slice.items(.tags);
+            const data = slice.items(.data);
             while (i < op_save_queue.len) : (i += 1) {
-                switch (op_save_queue.get(i)) {
+                switch (tags[i]) {
                     //destroy.. 나중에
-                    .destroy_buffer => |e| execute_destroy_buffer(e.buf),
-                    .destroy_image => |e| execute_destroy_image(e.buf),
+                    .destroy_buffer => execute_destroy_buffer(data[i].destroy_buffer.buf),
+                    .destroy_image => execute_destroy_image(data[i].destroy_image.buf),
                     else => continue,
                 }
             }
