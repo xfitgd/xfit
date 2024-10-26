@@ -28,7 +28,7 @@ comptime {
 pub const _system = @extern(*const fn ([*c]const u8) callconv(.C) c_int, .{ .name = "system", .linkage = .strong });
 
 fn lua_writestring(ptr: ?*const anyopaque, size: usize) callconv(.C) usize {
-    xfit.print("{s}", .{@as([*]const u8, @ptrCast(ptr.?))[0..size]});
+    xfit.write(@as([*]const u8, @ptrCast(ptr.?))[0..size]);
     return size;
 }
 //only has one %s
