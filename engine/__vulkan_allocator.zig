@@ -1,6 +1,7 @@
 const std = @import("std");
 const builtin = @import("builtin");
 const ArrayList = std.ArrayList;
+const MultiArrayList = std.MultiArrayList;
 const MemoryPoolExtra = std.heap.MemoryPoolExtra;
 const DoublyLinkedList = std.DoublyLinkedList;
 const HashMap = std.AutoHashMap;
@@ -77,9 +78,9 @@ var buffers: MemoryPoolExtra(vulkan_res, .{}) = undefined;
 var buffer_ids: ArrayList(*vulkan_res) = undefined;
 var memory_idx_counts: []u16 = undefined;
 var g_thread: std.Thread = undefined;
-var op_queue: ArrayList(?operation_node) = undefined;
-var op_save_queue: ArrayList(?operation_node) = undefined;
-var op_map_queue: ArrayList(?operation_node) = undefined;
+var op_queue: MultiArrayList(operation_node) = undefined;
+var op_save_queue: MultiArrayList(operation_node) = undefined;
+var op_map_queue: MultiArrayList(operation_node) = undefined;
 var staging_buf_queue: MemoryPoolExtra(vulkan_res_node(.buffer), .{}) = undefined;
 var mutex: std.Thread.Mutex = .{};
 pub var submit_mutex: std.Thread.Mutex = .{};
@@ -100,9 +101,9 @@ pub fn init() void {
     buffers = MemoryPoolExtra(vulkan_res, .{}).init(single_allocator);
     buffer_ids = ArrayList(*vulkan_res).init(single_allocator);
     memory_idx_counts = single_allocator.alloc(u16, __vulkan.mem_prop.memoryTypeCount) catch |e| xfit.herr3("__vulkan_allocator init alloc memory_idx_counts", e);
-    op_queue = ArrayList(?operation_node).init(single_allocator);
-    op_save_queue = ArrayList(?operation_node).init(single_allocator);
-    op_map_queue = ArrayList(?operation_node).init(single_allocator);
+    op_queue = MultiArrayList(operation_node){};
+    op_save_queue = MultiArrayList(operation_node){};
+    op_map_queue = MultiArrayList(operation_node){};
     staging_buf_queue = MemoryPoolExtra(vulkan_res_node(.buffer), .{}).init(single_allocator);
     descriptor_pools = HashMap([*]const descriptor_pool_size, ArrayList(descriptor_pool_memory)).init(single_allocator);
     set_list = ArrayList(vk.VkWriteDescriptorSet).init(single_allocator);
@@ -146,9 +147,9 @@ pub fn deinit() void {
     buffers.deinit();
     buffer_ids.deinit();
     single_allocator.free(memory_idx_counts);
-    op_queue.deinit();
-    op_save_queue.deinit();
-    op_map_queue.deinit();
+    op_queue.deinit(single_allocator);
+    op_save_queue.deinit(single_allocator);
+    op_map_queue.deinit(single_allocator);
     staging_buf_queue.deinit();
 
     var it = descriptor_pools.valueIterator();
@@ -251,6 +252,7 @@ const operation_node = union(enum) {
     __register_descriptor_pool: struct {
         __size: []descriptor_pool_size,
     },
+    void: void,
 };
 
 pub const descriptor_pool_memory = struct {
@@ -669,23 +671,23 @@ fn execute_update_descriptor_sets(sets: []descriptor_set) void {
 }
 
 fn save_to_map_queue(nres: *?*vulkan_res) void {
-    for (op_save_queue.items) |*v| {
-        if (v.* != null) {
-            switch (v.*.?) {
-                .map_copy => |e| {
-                    if (nres.* == null) {
-                        op_map_queue.append(v.*) catch unreachable;
-                        nres.* = e.res;
-                        v.* = null;
-                    } else {
-                        if (e.res == nres.*.?) {
-                            op_map_queue.append(v.*) catch unreachable;
-                            v.* = null;
-                        }
+    var i: usize = 0;
+    while (i < op_save_queue.len) : (i += 1) {
+        const t = op_save_queue.get(i);
+        switch (t) {
+            .map_copy => |e| {
+                if (nres.* == null) {
+                    op_map_queue.append(single_allocator, t) catch unreachable;
+                    nres.* = e.res;
+                    op_save_queue.set(i, .void);
+                } else {
+                    if (e.res == nres.*.?) {
+                        op_map_queue.append(single_allocator, t) catch unreachable;
+                        op_save_queue.set(i, .void);
                     }
-                },
-                else => {},
-            }
+                }
+            },
+            else => {},
         }
     }
 }
@@ -696,54 +698,55 @@ fn thread_func() void {
 
         while (cond_cnt == false) cond.wait(&mutex);
         cond_cnt = false;
-        if (exited and op_queue.items.len == 0) {
+        if (exited and op_queue.len == 0) {
             finish_cond.broadcast();
             mutex.unlock();
             break;
         }
-        if (op_queue.items.len > 0) {
-            op_save_queue.appendSlice(op_queue.items) catch unreachable;
-            op_queue.resize(0) catch unreachable;
+        if (op_queue.len > 0) {
+            op_save_queue.deinit(single_allocator);
+            op_save_queue = op_queue.clone(single_allocator) catch unreachable;
+            op_queue.resize(single_allocator, 0) catch unreachable;
         } else {
             mutex.unlock();
             continue;
         }
         mutex.unlock();
 
-        op_map_queue.resize(0) catch unreachable;
+        op_map_queue.resize(single_allocator, 0) catch unreachable;
         var nres: ?*vulkan_res = null;
         {
             var i: usize = 0;
-            const len = op_save_queue.items.len;
-            while (i < len) : (i += 1) {
-                if (op_save_queue.items[i] != null) {
-                    switch (op_save_queue.items[i].?) {
-                        //create.. 과정에서 map_copy 명령이 추가될 수 있음
-                        .create_buffer => execute_create_buffer(op_save_queue.items[i].?.create_buffer.buf, op_save_queue.items[i].?.create_buffer.data),
-                        .create_texture => execute_create_texture(op_save_queue.items[i].?.create_texture.buf, op_save_queue.items[i].?.create_texture.data),
-                        .__register_descriptor_pool => execute_register_descriptor_pool(op_save_queue.items[i].?.__register_descriptor_pool.__size),
-                        else => continue,
-                    }
-                    op_save_queue.items[i] = null;
+            while (i < op_save_queue.len) : (i += 1) {
+                switch (op_save_queue.get(i)) {
+                    //create.. 과정에서 map_copy 명령이 추가될 수 있음
+                    .create_buffer => |e| execute_create_buffer(e.buf, e.data),
+                    .create_texture => |e| execute_create_texture(e.buf, e.data),
+                    .__register_descriptor_pool => |e| execute_register_descriptor_pool(e.__size),
+                    else => {
+                        continue;
+                    },
                 }
+                op_save_queue.set(i, .void);
             }
         }
         save_to_map_queue(&nres);
 
         dataMutex.lock();
-        while (op_map_queue.items.len > 0) {
-            nres.?.*.map_copy_execute(op_map_queue.items);
+        while (op_map_queue.len > 0) {
+            nres.?.*.map_copy_execute(op_map_queue.items(.data));
 
-            op_map_queue.resize(0) catch unreachable;
+            op_map_queue.resize(single_allocator, 0) catch unreachable;
             nres = null;
             save_to_map_queue(&nres);
         }
         dataMutex.unlock();
 
         var have_cmd: bool = false;
-        for (op_save_queue.items) |*v| {
-            if (v.* != null) {
-                switch (v.*.?) {
+        {
+            var i: usize = 0;
+            while (i < op_save_queue.len) : (i += 1) {
+                switch (op_save_queue.get(i)) {
                     .copy_buffer, .copy_buffer_to_image, .__update_descriptor_sets => {
                         have_cmd = true;
                         break;
@@ -760,19 +763,18 @@ fn thread_func() void {
             var result = vk.vkBeginCommandBuffer(cmd, &begin);
             xfit.herr(result == vk.VK_SUCCESS, "begin_single_time_commands.vkBeginCommandBuffer : {d}", .{result});
 
-            for (op_save_queue.items) |*v| {
-                if (v.* != null) {
-                    switch (v.*.?) {
-                        .copy_buffer => execute_copy_buffer(v.*.?.copy_buffer.src, v.*.?.copy_buffer.target),
-                        .copy_buffer_to_image => execute_copy_buffer_to_image(v.*.?.copy_buffer_to_image.src, v.*.?.copy_buffer_to_image.target),
-                        .__update_descriptor_sets => {
-                            execute_update_descriptor_sets(v.*.?.__update_descriptor_sets.sets);
-                            continue;
-                        },
-                        else => continue,
-                    }
-                    v.* = null;
+            var i: usize = 0;
+            while (i < op_save_queue.len) : (i += 1) {
+                switch (op_save_queue.get(i)) {
+                    .copy_buffer => |e| execute_copy_buffer(e.src, e.target),
+                    .copy_buffer_to_image => |e| execute_copy_buffer_to_image(e.src, e.target),
+                    .__update_descriptor_sets => |e| {
+                        execute_update_descriptor_sets(e.sets);
+                        continue;
+                    },
+                    else => continue,
                 }
+                op_save_queue.set(i, .void);
             }
             if (set_list.items.len > 0) {
                 vk.vkUpdateDescriptorSets(__vulkan.vkDevice, @intCast(set_list.items.len), set_list.items.ptr, 0, null);
@@ -796,15 +798,15 @@ fn thread_func() void {
 
         if (!single_arena_allocator.reset(.retain_capacity)) unreachable;
 
-        for (op_save_queue.items) |*v| {
-            if (v.* != null) {
-                switch (v.*.?) {
+        {
+            var i: usize = 0;
+            while (i < op_save_queue.len) : (i += 1) {
+                switch (op_save_queue.get(i)) {
                     //destroy.. 나중에
-                    .destroy_buffer => execute_destroy_buffer(v.*.?.destroy_buffer.buf),
-                    .destroy_image => execute_destroy_image(v.*.?.destroy_image.buf),
+                    .destroy_buffer => |e| execute_destroy_buffer(e.buf),
+                    .destroy_image => |e| execute_destroy_image(e.buf),
                     else => continue,
                 }
-                v.* = null;
             }
         }
 
@@ -818,7 +820,7 @@ fn thread_func() void {
         mutex.unlock();
 
         if (!staging_buf_queue.reset(.retain_capacity)) unreachable;
-        op_save_queue.resize(0) catch unreachable;
+        op_save_queue.resize(single_allocator, 0) catch unreachable;
     }
 }
 
@@ -827,7 +829,7 @@ var cond_cnt: bool = false;
 
 pub fn execute_and_wait_all_op() void {
     mutex.lock();
-    if (op_queue.items.len > 0) {
+    if (op_queue.len > 0) {
         cond.signal();
         cond_cnt = true;
         finish_cond.wait(&mutex);
@@ -836,7 +838,7 @@ pub fn execute_and_wait_all_op() void {
 }
 pub fn execute_all_op() void {
     mutex.lock();
-    if (op_queue.items.len > 0) {
+    if (op_queue.len > 0) {
         cond.signal();
         cond_cnt = true;
     }
@@ -878,13 +880,13 @@ fn append_op(node: operation_node) void {
             v.*.__res = single_arena_allocator.allocator().dupe(res_union, v.*.__res) catch unreachable;
         }
     }
-    op_queue.append(node) catch xfit.herrm("self.op_queue.append");
+    op_queue.append(single_allocator, node) catch xfit.herrm("self.op_queue.append");
     // if (self.op_queue.items.len == 12) {
     //     unreachable;
     // }
 }
 fn append_op_save(node: operation_node) void {
-    op_save_queue.append(node) catch xfit.herrm("self.op_save_queue.append");
+    op_save_queue.append(single_allocator, node) catch xfit.herrm("self.op_save_queue.append");
 }
 
 pub fn vulkan_res_node(_res_type: res_type) type {
@@ -1071,16 +1073,15 @@ const vulkan_res = struct {
             self.*.pool.deinit();
         }
     }
-    fn map_copy_execute(self: *vulkan_res, nodes: []?operation_node) void {
+    fn map_copy_execute(self: *vulkan_res, nodes: anytype) void {
         var start: usize = std.math.maxInt(usize);
         var end: usize = std.math.minInt(usize);
         var ranges: []vk.VkMappedMemoryRange = undefined;
         if (self.*.cached) {
             ranges = single_arena_allocator.allocator().alignedAlloc(vk.VkMappedMemoryRange, @alignOf(vk.VkMappedMemoryRange), nodes.len) catch unreachable;
 
-            for (nodes, ranges) |v, *r| {
-                const copy = v.?.map_copy;
-                const nd: *DoublyLinkedList(node).Node = @alignCast(@ptrCast(copy.ires.get_idx()));
+            for (nodes, ranges) |copy, *r| {
+                const nd: *DoublyLinkedList(node).Node = @alignCast(@ptrCast(copy.map_copy.ires.get_idx()));
                 start = @min(start, nd.*.data.idx);
                 end = @max(end, nd.*.data.idx + nd.*.data.size);
                 r.memory = self.*.mem;
@@ -1092,9 +1093,8 @@ const vulkan_res = struct {
                 r.sType = vk.VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
             }
         } else {
-            for (nodes) |v| {
-                const copy = v.?.map_copy;
-                const nd: *DoublyLinkedList(node).Node = @alignCast(@ptrCast(copy.ires.get_idx()));
+            for (nodes) |copy| {
+                const nd: *DoublyLinkedList(node).Node = @alignCast(@ptrCast(copy.map_copy.ires.get_idx()));
                 start = @min(start, nd.*.data.idx);
                 end = @max(end, nd.*.data.idx + nd.*.data.size);
             }
@@ -1116,7 +1116,7 @@ const vulkan_res = struct {
             }
         }
         for (nodes) |v| {
-            const copy = v.?.map_copy;
+            const copy = v.map_copy;
             const nd: *DoublyLinkedList(node).Node = @alignCast(@ptrCast(copy.ires.get_idx()));
             const st = (nd.*.data.idx - self.*.map_start) * self.*.cell_size;
             //const en = (nd.*.data.idx + nd.*.data.size - start) * self.*.cell_size;
