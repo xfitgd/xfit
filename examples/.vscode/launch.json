@@ -5,8 +5,8 @@
             "name": "Debug (Windows MSVC)",
             "type": "cppvsdbg",
             "request": "launch",
-            "program":  "${workspaceFolder}/examples/zig-out/bin/XfitTest.exe",
-            "cwd": "${workspaceFolder}/examples/assets",
+            "program":  "${workspaceFolder}/zig-out/bin/XfitTest.exe",
+            "cwd": "${workspaceFolder}/assets",
             "console": "integratedTerminal",
             "preLaunchTask": "build zig"
         },
@@ -21,9 +21,15 @@
             "launchActivity": "android.app.NativeActivity",  // Activity to launch
             "preLaunchTask": "build zig",
             "native": {
-                "symbolSearchPaths": ["${workspaceFolder}/examples/lib/${command:abi}/"]
+                "abiSupported": ["arm64-v8a", "riscv64", "x86_64"],
+                "abiMap": {
+                    "arm64-v8a": "arm64-v8a",
+                    "riscv64": "riscv64",
+                    "x86_64": "x86_64",
+                },
+                "symbolSearchPaths": ["${workspaceFolder}/lib/${command:abi}/"]
             },
-            "apkPath": "${workspaceFolder}/examples/zig-out/signed.apk",
+            "apkPath": "${workspaceFolder}/zig-out/signed.apk",
         }
     ]
 }

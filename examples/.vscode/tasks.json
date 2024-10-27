@@ -4,7 +4,7 @@
         {
             "label": "build zig",
             "type": "shell",
-            "command": "cd examples & zig build",
+            "command": "zig build",
         },
         {
             "label": "install apk",
