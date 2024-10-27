@@ -39,6 +39,7 @@ inline fn get_arch_text(arch: std.Target.Cpu.Arch) []const u8 {
     return switch (arch) {
         .x86_64 => "x86_64",
         .aarch64 => "aarch64",
+        .riscv64 => "riscv64",
         .arm => "arm",
         else => unreachable,
     };
@@ -79,14 +80,17 @@ pub fn init(
 
     const arch_text = comptime [_][]const u8{
         "aarch64-linux-android",
+        "riscv64-linux-android",
         "x86_64-linux-android",
     };
     const out_arch_text = comptime [_][]const u8{
         "../lib/arm64-v8a",
+        "../lib/riscv64",
         "../lib/x86_64",
     };
     const targets = [_]std.Target.Query{
         .{ .os_tag = .linux, .cpu_arch = .aarch64, .abi = .android, .cpu_features_add = std.Target.aarch64.featureSet(&.{.v8a}) },
+        .{ .os_tag = .linux, .cpu_arch = .riscv64, .abi = .android },
         .{ .os_tag = .linux, .cpu_arch = .x86_64, .abi = .android },
     };
 
@@ -103,7 +107,7 @@ pub fn init(
         "libvorbisenc.a",
         "libvorbisfile.a",
         "libminiaudio.a",
-        "liblua.a",
+        "liblua.a", //custom
     };
 
     const linux_system_lib_names = comptime [_][]const u8{
@@ -122,7 +126,7 @@ pub fn init(
         "libwayland-cursor.so",
     };
     const linux_local_lib_names = comptime [_][]const u8{
-        "liblua.a",
+        "liblua.a", //custom
         "miniaudio.o",
     };
 
@@ -175,9 +179,12 @@ pub fn init(
                 .dest_dir = .{ .override = .{ .custom = out_arch_text[i] } },
             }).step);
         } else if (PLATFORM == XfitPlatform.windows) {
-            const target = b.standardTargetOptions(.{ .default_target = .{
+            var target = b.standardTargetOptions(.{ .default_target = .{
                 .os_tag = .windows,
             } });
+            if (target.result.cpu.arch == .x86_64) {
+                target.result.cpu.features.addFeatureSet(std.Target.x86.featureSet(&.{.sse4_1}));
+            }
 
             result = b.addExecutable(.{
                 .target = target,
