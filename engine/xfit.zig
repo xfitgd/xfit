@@ -27,6 +27,7 @@ pub const xbox_pad_input = @import("xbox_pad_input.zig");
 pub const input = @import("input.zig");
 pub const mem = @import("mem.zig");
 pub const ini = @import("ini.zig");
+pub const s2s = @import("s2s.zig");
 
 //system engine only headers
 const __system = @import("__system.zig");
@@ -275,7 +276,7 @@ pub const init_setting = struct {
     pub const DEF_POS = __windows.CW_USEDEFAULT;
     pub const PRIMARY_SCREEN_INDEX = std.math.maxInt(u32);
     //*ignore field mobile
-    window_width: u32 = DEF_SIZE,
+    window_width: u32 = DEF_SIZE, //or 0
     window_height: u32 = DEF_SIZE,
     window_x: i32 = DEF_POS,
     window_y: i32 = DEF_POS,
