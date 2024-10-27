@@ -5,4 +5,9 @@
 *.spv
 *.exe
 /engine/shaders/out
-com/
+/com
+
+/examples/zig-out
+/examples/com
+/examples/lib
+/examples/.zig-cache

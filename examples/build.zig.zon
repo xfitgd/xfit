@@ -1,0 +1,13 @@
+.{
+    .name = "XfitTest",
+    .version = "0.0.1",
+    .dependencies = .{
+        .xfit_build = .{
+            .path = "../",
+        },
+    },
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+    },
+}
