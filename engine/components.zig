@@ -6,7 +6,7 @@ const __system = @import("__system.zig");
 
 const iobject = graphics.iobject;
 const transform = graphics.transform;
-const shape = graphics.shape;
+const shape_source = graphics.shape_source;
 
 const __vulkan = @import("__vulkan.zig");
 const vk = __vulkan.vk;
@@ -38,19 +38,19 @@ pub const button_state = enum {
 
 pub const button = struct {
     pub const source = struct {
-        src: shape.source,
+        src: shape_source,
         up_color: ?vector = null,
         over_color: ?vector = null,
         down_color: ?vector = null,
 
         pub fn init() source {
             return .{
-                .src = shape.source.init(),
+                .src = shape_source.init(),
             };
         }
         pub fn init_for_alloc(__allocator: std.mem.Allocator) source {
             return .{
-                .src = shape.source.init_for_alloc(__allocator),
+                .src = shape_source.init_for_alloc(__allocator),
             };
         }
     };

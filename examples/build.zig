@@ -25,8 +25,9 @@ const EXAMPLES = enum(usize) {
     CONSOLE,
 };
 
-fn callback(result: *std.Build.Step.Compile, target: std.Build.ResolvedTarget) void {
+fn callback(b: *std.Build, result: *std.Build.Step.Compile, target: std.Build.ResolvedTarget) void {
     //TODO 여기에 사용자 지정 라이브러리 등을 추가합니다.
+    _ = b;
     _ = result;
     _ = target;
 }

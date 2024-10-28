@@ -50,9 +50,9 @@ var rect_button_text_src: components.button.source = undefined;
 var rect_button_srcs = [3]*components.button.source{ &rect_button_src, &rect_button_src2, &rect_button_text_src };
 var button_area_rect = math.rect{ .left = -100, .right = 100, .top = 50, .bottom = -50 };
 
-var shape_src: graphics.shape.source = undefined;
-var shape_src2: graphics.shape.source = undefined;
-var extra_src = [_]*graphics.shape.source{&shape_src2};
+var shape_src: graphics.shape_source = undefined;
+var shape_src2: graphics.shape_source = undefined;
+var extra_src = [_]*graphics.shape_source{&shape_src2};
 var image_src: graphics.texture = undefined;
 var anim_image_src: graphics.texture_array = undefined;
 var cmd: *render_command = undefined;
@@ -127,12 +127,12 @@ pub fn xfit_init() !void {
     img = try objects_mem_pool.create();
     anim_img = try objects_mem_pool.create();
 
-    shape_src = graphics.shape.source.init_for_alloc(allocator);
+    shape_src = graphics.shape_source.init_for_alloc(allocator);
     shape_src.color = .{ 1, 1, 1, 0.5 };
 
     text_shape.* = .{ ._shape = graphics.shape.init(&shape_src) };
 
-    shape_src2 = graphics.shape.source.init_for_alloc(allocator);
+    shape_src2 = graphics.shape_source.init_for_alloc(allocator);
     shape_src2.color = .{ 1, 0, 1, 1 };
 
     rect_button_text_src = components.button.source.init_for_alloc(allocator);
