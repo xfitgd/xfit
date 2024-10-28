@@ -3749,6 +3749,9 @@ pub const MINMAXINFO = extern struct {
 pub const PMINMAXINFO = [*c]MINMAXINFO;
 pub const LPMINMAXINFO = [*c]MINMAXINFO;
 
+pub extern fn SendMessageA(hWnd: HWND, Msg: UINT, wParam: WPARAM, lParam: LPARAM) callconv(@import("std").os.windows.WINAPI) LRESULT;
+pub extern fn SendMessageW(hWnd: HWND, Msg: UINT, wParam: WPARAM, lParam: LPARAM) callconv(@import("std").os.windows.WINAPI) LRESULT;
+
 pub const DROPSTRUCT = struct_tagDROPSTRUCT;
 pub const PDROPSTRUCT = [*c]struct_tagDROPSTRUCT;
 pub const LPDROPSTRUCT = [*c]struct_tagDROPSTRUCT;

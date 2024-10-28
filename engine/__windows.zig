@@ -134,8 +134,12 @@ fn render_thread(param: win32.LPVOID) callconv(std.os.windows.WINAPI) DWORD {
     return 0;
 }
 
+pub var icon: win32.HICON = undefined;
+
 pub fn windows_start() void {
     const CLASS_NAME = "Xfit Window Class";
+
+    if (__system.init_set.icon != null) icon = win32.LoadIconA(hInstance, @ptrCast(__system.init_set.icon));
 
     var wc = win32.WNDCLASSA{
         .style = 0,
@@ -143,7 +147,7 @@ pub fn windows_start() void {
         .cbClsExtra = 0,
         .cbWndExtra = 0,
         .hInstance = hInstance,
-        .hIcon = if (__system.init_set.icon == null) win32.LoadIconA(null, @ptrFromInt(win32.IDI_APPLICATION)) else win32.LoadIconA(hInstance, @ptrCast(__system.init_set.icon)),
+        .hIcon = if (__system.init_set.icon == null) win32.LoadIconA(null, @ptrFromInt(win32.IDI_APPLICATION)) else icon,
         .hCursor = if (__system.init_set.cursor == null) win32.LoadCursorA(null, @ptrFromInt(win32.IDC_ARROW)) else win32.LoadCursorA(hInstance, @ptrCast(__system.init_set.cursor)),
         .hbrBackground = null,
         .lpszMenuName = null,
@@ -185,6 +189,13 @@ pub fn windows_start() void {
                 change_fullscreen(&__system.monitors.items[__system.init_set.screen_index], __system.monitors.items[__system.init_set.screen_index].primary_resolution.?);
             }
         }
+        __system.prev_window = .{
+            .x = window_x,
+            .y = window_y,
+            .width = window_width,
+            .height = window_height,
+            .state = window.window_state.Restore,
+        };
     }
 
     _ = win32.CreateThread(null, 0, render_thread, null, 0, &render_thread_id);
@@ -245,6 +256,9 @@ pub fn set_window_mode() void {
     if (__vulkan.is_fullscreen_ex) {
         __vulkan.is_fullscreen_ex = false;
     }
+
+    _ = win32.SendMessageA(hWnd, win32.WM_SETICON, win32.ICON_SMALL, @bitCast(@intFromPtr(icon)));
+    _ = win32.SendMessageA(hWnd, win32.WM_SETICON, win32.ICON_BIG, @bitCast(@intFromPtr(icon)));
 
     __vulkan.fullscreen_mutex.unlock();
 }
@@ -312,6 +326,9 @@ pub fn set_window_mode2(pos: math.point(i32), size: math.point(u32), state: wind
         .Maximized => win32.SW_MAXIMIZE,
         .Minimized => win32.SW_MINIMIZE,
     });
+
+    _ = win32.SendMessageA(hWnd, win32.WM_SETICON, win32.ICON_SMALL, @bitCast(@intFromPtr(icon)));
+    _ = win32.SendMessageA(hWnd, win32.WM_SETICON, win32.ICON_BIG, @bitCast(@intFromPtr(icon)));
 
     __vulkan.fullscreen_mutex.unlock();
 }

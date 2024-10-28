@@ -210,7 +210,7 @@ pub fn run(
             }
             result.linkSystemLibrary("setupapi");
             result.linkSystemLibrary("hid");
-            //result.linkSystemLibrary("Gdi32");
+            result.linkSystemLibrary("Gdi32");
 
             result.addObjectFile(get_lazypath(b, std.fmt.allocPrint(arena_allocator.allocator(), "{s}/lib/windows/vulkan.lib", .{engine_path}) catch unreachable));
             for (lib_names) |n| {

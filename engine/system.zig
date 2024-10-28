@@ -90,27 +90,15 @@ pub const monitor_info = struct {
 
     name: [32]u8 = std.mem.zeroes([32]u8),
 
-    fn save_prev_window_state() void {
-        if (__system.init_set.screen_mode == .WINDOW) {
-            __system.prev_window = .{
-                .x = window.window_x(),
-                .y = window.window_y(),
-                .width = window.window_width(),
-                .height = window.window_height(),
-                .state = if (xfit.platform == .windows) __windows.get_window_state() else window.window_state.Restore,
-            };
-        }
-    }
-
     pub fn set_fullscreen_mode(self: Self, resolution: *const screen_info) void {
-        save_prev_window_state();
+        __system.save_prev_window_state();
         if (xfit.platform == .windows) {
             __windows.set_fullscreen_mode(&self, resolution);
             @atomicStore(xfit.screen_mode, &__system.init_set.screen_mode, xfit.screen_mode.FULLSCREEN, std.builtin.AtomicOrder.monotonic);
         } else {}
     }
     pub fn set_borderlessscreen_mode(self: Self) void {
-        save_prev_window_state();
+        __system.save_prev_window_state();
         if (xfit.platform == .windows) {
             __windows.set_borderlessscreen_mode(&self);
             @atomicStore(xfit.screen_mode, &__system.init_set.screen_mode, xfit.screen_mode.BORDERLESSSCREEN, std.builtin.AtomicOrder.monotonic);

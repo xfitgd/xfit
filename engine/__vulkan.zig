@@ -2146,19 +2146,23 @@ pub fn drawFrame() void {
         defer std.heap.c_allocator.free(cmds);
 
         cmds[0] = vkCommandBuffer;
+        var cmdidx: usize = 1;
 
-        for (graphics.render_cmd.?, cmds[1..cmds.len]) |*cmd, *v| {
+        for (graphics.render_cmd.?) |*cmd| {
             if (@atomicLoad(bool, &cmd.*.*.__refesh[state.frame], .monotonic)) {
                 @atomicStore(bool, &cmd.*.*.__refesh[state.frame], false, .monotonic);
                 recordCommandBuffer(cmd, @intCast(state.frame));
             }
-            v.* = cmd.*.__command_buffers[state.frame][imageIndex];
+            if (cmd.*.*.scene != null and cmd.*.*.scene.?.len > 0) {
+                cmds[cmdidx] = cmd.*.*.__command_buffers[state.frame][imageIndex];
+                cmdidx += 1;
+            }
         }
 
         const waitStages: u32 = vk.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
         var submitInfo: vk.VkSubmitInfo = .{
             .waitSemaphoreCount = 1,
-            .commandBufferCount = @intCast(cmds.len),
+            .commandBufferCount = @intCast(cmdidx),
             .signalSemaphoreCount = 1,
             .pWaitSemaphores = &vkImageAvailableSemaphore[state.frame],
             .pWaitDstStageMask = &waitStages,
