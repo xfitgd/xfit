@@ -24,6 +24,7 @@ const pointu = math.pointu;
 const vector = math.vector;
 const matrix = math.matrix;
 const matrix_error = math.matrix_error;
+const __render_command = @import("__render_command.zig");
 
 const vulkan_res_node = __vulkan_allocator.vulkan_res_node;
 
@@ -40,6 +41,11 @@ pub inline fn execute_and_wait_all_op() void {
 }
 pub inline fn execute_all_op() void {
     __vulkan_allocator.execute_all_op();
+}
+pub inline fn set_render_clear_color(_color: vector) void {
+    const color_struct = packed struct { _0: f32, _1: f32, _2: f32, _3: f32 };
+    const clear_color: color_struct = .{ ._0 = _color[0], ._1 = _color[1], ._2 = _color[2], ._3 = _color[3] };
+    @atomicStore(color_struct, @as(*color_struct, @ptrCast(&__vulkan.clear_color)), clear_color, .monotonic);
 }
 pub inline fn lock_data() void {
     __vulkan_allocator.lock_data();

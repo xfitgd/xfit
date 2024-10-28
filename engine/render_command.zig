@@ -47,7 +47,7 @@ pub fn init() *Self {
         xfit.herr(result == vk.VK_SUCCESS, "render_command vkAllocateCommandBuffers vkCommandPool : {d}", .{result});
     }
     __render_command.mutex.lock();
-    __render_command.render_cmd_list.append(self) catch xfit.herrm(" render_cmd_list.append(&self)");
+    __render_command.render_cmd_list.?.append(self) catch xfit.herrm(" render_cmd_list.append(&self)");
     __render_command.mutex.unlock();
     return self;
 }
@@ -58,9 +58,9 @@ pub fn deinit(self: *Self) void {
     }
     var i: usize = 0;
     __render_command.mutex.lock();
-    while (i < __render_command.render_cmd_list.items.len) : (i += 1) {
-        if (__render_command.render_cmd_list.items[i] == self) {
-            _ = __render_command.render_cmd_list.orderedRemove(i);
+    while (i < __render_command.render_cmd_list.?.items.len) : (i += 1) {
+        if (__render_command.render_cmd_list.?.items[i] == self) {
+            _ = __render_command.render_cmd_list.?.orderedRemove(i);
             break;
         }
     }

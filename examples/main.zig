@@ -135,6 +135,8 @@ pub fn xfit_init() !void {
     shape_src2 = graphics.shape_source.init_for_alloc(allocator);
     shape_src2.color = .{ 1, 0, 1, 1 };
 
+    //graphics.set_render_clear_color(.{ 1, 1, 1, 0 });
+
     rect_button_text_src = components.button.source.init_for_alloc(allocator);
 
     try components.button.make_square_button(rect_button_srcs[0..2], .{ 100, 50 }, allocator);

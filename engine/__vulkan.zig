@@ -49,6 +49,9 @@ pub var __pre_mat_uniform: __vulkan_allocator.vulkan_res_node(.buffer) = .{};
 
 pub var queue_mutex: std.Thread.Mutex = .{};
 
+const color_struct = packed struct { _0: f32, _1: f32, _2: f32, _3: f32 };
+pub var clear_color: color_struct = std.mem.zeroes(color_struct);
+
 pub const pipeline_set = struct {
     pipeline: vk.VkPipeline = null,
     pipelineLayout: vk.VkPipelineLayout = null,
@@ -2163,7 +2166,9 @@ pub fn drawFrame() void {
             .pSignalSemaphores = &vkRenderFinishedSemaphore[state.frame],
         };
 
-        const clearColor: vk.VkClearValue = .{ .color = .{ .float32 = .{ 0, 0, 0, 0 } } };
+        const cls_color: color_struct = @atomicLoad(color_struct, &clear_color, .monotonic);
+        const clearColor: vk.VkClearValue = .{ .color = .{ .float32 = .{ cls_color._0, cls_color._1, cls_color._2, cls_color._3 } } };
+
         const clearDepthStencil: vk.VkClearValue = .{ .depthStencil = .{ .stencil = 0, .depth = 1 } };
         var renderPassInfo: vk.VkRenderPassBeginInfo = .{
             .sType = vk.VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
