@@ -55,7 +55,7 @@ pub fn run(
     root_source_file: std.Build.LazyPath,
     PLATFORM: XfitPlatform,
     OPTIMIZE: std.builtin.OptimizeMode,
-    callback: fn (*std.Build.Step.Compile, std.Build.ResolvedTarget) void,
+    callback: fn (*std.Build, *std.Build.Step.Compile, std.Build.ResolvedTarget) void,
     is_console: bool, //ignores for target mobile
 ) void {
     var arena_allocator = std.heap.ArenaAllocator.init(b.allocator);
@@ -182,7 +182,7 @@ pub fn run(
                 result.addObjectFile(get_lazypath(b, std.fmt.allocPrint(arena_allocator.allocator(), "{s}/lib/android/{s}/{s}", .{ engine_path, get_arch_text(targets[i].cpu_arch.?), n }) catch unreachable));
             }
 
-            callback(result, target);
+            callback(b, result, target);
 
             install_step.dependOn(&b.addInstallArtifact(result, .{
                 .dest_dir = .{ .override = .{ .custom = out_arch_text[i] } },
@@ -217,7 +217,7 @@ pub fn run(
                 result.addObjectFile(get_lazypath(b, std.fmt.allocPrint(arena_allocator.allocator(), "{s}/lib/windows/{s}/{s}", .{ engine_path, get_arch_text(target.result.cpu.arch), n }) catch unreachable));
             }
 
-            callback(result, target);
+            callback(b, result, target);
 
             b.installArtifact(result);
         } else if (PLATFORM == XfitPlatform.linux) {
@@ -245,7 +245,7 @@ pub fn run(
                 result.addObjectFile(get_lazypath(b, std.fmt.allocPrint(arena_allocator.allocator(), "{s}/lib/linux/{s}/{s}", .{ engine_path, get_arch_text(target.result.cpu.arch), n }) catch unreachable));
             }
 
-            callback(result, target);
+            callback(b, result, target);
 
             b.installArtifact(result);
         } else unreachable;
