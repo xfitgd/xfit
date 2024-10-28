@@ -50,9 +50,8 @@ var rect_button_text_src: components.button.source = undefined;
 var rect_button_srcs = [3]*components.button.source{ &rect_button_src, &rect_button_src2, &rect_button_text_src };
 var button_area_rect = math.rect{ .left = -100, .right = 100, .top = 50, .bottom = -50 };
 
-var shape_src: graphics.shape_source = undefined;
+var shape_src: []graphics.shape_source = undefined;
 var shape_src2: graphics.shape_source = undefined;
-var extra_src = [_]*graphics.shape_source{&shape_src2};
 var image_src: graphics.texture = undefined;
 var anim_image_src: graphics.texture_array = undefined;
 var cmd: *render_command = undefined;
@@ -127,11 +126,6 @@ pub fn xfit_init() !void {
     img = try objects_mem_pool.create();
     anim_img = try objects_mem_pool.create();
 
-    shape_src = graphics.shape_source.init_for_alloc(allocator);
-    shape_src.color = .{ 1, 1, 1, 0.5 };
-
-    text_shape.* = .{ ._shape = graphics.shape.init(&shape_src) };
-
     shape_src2 = graphics.shape_source.init_for_alloc(allocator);
     shape_src2.color = .{ 1, 0, 1, 1 };
 
@@ -168,14 +162,35 @@ pub fn xfit_init() !void {
     font0_data = file_.read_file("Spoqa Han Sans Regular.woff", allocator) catch |e| xfit.herr3("read_file font0_data", e);
     font0 = font.init(font0_data, 0) catch |e| xfit.herr3("font0.init", e);
 
-    try font0.render_string("Hello World!\n안녕하세요. break;", .{}, &shape_src, allocator);
+    const option2: font.render_option2 = .{
+        .option = .{},
+        .ranges = &[_]font.range{
+            .{
+                .font = &font0,
+                .color = .{ 1, 1, 1, 1 },
+                .len = 5,
+                .scale = .{ 2, 2 },
+            },
+            .{
+                .font = &font0,
+                .color = .{ 0, 0, 1, 1 },
+                .len = 0,
+                .scale = .{ 1, 1 },
+            },
+        },
+    };
+    shape_src = try font.render_string2("Hello World!\n안녕하세요. break;", option2, allocator);
+
+    text_shape.* = .{ ._shape = graphics.shape.init(&shape_src[0]) };
     // var t1 = std.time.Timer.start() catch unreachable;
     // xfit.print("{d}", .{t1.lap()});
-    try font0.render_string("CONTINUE계속", .{}, &shape_src2, allocator);
+    _ = try font0.render_string("CONTINUE계속", .{}, &shape_src2, allocator);
 
-    try font0.render_string("버튼", .{ .pivot = .{ 0.5, 0.3 }, .scale = .{ 4.5, 4.5 } }, &rect_button_text_src.src, allocator);
+    _ = try font0.render_string("버튼", .{ .pivot = .{ 0.5, 0.3 }, .scale = .{ 4.5, 4.5 } }, &rect_button_text_src.src, allocator);
 
-    shape_src.build(.gpu, .cpu);
+    for (shape_src) |*src| {
+        src.*.build(.gpu, .cpu);
+    }
     shape_src2.build(.gpu, .cpu);
     rect_button_text_src.src.color = .{ 0, 0, 0, 1 };
     rect_button_text_src.src.build(.gpu, .cpu);
@@ -187,7 +202,12 @@ pub fn xfit_init() !void {
 
     text_shape.*._shape.transform.camera = &g_camera;
     text_shape.*._shape.transform.projection = &g_proj;
-    text_shape.*._shape.extra_src = extra_src[0..1];
+    var extra_src = try allocator.alloc(*graphics.shape_source, shape_src.len - 1 + 1); // shape_src 1..len + shape_src2
+    for (extra_src[0 .. extra_src.len - 1], shape_src[1..]) |*a, *b| {
+        a.* = b;
+    }
+    extra_src[extra_src.len - 1] = &shape_src2;
+    text_shape.*._shape.extra_src = extra_src;
 
     text_shape.*._shape.transform.model = matrix.scaling(5, 5, 1.0).multiply(&matrix.translation(-200, 0, 0.5));
     text_shape.*.build();
@@ -332,12 +352,12 @@ fn move_callback() !bool {
 
 pub fn xfit_update() !void {
     update_mutex.lock();
-    shape_src.color[3] = shape_alpha;
+    shape_src[0].color[3] = shape_alpha;
     text_shape.*._shape.transform.model = matrix.scaling(5, 5, 1.0).multiply(&matrix.translation(-200 + dx, 0, 0.5));
     update_mutex.unlock();
 
     text_shape.*._shape.transform.copy_update();
-    shape_src.copy_color_update();
+    shape_src[0].copy_color_update();
 
     anim.update(xfit.dt());
 }
@@ -354,7 +374,10 @@ pub fn xfit_size() !void {
 pub fn xfit_destroy() !void {
     move_callback_thread.join();
 
-    shape_src.deinit_for_alloc();
+    for (shape_src) |*src| {
+        src.*.deinit_for_alloc();
+    }
+    allocator.free(text_shape.*._shape.extra_src.?);
     shape_src2.deinit_for_alloc();
     rect_button_src.src.deinit_for_alloc();
     rect_button_src2.src.deinit_for_alloc();
@@ -381,6 +404,7 @@ pub fn xfit_destroy() !void {
 
 ///after system clean
 pub fn xfit_clean() !void {
+    allocator.free(shape_src);
     objects.deinit();
     vertices_mem_pool.deinit();
     objects_mem_pool.deinit();

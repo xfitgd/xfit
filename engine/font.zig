@@ -108,7 +108,63 @@ pub const render_option = struct {
     pivot: point = .{ 0, 0 },
     area: ?point = null,
 };
-pub fn render_string(self: *Self, _str: []const u8, _render_option: render_option, out_shape_src: *graphics.shape_source, allocator: std.mem.Allocator) !void {
+pub const range = struct {
+    font: *Self,
+    color: vector,
+    len: usize,
+    scale: point,
+};
+pub const render_option2 = struct {
+    option: render_option,
+    ranges: []const range,
+};
+
+///alloc return []graphics.shape_source and each element vertices.array.? indices.array.?
+pub fn render_string2(_str: []const u8, _render_option: render_option2, allocator: std.mem.Allocator) ![]graphics.shape_source {
+    var srclist = std.ArrayListAligned(graphics.shape_source, null).init(allocator);
+    errdefer srclist.deinit();
+    var i: usize = 0;
+    var option = _render_option.option;
+    for (_render_option.ranges) |v| {
+        option.scale = _render_option.option.scale * v.scale;
+        var same: bool = false;
+        var src: *graphics.shape_source = undefined;
+        for (srclist.items) |*e| {
+            if (math.compare(e.*.color, v.color)) {
+                same = true;
+                src = e;
+                break;
+            }
+        }
+        if (!same) {
+            try srclist.append(graphics.shape_source.init_for_alloc(allocator));
+            srclist.items[srclist.items.len - 1].color = v.color;
+
+            src = &srclist.items[srclist.items.len - 1];
+        }
+        if (v.len == 0 or i + v.len >= _str.len) {
+            _ = v.font.*.render_string(_str[i..], option, src, allocator) catch |e| {
+                for (srclist.items) |*s| {
+                    s.*.deinit_for_alloc();
+                }
+                return e;
+            };
+            break;
+        } else {
+            option._offset = v.font.*.render_string(_str[i..(i + v.len)], option, src, allocator) catch |e| {
+                for (srclist.items) |*s| {
+                    s.*.deinit_for_alloc();
+                }
+                return e;
+            };
+            i += v.len;
+        }
+    }
+    return try srclist.toOwnedSlice();
+}
+
+///alloc out_shape_src.*.vertices.array.? and out_shape_src.*.indices.array.?
+pub fn render_string(self: *Self, _str: []const u8, _render_option: render_option, out_shape_src: *graphics.shape_source, allocator: std.mem.Allocator) !point {
     try init_shape_src(out_shape_src, allocator);
     const start_ = out_shape_src.*.vertices.array.?.len;
     var maxP: point = .{ std.math.floatMin(f32), std.math.floatMin(f32) };
@@ -133,6 +189,7 @@ pub fn render_string(self: *Self, _str: []const u8, _render_option: render_optio
     while (i < out_shape_src.*.vertices.array.?.len) : (i += 1) {
         out_shape_src.*.vertices.array.?[i].pos -= _render_option.pivot * size * _render_option.scale;
     }
+    return offset * _render_option.scale;
 }
 
 fn _render_char(self: *Self, char: u21, out_shape_src: *graphics.shape_source, offset: *point, area: ?math.point, scale: point, allocator: std.mem.Allocator) !void {
