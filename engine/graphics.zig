@@ -170,7 +170,7 @@ pub const iobject = union(iobject_type) {
             inline else => |*case| case.*.deinit(),
         }
     }
-    pub inline fn deinit_callback(self: *Self, callback: ?*const fn () void) void {
+    pub inline fn deinit_callback(self: *Self, callback: ?*const fn (caller: *anyopaque) void) void {
         switch (self.*) {
             inline else => |*case| case.*.deinit_callback(callback),
         }
@@ -218,17 +218,17 @@ pub fn vertices(comptime vertexT: type) type {
         }
         pub inline fn deinit(self: *Self) void {
             self.*.__check_init.deinit();
-            self.*.node.clean(null);
+            self.*.node.clean(null, {});
         }
-        pub inline fn deinit_callback(self: *Self, callback: ?*const fn () void) void {
+        pub inline fn deinit_callback(self: *Self, callback: ?*const fn (caller: *anyopaque) void) void {
             self.*.__check_init.deinit();
-            self.*.node.clean(callback);
+            self.*.node.clean(callback, self);
         }
         pub inline fn deinit_for_alloc(self: *Self) void {
             deinit(self);
             self.allocator.free(self.array.?);
         }
-        pub inline fn deinit_for_alloc_callback(self: *Self, callback: ?*const fn () void) void {
+        pub inline fn deinit_for_alloc_callback(self: *Self, callback: ?*const fn (caller: *anyopaque) void) void {
             deinit_callback(self, callback);
             self.allocator.free(self.array.?);
         }
@@ -278,17 +278,17 @@ pub fn indices_(comptime _type: index_type) type {
         }
         pub inline fn deinit(self: *Self) void {
             self.*.__check_init.deinit();
-            self.*.node.clean(null);
+            self.*.node.clean(null, {});
         }
-        pub inline fn deinit_callback(self: *Self, callback: ?*const fn () void) void {
+        pub inline fn deinit_callback(self: *Self, callback: ?*const fn (caller: *anyopaque) void) void {
             self.*.__check_init.deinit();
-            self.*.node.clean(callback);
+            self.*.node.clean(callback, self);
         }
         pub inline fn deinit_for_alloc(self: *Self) void {
             deinit(self);
             self.allocator.free(self.array.?);
         }
-        pub inline fn deinit_for_alloc_callback(self: *Self, callback: ?*const fn () void) void {
+        pub inline fn deinit_for_alloc_callback(self: *Self, callback: ?*const fn (caller: *anyopaque) void) void {
             deinit_callback(self, callback);
             self.allocator.free(self.array.?);
         }
@@ -353,7 +353,7 @@ pub const projection = struct {
     }
     pub inline fn deinit(self: *Self) void {
         self.*.__check_alloc.deinit();
-        self.*.__uniform.clean(null);
+        self.*.__uniform.clean(null, {});
     }
     pub fn build(self: *Self, _flag: write_flag) void {
         self.*.__check_alloc.init(__system.allocator);
@@ -382,7 +382,7 @@ pub const camera = struct {
     }
     pub inline fn deinit(self: *Self) void {
         self.*.__check_alloc.deinit();
-        self.*.__uniform.clean(null);
+        self.*.__uniform.clean(null, {});
     }
     pub fn build(self: *Self) void {
         self.*.__uniform.create_buffer(.{
@@ -413,7 +413,7 @@ pub const color_transform = struct {
     }
     pub inline fn deinit(self: *Self) void {
         self.*.__check_alloc.deinit();
-        self.*.__uniform.clean(null);
+        self.*.__uniform.clean(null, {});
     }
     pub fn build(self: *Self, _flag: write_flag) void {
         self.*.__check_alloc.init(__system.allocator);
@@ -446,9 +446,9 @@ pub const transform = struct {
 
     __check_init: mem.check_init = .{},
 
-    pub inline fn __deinit(self: *Self, callback: ?*const fn () void) void {
+    pub inline fn __deinit(self: *Self, callback: ?*const fn (caller: *anyopaque) void) void {
         self.*.__check_init.deinit();
-        self.*.__model_uniform.clean(callback);
+        self.*.__model_uniform.clean(callback, self);
     }
     // inline fn get_mat_set_wh(self: *Self, _type: type) matrix {
     //     const e: *_type = @fieldParentPtr("transform", self);
@@ -521,11 +521,11 @@ pub const texture = struct {
 
     pub inline fn deinit(self: *Self) void {
         self.*.__check_init.deinit();
-        self.*.__image.clean(null);
+        self.*.__image.clean(null, {});
     }
-    pub fn deinit_callback(self: *Self, callback: ?*const fn () void) void {
+    pub fn deinit_callback(self: *Self, callback: ?*const fn (caller: *anyopaque) void) void {
         self.*.__check_init.deinit();
-        self.*.__image.clean(callback);
+        self.*.__image.clean(callback, self);
     }
     // pub fn copy(self: *Self, _data: []const u8, rect: ?math.recti) void {
     //     __vulkan_allocator.copy_texture(self, _data, rect);
@@ -585,11 +585,11 @@ pub const texture_array = struct {
 
     pub inline fn deinit(self: *Self) void {
         self.*.__check_init.deinit();
-        self.*.__image.clean(null);
+        self.*.__image.clean(null, {});
     }
-    pub fn deinit_callback(self: *Self, callback: ?*const fn () void) void {
+    pub fn deinit_callback(self: *Self, callback: ?*const fn (caller: *anyopaque) void) void {
         self.*.__check_init.deinit();
-        self.*.__image.clean(callback);
+        self.*.__image.clean(callback, self);
     }
 };
 
@@ -658,11 +658,11 @@ pub const tile_texture_array = struct {
 
     pub inline fn deinit(self: *Self) void {
         self.*.__check_init.deinit();
-        self.*.__image.clean(null);
+        self.*.__image.clean(null, {});
     }
-    pub inline fn deinit_callback(self: *Self, callback: ?*const fn () void) void {
+    pub inline fn deinit_callback(self: *Self, callback: ?*const fn (caller: *anyopaque) void) void {
         self.*.__check_init.deinit();
-        self.*.__image.clean(callback);
+        self.*.__image.clean(callback, self);
     }
 };
 
@@ -715,25 +715,25 @@ pub const shape_source = struct {
         self.*.__set.__res = __set_res[0..1];
         __vulkan_allocator.update_descriptor_sets((&self.*.__set)[0..1]);
     }
-    pub fn deinit_callback(self: *shape_source, callback: ?*const fn () void) void {
+    pub fn deinit_callback(self: *shape_source, callback: ?*const fn (caller: *anyopaque) void) void {
         self.*.vertices.deinit();
         self.*.indices.deinit();
-        self.*.__uniform.clean(callback);
+        self.*.__uniform.clean(callback, self);
     }
     pub fn deinit(self: *shape_source) void {
         self.*.vertices.deinit();
         self.*.indices.deinit();
-        self.*.__uniform.clean(null);
+        self.*.__uniform.clean(null, {});
     }
     pub fn deinit_for_alloc(self: *shape_source) void {
         self.*.vertices.deinit_for_alloc();
         self.*.indices.deinit_for_alloc();
-        self.*.__uniform.clean(null);
+        self.*.__uniform.clean(null, {});
     }
-    pub fn deinit_for_alloc_callback(self: *shape_source, callback: ?*const fn () void) void {
+    pub fn deinit_for_alloc_callback(self: *shape_source, callback: ?*const fn (caller: *anyopaque) void) void {
         self.*.vertices.deinit_for_alloc();
         self.*.indices.deinit_for_alloc();
-        self.*.__uniform.clean(callback);
+        self.*.__uniform.clean(callback, self);
     }
     ///write_flag가 cpu일때만 호출
     pub fn copy_color_update(self: *shape_source) void {
@@ -777,7 +777,7 @@ pub fn shape_(_msaa: bool) type {
         pub fn deinit(self: *Self) void {
             self.*.transform.__deinit(null);
         }
-        pub fn deinit_callback(self: *Self, callback: ?*const fn () void) void {
+        pub fn deinit_callback(self: *Self, callback: ?*const fn (caller: *anyopaque) void) void {
             self.*.transform.__deinit(callback);
         }
         pub fn __draw(self: *Self, cmd: vk.VkCommandBuffer) void {
@@ -835,7 +835,7 @@ pub const image = struct {
     pub fn deinit(self: *Self) void {
         self.*.transform.__deinit(null);
     }
-    pub fn deinit_callback(self: *Self, callback: ?*const fn () void) void {
+    pub fn deinit_callback(self: *Self, callback: ?*const fn (caller: *anyopaque) void) void {
         self.*.transform.__deinit(callback);
     }
     pub fn update(self: *Self) void {
@@ -926,11 +926,11 @@ pub const animate_image = struct {
 
     pub fn deinit(self: *Self) void {
         self.*.transform.__deinit(null);
-        self.*.__frame_uniform.clean(null);
+        self.*.__frame_uniform.clean(null, {});
     }
-    pub fn deinit_callback(self: *Self, callback: ?*const fn () void) void {
+    pub fn deinit_callback(self: *Self, callback: ?*const fn (caller: *anyopaque) void) void {
         self.*.transform.__deinit(null);
-        self.*.__frame_uniform.clean(callback);
+        self.*.__frame_uniform.clean(callback, self);
     }
     pub fn next_frame(self: *Self) void {
         if (!self.*.__frame_uniform.is_build() or self.*.src.*.get_tex_count_build() == 0) return;
@@ -1032,11 +1032,11 @@ pub const tile_image = struct {
 
     pub fn deinit(self: *Self) void {
         self.*.transform.__deinit(null);
-        self.*.__tile_uniform.clean(null);
+        self.*.__tile_uniform.clean(null, {});
     }
-    pub fn deinit_callback(self: *Self, callback: ?*const fn () void) void {
+    pub fn deinit_callback(self: *Self, callback: ?*const fn (caller: *anyopaque) void) void {
         self.*.transform.__deinit(null);
-        self.*.__tile_uniform.clean(callback);
+        self.*.__tile_uniform.clean(callback, self);
     }
     pub fn set_frame(self: *Self, _frame: u32) void {
         if (!self.*.__tile_uniform.is_build() or self.*.src.*.get_tex_count_build() == 0) return;

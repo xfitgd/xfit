@@ -1790,6 +1790,8 @@ pub extern fn GetClientRect(hWnd: HWND, lpRect: LPRECT) callconv(@import("std").
 pub extern fn GetSystemMetrics(nIndex: c_int) callconv(@import("std").os.windows.WINAPI) c_int;
 pub extern fn PeekMessageA(lpMsg: LPMSG, hWnd: HWND, wMsgFilterMin: UINT, wMsgFilterMax: UINT, wRemoveMsg: UINT) callconv(@import("std").os.windows.WINAPI) BOOL;
 pub extern fn PeekMessageW(lpMsg: LPMSG, hWnd: HWND, wMsgFilterMin: UINT, wMsgFilterMax: UINT, wRemoveMsg: UINT) callconv(@import("std").os.windows.WINAPI) BOOL;
+pub extern fn PostMessageA(hWnd: HWND, Msg: UINT, wParam: WPARAM, lParam: LPARAM) callconv(@import("std").os.windows.WINAPI) BOOL;
+pub extern fn PostMessageW(hWnd: HWND, Msg: UINT, wParam: WPARAM, lParam: LPARAM) callconv(@import("std").os.windows.WINAPI) BOOL;
 pub extern fn TranslateMessage(lpMsg: [*c]const MSG) callconv(@import("std").os.windows.WINAPI) BOOL;
 pub extern fn DispatchMessageA(lpMsg: [*c]const MSG) callconv(@import("std").os.windows.WINAPI) LRESULT;
 pub extern fn DispatchMessageW(lpMsg: [*c]const MSG) callconv(@import("std").os.windows.WINAPI) LRESULT;

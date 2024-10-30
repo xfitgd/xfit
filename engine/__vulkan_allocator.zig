@@ -241,11 +241,13 @@ const operation_node = union(enum) {
     },
     destroy_buffer: struct {
         buf: *vulkan_res_node(.buffer),
-        callback: ?*const fn () void = null,
+        callback: ?*const fn (callback_data: *anyopaque) void = null,
+        callback_data: *anyopaque = undefined,
     },
     destroy_image: struct {
         buf: *vulkan_res_node(.texture),
-        callback: ?*const fn () void = null,
+        callback: ?*const fn (callback_data: *anyopaque) void = null,
+        callback_data: *anyopaque = undefined,
     },
     __update_descriptor_sets: struct {
         sets: []descriptor_set,
@@ -397,9 +399,9 @@ fn execute_create_buffer(buf: *vulkan_res_node(.buffer), _data: ?[]const u8) voi
         }
     }
 }
-fn execute_destroy_buffer(buf: *vulkan_res_node(.buffer), callback: ?*const fn () void) void {
+fn execute_destroy_buffer(buf: *vulkan_res_node(.buffer), callback: ?*const fn (caller: *anyopaque) void, caller: *anyopaque) void {
     buf.*.__destroy_buffer();
-    if (callback != null) callback.?();
+    if (callback != null) callback.?(caller);
 }
 
 inline fn bit_size(fmt: texture_format) c_uint {
@@ -552,9 +554,9 @@ fn execute_create_texture(buf: *vulkan_res_node(.texture), _data: ?[]const u8) v
         }
     }
 }
-fn execute_destroy_image(buf: *vulkan_res_node(.texture), callback: ?*const fn () void) void {
+fn execute_destroy_image(buf: *vulkan_res_node(.texture), callback: ?*const fn (caller: *anyopaque) void, caller: *anyopaque) void {
     buf.*.__destroy_image();
-    if (callback != null) callback.?();
+    if (callback != null) callback.?(caller);
 }
 
 fn execute_register_descriptor_pool(__size: []descriptor_pool_size) void {
@@ -822,8 +824,8 @@ fn thread_func() void {
             while (i < op_save_queue.len) : (i += 1) {
                 switch (tags[i]) {
                     //destroy.. 나중에
-                    .destroy_buffer => execute_destroy_buffer(data[i].destroy_buffer.buf, data[i].destroy_buffer.callback),
-                    .destroy_image => execute_destroy_image(data[i].destroy_image.buf, data[i].destroy_image.callback),
+                    .destroy_buffer => execute_destroy_buffer(data[i].destroy_buffer.buf, data[i].destroy_buffer.callback, data[i].destroy_buffer.callback_data),
+                    .destroy_image => execute_destroy_image(data[i].destroy_image.buf, data[i].destroy_image.callback, data[i].destroy_image.callback_data),
                     else => continue,
                 }
             }
@@ -1044,7 +1046,7 @@ pub fn vulkan_res_node(_res_type: res_type) type {
             self.*.map_copy(self.*.map_data.?[0..u8data.len]);
             dataMutex.unlock();
         }
-        pub fn clean(self: *vulkan_res_node_Self, callback: ?*const fn () void) void {
+        pub fn clean(self: *vulkan_res_node_Self, callback: ?*const fn (caller: *anyopaque) void, data: anytype) void {
             self.*.builded = false;
 
             switch (_res_type) {
@@ -1053,12 +1055,20 @@ pub fn vulkan_res_node(_res_type: res_type) type {
                     if (self.*.pvulkan_buffer == null) {
                         vk.vkDestroyImageView(__vulkan.vkDevice, self.*.__image_view, null);
                     } else {
-                        append_op(.{ .destroy_image = .{ .buf = self, .callback = callback } });
+                        append_op(.{ .destroy_image = .{
+                            .buf = self,
+                            .callback = callback,
+                            .callback_data = if (@TypeOf(data) != void) @ptrCast(data) else undefined,
+                        } });
                     }
                 },
                 .buffer => {
                     self.*.buffer_option.len = 0;
-                    append_op(.{ .destroy_buffer = .{ .buf = self, .callback = callback } });
+                    append_op(.{ .destroy_buffer = .{
+                        .buf = self,
+                        .callback = callback,
+                        .callback_data = if (@TypeOf(data) != void) @ptrCast(data) else undefined,
+                    } });
                 },
             }
         }

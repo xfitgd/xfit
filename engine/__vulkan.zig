@@ -1642,7 +1642,7 @@ pub fn vulkan_start() void {
 pub fn vulkan_destroy() void {
     //graphics destroy
     no_color_tran.deinit();
-    __pre_mat_uniform.clean(null);
+    __pre_mat_uniform.clean(null, {});
 
     cleanup_swapchain();
 
@@ -1722,10 +1722,10 @@ fn cleanup_swapchain() void {
             vk_swapchain_frame_buffers[i].deinit();
         }
 
-        depth_stencil_image_sample.clean(null);
-        color_image_sample.clean(null);
-        depth_stencil_image.clean(null);
-        color_image.clean(null);
+        depth_stencil_image_sample.clean(null, {});
+        color_image_sample.clean(null, {});
+        depth_stencil_image.clean(null, {});
+        color_image.clean(null, {});
 
         __vulkan_allocator.execute_and_wait_all_op();
 

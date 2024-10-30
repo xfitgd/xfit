@@ -262,7 +262,7 @@ pub fn exit() void {
         return;
     }
     if (platform == .windows) {
-        _ = __windows.win32.DestroyWindow(__windows.hWnd);
+        __system.exiting.store(true, std.builtin.AtomicOrder.release);
     } else if (platform == .android) {
         __system.exiting.store(true, .release);
         @atomicStore(bool, &__android.app.destroryRequested, true, .monotonic);
