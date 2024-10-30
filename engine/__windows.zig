@@ -49,7 +49,8 @@ const xbox_guid = win32.GUID{
 
 var render_thread_id: DWORD = undefined;
 var render_thread_sem: std.Thread.Semaphore = .{};
-var window_destroyed: bool = false;
+///X를 직접 눌러 껏을땐 false exit 호출시 true
+var manual_window_destroyed: bool = false;
 
 pub fn vulkan_windows_start(vkInstance: __vulkan.vk.VkInstance, vkSurface: *__vulkan.vk.VkSurfaceKHR) void {
     if (vkSurface.* != null) {
@@ -130,9 +131,9 @@ fn render_thread(param: win32.LPVOID) callconv(std.os.windows.WINAPI) DWORD {
     };
     __vulkan.vulkan_destroy();
 
-    if (!window_destroyed) {
+    if (!manual_window_destroyed) {
+        manual_window_destroyed = true;
         _ = win32.PostMessageA(hWnd, win32.WM_DESTROY, 0, 0);
-        window_destroyed = true;
     }
 
     render_thread_sem.post();
@@ -758,12 +759,11 @@ fn WindowProc(hwnd: HWND, uMsg: u32, wParam: win32.WPARAM, lParam: win32.LPARAM)
         win32.WM_ERASEBKGND => return 1,
         win32.WM_DESTROY => {
             win32.PostQuitMessage(0);
-            if (window_destroyed) {
+            if (!manual_window_destroyed) {
+                manual_window_destroyed = true;
                 __system.exiting.store(true, std.builtin.AtomicOrder.release);
 
                 render_thread_sem.wait();
-            } else {
-                window_destroyed = true;
             }
 
             __raw_input.destroy();
