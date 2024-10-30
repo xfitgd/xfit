@@ -272,13 +272,13 @@ pub fn run(
     var cmd: *std.Build.Step.Run = undefined;
     if (builtin.os.tag == .windows) {
         if (PLATFORM == XfitPlatform.android) {
-            cmd = b.addSystemCommand(&.{ std.fmt.allocPrint(arena_allocator.allocator(), "{s}/compile.bat", .{engine_path}) catch unreachable, engine_path, b.install_path, "android", ANDROID_PATH, std.fmt.comptimePrint("{d}", .{ANDROID_VER}), ANDROID_BUILD_TOOL_VER, b.build_root.path.? });
+            cmd = b.addSystemCommand(&.{ std.fmt.allocPrint(arena_allocator.allocator(), "{s}/compile.bat", .{engine_path}) catch unreachable, engine_path, b.install_path, "android", ANDROID_PATH, std.fmt.comptimePrint("{d}", .{ANDROID_VER}), ANDROID_BUILD_TOOL_VER, b.build_root.path.?, get_arch_text(builtin.cpu.arch) });
         } else {
             cmd = b.addSystemCommand(&.{std.fmt.allocPrint(arena_allocator.allocator(), "{s}/compile.bat", .{engine_path}) catch unreachable});
         }
     } else {
         if (PLATFORM == XfitPlatform.android) {
-            cmd = b.addSystemCommand(&.{ std.fmt.allocPrint(arena_allocator.allocator(), "{s}/compile.sh", .{engine_path}) catch unreachable, engine_path, b.install_path, "android", ANDROID_PATH, std.fmt.comptimePrint("{d}", .{ANDROID_VER}), ANDROID_BUILD_TOOL_VER, b.build_root.path.? });
+            cmd = b.addSystemCommand(&.{ std.fmt.allocPrint(arena_allocator.allocator(), "{s}/compile.sh", .{engine_path}) catch unreachable, engine_path, b.install_path, "android", ANDROID_PATH, std.fmt.comptimePrint("{d}", .{ANDROID_VER}), ANDROID_BUILD_TOOL_VER, b.build_root.path.?, get_arch_text(builtin.cpu.arch) });
         } else {
             cmd = b.addSystemCommand(&.{std.fmt.allocPrint(arena_allocator.allocator(), "{s}/compile.sh", .{engine_path}) catch unreachable});
         }
