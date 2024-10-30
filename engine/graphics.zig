@@ -513,7 +513,11 @@ pub const texture = struct {
 
     pub inline fn deinit(self: *Self) void {
         self.*.__check_init.deinit();
-        self.*.__image.clean();
+        self.*.__image.clean(null);
+    }
+    pub fn deinit_callback(self: *Self, callback: ?*const fn () void) void {
+        self.*.__check_init.deinit();
+        self.*.__image.clean(callback);
     }
     // pub fn copy(self: *Self, _data: []const u8, rect: ?math.recti) void {
     //     __vulkan_allocator.copy_texture(self, _data, rect);
