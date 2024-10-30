@@ -443,7 +443,7 @@ fn recordCommandBuffer(commandBuffer: **render_command, fr: u32) void {
 
         shape_list.resize(0) catch unreachable;
         for (commandBuffer.*.*.scene.?) |value| {
-            if (value.* != ._shape and value.* != ._button) {
+            if (!value.*.is_shape_type()) {
                 value.*.__draw(cmd);
             } else {
                 shape_list.append(value) catch unreachable;

@@ -1095,27 +1095,58 @@ const vulkan_res = struct {
     fn map_copy_execute(self: *vulkan_res, nodes: anytype) void {
         var start: usize = std.math.maxInt(usize);
         var end: usize = std.math.minInt(usize);
+
+        var off_idx: usize = 0;
         var ranges: []vk.VkMappedMemoryRange = undefined;
         if (self.*.cached) {
             ranges = single_arena_allocator.allocator().alignedAlloc(vk.VkMappedMemoryRange, @alignOf(vk.VkMappedMemoryRange), nodes.len) catch unreachable;
 
             for (nodes, ranges) |copy, *r| {
                 const nd: *DoublyLinkedList(node).Node = @alignCast(@ptrCast(copy.map_copy.ires.get_idx()));
-                start = @min(start, nd.*.data.idx);
-                end = @max(end, nd.*.data.idx + nd.*.data.size);
                 r.memory = self.*.mem;
                 r.size = nd.*.data.size * self.*.cell_size;
                 r.offset = nd.*.data.idx * self.*.cell_size;
+                const temp = r.offset;
                 r.offset = math.floor_up(r.offset, nonCoherentAtomSize);
+                r.size += temp - r.offset;
                 r.size = math.ceil_up(r.size, nonCoherentAtomSize);
+                start = @min(start, r.offset);
+                end = @max(end, r.offset + r.size);
+                //range가 겹치면 합칩니다.
+                for (ranges[0..off_idx]) |*t| {
+                    if (t.offset < r.offset + r.size and t.offset + t.size > r.offset) {
+                        const end_ = @max(r.offset + r.size, t.offset + t.size);
+                        t.offset = @min(r.offset, t.offset);
+                        t.size = end_ - t.offset;
+                        for (ranges[0..off_idx]) |*t2| {
+                            if (t.offset != t2.offset) {
+                                if (t2.offset < t.offset + t.size and t2.offset + t2.size > t.offset) { //양쪽에서 겹치는 경우
+                                    const end_2 = @max(t2.offset + t2.size, t.offset + t.size);
+                                    t.offset = @min(t2.offset, t.offset);
+                                    t.size = end_2 - t.offset;
+                                    if (t2.offset != ranges[off_idx - 1].offset) {
+                                        std.mem.swap(u64, &ranges[off_idx - 1].offset, &t2.offset);
+                                        std.mem.swap(u64, &ranges[off_idx - 1].size, &t2.size);
+                                    }
+                                    off_idx -= 1;
+                                    break;
+                                }
+                            }
+                        }
+                        off_idx -= 1;
+                        break;
+                    }
+                }
+
                 r.pNext = null;
                 r.sType = vk.VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
+                off_idx += 1;
             }
         } else {
             for (nodes) |copy| {
                 const nd: *DoublyLinkedList(node).Node = @alignCast(@ptrCast(copy.map_copy.ires.get_idx()));
-                start = @min(start, nd.*.data.idx);
-                end = @max(end, nd.*.data.idx + nd.*.data.size);
+                start = @min(start, nd.*.data.idx * self.*.cell_size);
+                end = @max(end, (nd.*.data.idx + nd.*.data.size) * self.*.cell_size);
             }
         }
 
@@ -1131,13 +1162,13 @@ const vulkan_res = struct {
             self.*.map_start = start;
         } else {
             if (self.*.cached) {
-                _ = vk.vkInvalidateMappedMemoryRanges(__vulkan.vkDevice, @intCast(ranges.len), ranges.ptr);
+                _ = vk.vkInvalidateMappedMemoryRanges(__vulkan.vkDevice, @intCast(off_idx), ranges.ptr);
             }
         }
         for (nodes) |v| {
             const copy = v.map_copy;
             const nd: *DoublyLinkedList(node).Node = @alignCast(@ptrCast(copy.ires.get_idx()));
-            const st = (nd.*.data.idx - self.*.map_start) * self.*.cell_size;
+            const st = (nd.*.data.idx) * self.*.cell_size - self.*.map_start;
             //const en = (nd.*.data.idx + nd.*.data.size - start) * self.*.cell_size;
             @memcpy(self.*.map_data[st..(st + copy.address.len)], copy.address[0..copy.address.len]);
         }
@@ -1180,6 +1211,11 @@ const vulkan_res = struct {
             .pool = MemoryPoolExtra(DoublyLinkedList(node).Node, .{}).init(single_allocator),
             .cached = (_prop & vk.VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT != 0) and (_prop & vk.VK_MEMORY_PROPERTY_HOST_CACHED_BIT != 0),
         };
+        if (res.cached) {
+            res.info.allocationSize = math.ceil_up(_len * _cell_size, nonCoherentAtomSize);
+            res.len = @divFloor(res.info.allocationSize, res.cell_size);
+            if (res.info.allocationSize == 7912) unreachable;
+        }
         if (!allocate_memory(&res.info, &res.mem)) {
             return null;
         }
@@ -1221,12 +1257,13 @@ const vulkan_res = struct {
             else => @compileError("__bind_any invaild res type."),
         }
     }
+    ///not cellsize
     fn map(self: *vulkan_res, _start: usize, _size: usize, _out_data: *?*anyopaque) void {
         const result = vk.vkMapMemory(
             __vulkan.vkDevice,
             self.*.mem,
-            _start * self.*.cell_size,
-            _size * self.*.cell_size,
+            _start,
+            _size,
             0,
             _out_data,
         );
@@ -1385,10 +1422,6 @@ fn create_allocator_and_bind(_res: anytype, _prop: vk.VkMemoryPropertyFlags, _ou
         // });
         const flag = (vk.VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT | vk.VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
         var BLK = if (prop & flag == flag) SPECIAL_BLOCK_LEN else BLOCK_LEN;
-        if (prop & vk.VK_MEMORY_PROPERTY_HOST_CACHED_BIT != 0) {
-            max_size = math.ceil_up(max_size, nonCoherentAtomSize);
-            BLK = math.ceil_up(BLK, nonCoherentAtomSize);
-        }
         const R = vulkan_res.init(
             @intCast(mem_require.alignment),
             std.math.divCeil(usize, @max(BLK, max_size), @intCast(mem_require.alignment)) catch 1,
@@ -1409,10 +1442,6 @@ fn create_allocator_and_bind(_res: anytype, _prop: vk.VkMemoryPropertyFlags, _ou
             }
             if (res == null) {
                 BLK = BLOCK_LEN;
-                if (prop & vk.VK_MEMORY_PROPERTY_HOST_CACHED_BIT != 0) {
-                    max_size = math.ceil_up(max_size, nonCoherentAtomSize);
-                    BLK = math.ceil_up(BLK, nonCoherentAtomSize);
-                }
                 res.?.* = vulkan_res.init(
                     @intCast(mem_require.alignment),
                     std.math.divCeil(usize, @max(BLOCK_LEN, max_size), @intCast(mem_require.alignment)) catch 1,

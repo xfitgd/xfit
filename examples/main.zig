@@ -44,10 +44,10 @@ pub var g_camera: graphics.camera = undefined;
 var font0: font = undefined;
 var font0_data: []u8 = undefined;
 
-var rect_button_src: components.button.source = undefined;
-var rect_button_src2: components.button.source = undefined;
-var rect_button_text_src: components.button.source = undefined;
-var rect_button_srcs = [3]*components.button.source{ &rect_button_src, &rect_button_src2, &rect_button_text_src };
+var rect_button_src: components.button_source = undefined;
+var rect_button_src2: components.button_source = undefined;
+var rect_button_text_src: components.button_source = undefined;
+var rect_button_srcs = [3]*components.button_source{ &rect_button_src, &rect_button_src2, &rect_button_text_src };
 var button_area_rect = math.rect{ .left = -100, .right = 100, .top = 50, .bottom = -50 };
 
 var shape_src: []graphics.shape_source = undefined;
@@ -131,7 +131,7 @@ pub fn xfit_init() !void {
 
     //graphics.set_render_clear_color(.{ 1, 1, 1, 0 });
 
-    rect_button_text_src = components.button.source.init_for_alloc(allocator);
+    rect_button_text_src = components.button_source.init_for_alloc(allocator);
 
     try components.button.make_square_button(rect_button_srcs[0..2], .{ 100, 50 }, allocator);
 

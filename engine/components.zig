@@ -36,223 +36,229 @@ pub const button_state = enum {
     DOWN,
 };
 
-pub const button = struct {
-    pub const source = struct {
-        src: shape_source,
-        up_color: ?vector = null,
-        over_color: ?vector = null,
-        down_color: ?vector = null,
+pub const button = button_(true);
+pub const pixel_button = button_(false);
 
-        pub fn init() source {
-            return .{
-                .src = shape_source.init(),
-            };
-        }
-        pub fn init_for_alloc(__allocator: std.mem.Allocator) source {
-            return .{
-                .src = shape_source.init_for_alloc(__allocator),
-            };
-        }
-    };
-    const Self = @This();
+pub const button_source = struct {
+    src: shape_source,
+    up_color: ?vector = null,
+    over_color: ?vector = null,
+    down_color: ?vector = null,
 
-    transform: transform = .{ .parent_type = ._button },
-    srcs: []*source,
-    area: iarea,
-    state: button_state = .UP,
-    __set: descriptor_set,
-    on_over: ?*const fn (self: *Self, _mouse_pos: point) void = null,
-    on_down: ?*const fn (self: *Self, _mouse_pos: point) void = null,
-    on_up: ?*const fn (self: *Self, _mouse_pos: ?point) void = null,
-    _touch_idx: ?u32 = null,
-
-    pub fn init(_srcs: []*source, _area: iarea) Self {
+    pub fn init() button_source {
         return .{
-            .__set = .{
-                .bindings = graphics.single_pool_binding[0..1],
-                .size = graphics.transform_uniform_pool_sizes[0..1],
-                .layout = __vulkan.shape_color_2d_pipeline_set.descriptorSetLayout,
-            },
-            .area = _area,
-            .srcs = _srcs,
+            .src = shape_source.init(),
         };
     }
-
-    fn update_color(self: *Self) void {
-        for (self.*.srcs) |v| {
-            if (v.*.up_color == null or v.*.src.vertices.node.res == null or v.*.src.indices.node.res == null) continue;
-            if (self.*.state == .UP) {
-                v.*.src.color = v.*.up_color.?;
-                v.*.src.copy_color_update();
-            } else if (self.*.state == .OVER) {
-                if (v.*.over_color == null) {
-                    v.*.src.color = v.*.up_color.?;
-                    v.*.src.copy_color_update();
-                } else {
-                    v.*.src.color = v.*.over_color.?;
-                    v.*.src.copy_color_update();
-                }
-            } else if (self.*.state == .DOWN) {
-                if (v.*.down_color != null) {
-                    v.*.src.color = v.*.down_color.?;
-                    v.*.src.copy_color_update();
-                }
-            }
-        }
-    }
-    pub fn on_mouse_move(self: *Self, _mouse_pos: point) void {
-        if (self.state == .UP) {
-            if (self.area.rect.is_point_in(_mouse_pos)) {
-                self.state = .OVER;
-                self.update_color();
-                if (self.on_over != null) self.on_over.?(self, _mouse_pos);
-            }
-        } else if (self.state == .OVER) {
-            if (!self.area.rect.is_point_in(_mouse_pos)) {
-                self.state = .UP;
-                self.update_color();
-            }
-        }
-    }
-    pub fn on_mouse_down(self: *Self, _mouse_pos: point) void {
-        if (self.state == .UP) {
-            if (self.area.rect.is_point_in(_mouse_pos)) {
-                self.state = .DOWN;
-                self.update_color();
-                if (self.on_down != null) self.on_down.?(self, _mouse_pos);
-            }
-        } else if (self.state == .OVER) {
-            self.state = .DOWN;
-            self.update_color();
-            if (self.on_down != null) self.on_down.?(self, _mouse_pos);
-        }
-    }
-    pub fn on_mouse_up(self: *Self, _mouse_pos: point) void {
-        if (self.state == .DOWN) {
-            if (self.area.rect.is_point_in(_mouse_pos)) {
-                self.state = .OVER;
-            } else {
-                self.state = .UP;
-            }
-            self.update_color();
-            if (self.on_up != null) self.on_up.?(self, _mouse_pos);
-        }
-    }
-    pub fn on_touch_down(self: *Self, touch_idx: u32, _mouse_pos: point) void {
-        if (self.state == .UP) {
-            if (self.area.rect.is_point_in(_mouse_pos)) {
-                self.state = .DOWN;
-                self.update_color();
-                self._touch_idx = touch_idx;
-                if (self.on_down != null) self.on_down.?(self, _mouse_pos);
-            }
-        } else if (self._touch_idx != null and self._touch_idx.? == touch_idx) {
-            self.state = .UP;
-            self._touch_idx = null;
-            self.update_color();
-            if (self.on_up != null) self.on_up.?(self, _mouse_pos);
-        }
-    }
-    pub fn on_touch_up(self: *Self, touch_idx: u32, _mouse_pos: point) void {
-        if (self.state == .DOWN and self._touch_idx.? == touch_idx) {
-            self.state = .UP;
-            self._touch_idx = null;
-            self.update_color();
-            if (self.on_up != null) self.on_up.?(self, _mouse_pos);
-        }
-    }
-    pub fn on_mouse_out(self: *Self) void {
-        if (self.state == .DOWN or self.state == .OVER) {
-            self.state = .UP;
-            self.update_color();
-            if (self.state == .DOWN) {
-                if (self.on_up != null) self.on_up.?(self, null);
-            }
-        }
-    }
-
-    pub fn make_square_button(_out: []*source, scale: point, _allocator: std.mem.Allocator) !void {
-        _out[0].* = source.init_for_alloc(_allocator);
-        _out[1].* = source.init_for_alloc(_allocator);
-        _out[0].*.down_color = .{ 0.5, 0.5, 0.5, 0.8 };
-        _out[0].*.over_color = .{ 0.5, 0.7, 0.7, 1 };
-        _out[0].*.src.color = .{ 0.7, 0.7, 0.7, 1 };
-        _out[1].*.down_color = .{ 0.5, 0.5, 1, 1 };
-        _out[1].*.over_color = .{ 0.5, 0.5, 1, 1 };
-        _out[1].*.src.color = .{ 0.5, 0.5, 0.5, 1 };
-        _out[0].*.up_color = _out[0].*.src.color;
-        _out[1].*.up_color = _out[1].*.src.color;
-
-        var rect_line: [4]geometry.line = .{
-            geometry.line.line_init(.{ -scale[0], scale[1] }, .{ scale[0], scale[1] }),
-            geometry.line.line_init(.{ scale[0], scale[1] }, .{ scale[0], -scale[1] }),
-            geometry.line.line_init(.{ scale[0], -scale[1] }, .{ -scale[0], -scale[1] }),
-            geometry.line.line_init(.{ -scale[0], -scale[1] }, .{ -scale[0], scale[1] }),
+    pub fn init_for_alloc(__allocator: std.mem.Allocator) button_source {
+        return .{
+            .src = shape_source.init_for_alloc(__allocator),
         };
-
-        var rl = [1][]geometry.line{rect_line[0..rect_line.len]};
-        var rect_poly: geometry.polygon = .{
-            .tickness = 2,
-            .lines = rl[0..1],
-        };
-        var raw_polygon_outline = geometry.raw_polygon{
-            .vertices = try _allocator.alloc(graphics.shape_color_vertex_2d, 0),
-            .indices = try _allocator.alloc(u32, 0),
-        };
-        var raw_polygon = geometry.raw_polygon{
-            .vertices = try _allocator.alloc(graphics.shape_color_vertex_2d, 0),
-            .indices = try _allocator.alloc(u32, 0),
-        };
-        try rect_poly.compute_outline(_allocator, &raw_polygon_outline);
-        try rect_poly.compute_polygon(_allocator, &raw_polygon);
-
-        _out[0].*.src.vertices.array = raw_polygon.vertices;
-        _out[0].*.src.indices.array = raw_polygon.indices;
-        _out[0].*.src.build(.gpu, .cpu);
-
-        _out[1].*.src.vertices.array = raw_polygon_outline.vertices;
-        _out[1].*.src.indices.array = raw_polygon_outline.indices;
-        _out[1].*.src.build(.gpu, .cpu);
-    }
-
-    pub fn update(self: *Self) void {
-        var __set_res: [4]res_union = .{
-            .{ .buf = &self.*.transform.__model_uniform },
-            .{ .buf = &self.*.transform.camera.?.*.__uniform },
-            .{ .buf = &self.*.transform.projection.?.*.__uniform },
-            .{ .buf = &__vulkan.__pre_mat_uniform },
-        };
-        self.*.__set.__res = __set_res[0..4];
-        __vulkan_allocator.update_descriptor_sets((&self.*.__set)[0..1]);
-    }
-    pub fn build(self: *Self) void {
-        self.*.transform.__build();
-        self.*.update();
-    }
-    pub fn deinit(self: *Self) void {
-        self.*.transform.__deinit(null);
-    }
-    pub inline fn deinit_callback(self: *Self, callback: ?*const fn () void) void {
-        self.*.transform.__deinit(callback);
-    }
-    pub fn __draw(self: *Self, cmd: vk.VkCommandBuffer) void {
-        for (self.*.srcs) |_src| {
-            const src = &_src.*.src;
-            if (src.*.vertices.node.res == null or src.*.indices.node.res == null) continue;
-            vk.vkCmdBindPipeline(cmd, vk.VK_PIPELINE_BIND_POINT_GRAPHICS, __vulkan.shape_color_2d_pipeline_set.pipeline);
-
-            vk.vkCmdBindDescriptorSets(cmd, vk.VK_PIPELINE_BIND_POINT_GRAPHICS, __vulkan.shape_color_2d_pipeline_set.pipelineLayout, 0, 1, &self.*.__set.__set, 0, null);
-
-            const offsets: vk.VkDeviceSize = 0;
-            vk.vkCmdBindVertexBuffers(cmd, 0, 1, &src.*.vertices.node.res, &offsets);
-
-            vk.vkCmdBindIndexBuffer(cmd, src.*.indices.node.res, 0, vk.VK_INDEX_TYPE_UINT32);
-            vk.vkCmdDrawIndexed(cmd, src.*.indices.node.buffer_option.len / graphics.get_idx_type_size(src.*.indices.idx_type), 1, 0, 0, 0);
-
-            vk.vkCmdBindPipeline(cmd, vk.VK_PIPELINE_BIND_POINT_GRAPHICS, __vulkan.quad_shape_2d_pipeline_set.pipeline);
-
-            vk.vkCmdBindDescriptorSets(cmd, vk.VK_PIPELINE_BIND_POINT_GRAPHICS, __vulkan.quad_shape_2d_pipeline_set.pipelineLayout, 0, 1, &src.*.__set.__set, 0, null);
-            vk.vkCmdDraw(cmd, 6, 1, 0, 0);
-        }
     }
 };
+
+pub fn button_(_msaa: bool) type {
+    return struct {
+        const Self = @This();
+
+        transform: transform = .{ .parent_type = if (_msaa) ._button else ._pixel_button },
+        srcs: []*button_source,
+        area: iarea,
+        state: button_state = .UP,
+        __set: descriptor_set,
+        on_over: ?*const fn (self: *Self, _mouse_pos: point) void = null,
+        on_down: ?*const fn (self: *Self, _mouse_pos: point) void = null,
+        on_up: ?*const fn (self: *Self, _mouse_pos: ?point) void = null,
+        _touch_idx: ?u32 = null,
+
+        pub fn init(_srcs: []*button_source, _area: iarea) Self {
+            return .{
+                .__set = .{
+                    .bindings = graphics.single_pool_binding[0..1],
+                    .size = graphics.transform_uniform_pool_sizes[0..1],
+                    .layout = __vulkan.shape_color_2d_pipeline_set.descriptorSetLayout,
+                },
+                .area = _area,
+                .srcs = _srcs,
+            };
+        }
+
+        fn update_color(self: *Self) void {
+            for (self.*.srcs) |v| {
+                if (v.*.up_color == null or v.*.src.vertices.node.res == null or v.*.src.indices.node.res == null) continue;
+                if (self.*.state == .UP) {
+                    v.*.src.color = v.*.up_color.?;
+                    v.*.src.copy_color_update();
+                } else if (self.*.state == .OVER) {
+                    if (v.*.over_color == null) {
+                        v.*.src.color = v.*.up_color.?;
+                        v.*.src.copy_color_update();
+                    } else {
+                        v.*.src.color = v.*.over_color.?;
+                        v.*.src.copy_color_update();
+                    }
+                } else if (self.*.state == .DOWN) {
+                    if (v.*.down_color != null) {
+                        v.*.src.color = v.*.down_color.?;
+                        v.*.src.copy_color_update();
+                    }
+                }
+            }
+        }
+        pub fn on_mouse_move(self: *Self, _mouse_pos: point) void {
+            if (self.state == .UP) {
+                if (self.area.rect.is_point_in(_mouse_pos)) {
+                    self.state = .OVER;
+                    self.update_color();
+                    if (self.on_over != null) self.on_over.?(self, _mouse_pos);
+                }
+            } else if (self.state == .OVER) {
+                if (!self.area.rect.is_point_in(_mouse_pos)) {
+                    self.state = .UP;
+                    self.update_color();
+                }
+            }
+        }
+        pub fn on_mouse_down(self: *Self, _mouse_pos: point) void {
+            if (self.state == .UP) {
+                if (self.area.rect.is_point_in(_mouse_pos)) {
+                    self.state = .DOWN;
+                    self.update_color();
+                    if (self.on_down != null) self.on_down.?(self, _mouse_pos);
+                }
+            } else if (self.state == .OVER) {
+                self.state = .DOWN;
+                self.update_color();
+                if (self.on_down != null) self.on_down.?(self, _mouse_pos);
+            }
+        }
+        pub fn on_mouse_up(self: *Self, _mouse_pos: point) void {
+            if (self.state == .DOWN) {
+                if (self.area.rect.is_point_in(_mouse_pos)) {
+                    self.state = .OVER;
+                } else {
+                    self.state = .UP;
+                }
+                self.update_color();
+                if (self.on_up != null) self.on_up.?(self, _mouse_pos);
+            }
+        }
+        pub fn on_touch_down(self: *Self, touch_idx: u32, _mouse_pos: point) void {
+            if (self.state == .UP) {
+                if (self.area.rect.is_point_in(_mouse_pos)) {
+                    self.state = .DOWN;
+                    self.update_color();
+                    self._touch_idx = touch_idx;
+                    if (self.on_down != null) self.on_down.?(self, _mouse_pos);
+                }
+            } else if (self._touch_idx != null and self._touch_idx.? == touch_idx) {
+                self.state = .UP;
+                self._touch_idx = null;
+                self.update_color();
+                if (self.on_up != null) self.on_up.?(self, _mouse_pos);
+            }
+        }
+        pub fn on_touch_up(self: *Self, touch_idx: u32, _mouse_pos: point) void {
+            if (self.state == .DOWN and self._touch_idx.? == touch_idx) {
+                self.state = .UP;
+                self._touch_idx = null;
+                self.update_color();
+                if (self.on_up != null) self.on_up.?(self, _mouse_pos);
+            }
+        }
+        pub fn on_mouse_out(self: *Self) void {
+            if (self.state == .DOWN or self.state == .OVER) {
+                self.state = .UP;
+                self.update_color();
+                if (self.state == .DOWN) {
+                    if (self.on_up != null) self.on_up.?(self, null);
+                }
+            }
+        }
+
+        pub fn make_square_button(_out: []*button_source, scale: point, _allocator: std.mem.Allocator) !void {
+            _out[0].* = button_source.init_for_alloc(_allocator);
+            _out[1].* = button_source.init_for_alloc(_allocator);
+            _out[0].*.down_color = .{ 0.5, 0.5, 0.5, 0.8 };
+            _out[0].*.over_color = .{ 0.5, 0.7, 0.7, 1 };
+            _out[0].*.src.color = .{ 0.7, 0.7, 0.7, 1 };
+            _out[1].*.down_color = .{ 0.5, 0.5, 1, 1 };
+            _out[1].*.over_color = .{ 0.5, 0.5, 1, 1 };
+            _out[1].*.src.color = .{ 0.5, 0.5, 0.5, 1 };
+            _out[0].*.up_color = _out[0].*.src.color;
+            _out[1].*.up_color = _out[1].*.src.color;
+
+            var rect_line: [4]geometry.line = .{
+                geometry.line.line_init(.{ -scale[0], scale[1] }, .{ scale[0], scale[1] }),
+                geometry.line.line_init(.{ scale[0], scale[1] }, .{ scale[0], -scale[1] }),
+                geometry.line.line_init(.{ scale[0], -scale[1] }, .{ -scale[0], -scale[1] }),
+                geometry.line.line_init(.{ -scale[0], -scale[1] }, .{ -scale[0], scale[1] }),
+            };
+
+            var rl = [1][]geometry.line{rect_line[0..rect_line.len]};
+            var rect_poly: geometry.polygon = .{
+                .tickness = 2,
+                .lines = rl[0..1],
+            };
+            var raw_polygon_outline = geometry.raw_polygon{
+                .vertices = try _allocator.alloc(graphics.shape_color_vertex_2d, 0),
+                .indices = try _allocator.alloc(u32, 0),
+            };
+            var raw_polygon = geometry.raw_polygon{
+                .vertices = try _allocator.alloc(graphics.shape_color_vertex_2d, 0),
+                .indices = try _allocator.alloc(u32, 0),
+            };
+            try rect_poly.compute_outline(_allocator, &raw_polygon_outline);
+            try rect_poly.compute_polygon(_allocator, &raw_polygon);
+
+            _out[0].*.src.vertices.array = raw_polygon.vertices;
+            _out[0].*.src.indices.array = raw_polygon.indices;
+            _out[0].*.src.build(.gpu, .cpu);
+
+            _out[1].*.src.vertices.array = raw_polygon_outline.vertices;
+            _out[1].*.src.indices.array = raw_polygon_outline.indices;
+            _out[1].*.src.build(.gpu, .cpu);
+        }
+
+        pub fn update(self: *Self) void {
+            var __set_res: [4]res_union = .{
+                .{ .buf = &self.*.transform.__model_uniform },
+                .{ .buf = &self.*.transform.camera.?.*.__uniform },
+                .{ .buf = &self.*.transform.projection.?.*.__uniform },
+                .{ .buf = &__vulkan.__pre_mat_uniform },
+            };
+            self.*.__set.__res = __set_res[0..4];
+            __vulkan_allocator.update_descriptor_sets((&self.*.__set)[0..1]);
+        }
+        pub fn build(self: *Self) void {
+            self.*.transform.__build();
+            self.*.update();
+        }
+        pub fn deinit(self: *Self) void {
+            self.*.transform.__deinit(null);
+        }
+        pub inline fn deinit_callback(self: *Self, callback: ?*const fn () void) void {
+            self.*.transform.__deinit(callback);
+        }
+        pub fn __draw(self: *Self, cmd: vk.VkCommandBuffer) void {
+            for (self.*.srcs) |_src| {
+                const src = &_src.*.src;
+                if (src.*.vertices.node.res == null or src.*.indices.node.res == null) continue;
+                vk.vkCmdBindPipeline(cmd, vk.VK_PIPELINE_BIND_POINT_GRAPHICS, if (_msaa) __vulkan.shape_color_2d_pipeline_set.pipeline else __vulkan.pixel_shape_color_2d_pipeline_set.pipeline);
+
+                vk.vkCmdBindDescriptorSets(cmd, vk.VK_PIPELINE_BIND_POINT_GRAPHICS, __vulkan.shape_color_2d_pipeline_set.pipelineLayout, 0, 1, &self.*.__set.__set, 0, null);
+
+                const offsets: vk.VkDeviceSize = 0;
+                vk.vkCmdBindVertexBuffers(cmd, 0, 1, &src.*.vertices.node.res, &offsets);
+
+                vk.vkCmdBindIndexBuffer(cmd, src.*.indices.node.res, 0, vk.VK_INDEX_TYPE_UINT32);
+                vk.vkCmdDrawIndexed(cmd, src.*.indices.node.buffer_option.len / graphics.get_idx_type_size(src.*.indices.idx_type), 1, 0, 0, 0);
+
+                vk.vkCmdBindPipeline(cmd, vk.VK_PIPELINE_BIND_POINT_GRAPHICS, if (_msaa) __vulkan.quad_shape_2d_pipeline_set.pipeline else __vulkan.pixel_quad_shape_2d_pipeline_set.pipeline);
+
+                vk.vkCmdBindDescriptorSets(cmd, vk.VK_PIPELINE_BIND_POINT_GRAPHICS, __vulkan.quad_shape_2d_pipeline_set.pipelineLayout, 0, 1, &src.*.__set.__set, 0, null);
+                vk.vkCmdDraw(cmd, 6, 1, 0, 0);
+            }
+        }
+    };
+}

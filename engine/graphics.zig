@@ -152,6 +152,7 @@ const iobject_type = enum {
     _button,
     _tile_image,
     _pixel_shape,
+    _pixel_button,
     //_sprite_image,
 };
 pub const iobject = union(iobject_type) {
@@ -162,6 +163,7 @@ pub const iobject = union(iobject_type) {
     _button: components.button,
     _tile_image: tile_image,
     _pixel_shape: pixel_shape,
+    _pixel_button: components.pixel_button,
 
     pub inline fn deinit(self: *Self) void {
         switch (self.*) {
@@ -187,6 +189,12 @@ pub const iobject = union(iobject_type) {
         switch (self.*) {
             inline else => |*case| case.*.__draw(cmd),
         }
+    }
+    pub inline fn is_shape_type(self: *Self) bool {
+        return switch (self.*) {
+            ._shape, ._button => true,
+            else => false,
+        };
     }
 };
 
