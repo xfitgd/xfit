@@ -241,9 +241,11 @@ const operation_node = union(enum) {
     },
     destroy_buffer: struct {
         buf: *vulkan_res_node(.buffer),
+        callback: ?*const fn () void = null,
     },
     destroy_image: struct {
         buf: *vulkan_res_node(.texture),
+        callback: ?*const fn () void = null,
     },
     __update_descriptor_sets: struct {
         sets: []descriptor_set,
@@ -395,8 +397,9 @@ fn execute_create_buffer(buf: *vulkan_res_node(.buffer), _data: ?[]const u8) voi
         }
     }
 }
-fn execute_destroy_buffer(buf: *vulkan_res_node(.buffer)) void {
+fn execute_destroy_buffer(buf: *vulkan_res_node(.buffer), callback: ?*const fn () void) void {
     buf.*.__destroy_buffer();
+    if (callback != null) callback.?();
 }
 
 inline fn bit_size(fmt: texture_format) c_uint {
@@ -549,8 +552,9 @@ fn execute_create_texture(buf: *vulkan_res_node(.texture), _data: ?[]const u8) v
         }
     }
 }
-fn execute_destroy_image(buf: *vulkan_res_node(.texture)) void {
+fn execute_destroy_image(buf: *vulkan_res_node(.texture), callback: ?*const fn () void) void {
     buf.*.__destroy_image();
+    if (callback != null) callback.?();
 }
 
 fn execute_register_descriptor_pool(__size: []descriptor_pool_size) void {
@@ -818,8 +822,8 @@ fn thread_func() void {
             while (i < op_save_queue.len) : (i += 1) {
                 switch (tags[i]) {
                     //destroy.. 나중에
-                    .destroy_buffer => execute_destroy_buffer(data[i].destroy_buffer.buf),
-                    .destroy_image => execute_destroy_image(data[i].destroy_image.buf),
+                    .destroy_buffer => execute_destroy_buffer(data[i].destroy_buffer.buf, data[i].destroy_buffer.callback),
+                    .destroy_image => execute_destroy_image(data[i].destroy_image.buf, data[i].destroy_image.callback),
                     else => continue,
                 }
             }
@@ -1040,7 +1044,7 @@ pub fn vulkan_res_node(_res_type: res_type) type {
             self.*.map_copy(self.*.map_data.?[0..u8data.len]);
             dataMutex.unlock();
         }
-        pub fn clean(self: *vulkan_res_node_Self) void {
+        pub fn clean(self: *vulkan_res_node_Self, callback: ?*const fn () void) void {
             self.*.builded = false;
 
             switch (_res_type) {
@@ -1049,12 +1053,12 @@ pub fn vulkan_res_node(_res_type: res_type) type {
                     if (self.*.pvulkan_buffer == null) {
                         vk.vkDestroyImageView(__vulkan.vkDevice, self.*.__image_view, null);
                     } else {
-                        append_op(.{ .destroy_image = .{ .buf = self } });
+                        append_op(.{ .destroy_image = .{ .buf = self, .callback = callback } });
                     }
                 },
                 .buffer => {
                     self.*.buffer_option.len = 0;
-                    append_op(.{ .destroy_buffer = .{ .buf = self } });
+                    append_op(.{ .destroy_buffer = .{ .buf = self, .callback = callback } });
                 },
             }
         }

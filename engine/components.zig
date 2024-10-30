@@ -230,7 +230,10 @@ pub const button = struct {
         self.*.update();
     }
     pub fn deinit(self: *Self) void {
-        self.*.transform.__deinit();
+        self.*.transform.__deinit(null);
+    }
+    pub inline fn deinit_callback(self: *Self, callback: ?*const fn () void) void {
+        self.*.transform.__deinit(callback);
     }
     pub fn __draw(self: *Self, cmd: vk.VkCommandBuffer) void {
         for (self.*.srcs) |_src| {
