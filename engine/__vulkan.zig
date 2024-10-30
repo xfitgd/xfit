@@ -2170,8 +2170,11 @@ pub fn drawFrame() void {
             .pSignalSemaphores = &vkRenderFinishedSemaphore[state.frame],
         };
 
-        const cls_color: color_struct = @atomicLoad(color_struct, &clear_color, .monotonic);
-        const clearColor: vk.VkClearValue = .{ .color = .{ .float32 = .{ cls_color._0, cls_color._1, cls_color._2, cls_color._3 } } };
+        const cls_color0 = @atomicLoad(f32, &clear_color._0, .monotonic);
+        const cls_color1 = @atomicLoad(f32, &clear_color._1, .monotonic);
+        const cls_color2 = @atomicLoad(f32, &clear_color._2, .monotonic);
+        const cls_color3 = @atomicLoad(f32, &clear_color._3, .monotonic);
+        const clearColor: vk.VkClearValue = .{ .color = .{ .float32 = .{ cls_color0, cls_color1, cls_color2, cls_color3 } } };
 
         const clearDepthStencil: vk.VkClearValue = .{ .depthStencil = .{ .stencil = 0, .depth = 1 } };
         var renderPassInfo: vk.VkRenderPassBeginInfo = .{

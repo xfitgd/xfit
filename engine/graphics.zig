@@ -43,9 +43,10 @@ pub inline fn execute_all_op() void {
     __vulkan_allocator.execute_all_op();
 }
 pub inline fn set_render_clear_color(_color: vector) void {
-    const color_struct = packed struct { _0: f32, _1: f32, _2: f32, _3: f32 };
-    const clear_color: color_struct = .{ ._0 = _color[0], ._1 = _color[1], ._2 = _color[2], ._3 = _color[3] };
-    @atomicStore(color_struct, @as(*color_struct, @ptrCast(&__vulkan.clear_color)), clear_color, .monotonic);
+    @atomicStore(f32, &__vulkan.clear_color._0, _color[0], .monotonic);
+    @atomicStore(f32, &__vulkan.clear_color._1, _color[1], .monotonic);
+    @atomicStore(f32, &__vulkan.clear_color._2, _color[2], .monotonic);
+    @atomicStore(f32, &__vulkan.clear_color._3, _color[3], .monotonic);
 }
 pub inline fn lock_data() void {
     __vulkan_allocator.lock_data();
