@@ -308,10 +308,14 @@ pub const init_setting = struct {
 ///nanosec 1 / 1000000000 sec
 pub inline fn get_maxframe_u64() u64 {
     if (@sizeOf(usize) == 4) {
+        const native_endian = @import("builtin").target.cpu.arch.endian();
         const low: u64 = @atomicLoad(u32, @as(*u32, @ptrCast(&__system.init_set.maxframe)), std.builtin.AtomicOrder.monotonic);
         const high: u64 = @atomicLoad(u32, &@as([*]u32, @ptrCast(&__system.init_set.maxframe))[1], std.builtin.AtomicOrder.monotonic);
 
-        return high << 32 | low;
+        return switch (native_endian) {
+            .big => low << 32 | high,
+            .little => high << 32 | low,
+        };
     }
     return @atomicLoad(u64, &__system.init_set.maxframe, std.builtin.AtomicOrder.monotonic);
 }
