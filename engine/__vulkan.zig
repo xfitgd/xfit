@@ -919,6 +919,8 @@ pub fn vulkan_start() void {
             extension_names.append(vk.VK_KHR_WIN32_SURFACE_EXTENSION_NAME) catch |e| xfit.herr3("vulkan_start.extension_names.append(vk.VK_KHR_WIN32_SURFACE_EXTENSION_NAME)", e);
         } else if (xfit.platform == .android) {
             extension_names.append(vk.VK_KHR_ANDROID_SURFACE_EXTENSION_NAME) catch |e| xfit.herr3("vulkan_start.extension_names.append(vk.VK_KHR_ANDROID_SURFACE_EXTENSION_NAME)", e);
+        } else if (xfit.platform == .linux) {
+            //TODO vulkan init linux
         } else {
             @compileError("not support platform");
         }
@@ -960,6 +962,8 @@ pub fn vulkan_start() void {
         __windows.vulkan_windows_start(vkInstance, &vkSurface);
     } else if (xfit.platform == .android) {
         __android.vulkan_android_start(vkInstance, &vkSurface);
+    } else if (xfit.platform == .linux) {
+        //TODO linux start vulkan
     } else {
         @compileError("not support platform");
     }
@@ -1708,6 +1712,8 @@ fn recreateSurface() void {
         __windows.vulkan_windows_start(vkInstance, &vkSurface);
     } else if (xfit.platform == .android) {
         //__android.vulkan_android_start(vkInstance, &vkSurface);
+    } else if (xfit.platform == .linux) {
+        // TODO recreateSurface linux
     } else {
         @compileError("not support platform");
     }

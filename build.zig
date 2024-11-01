@@ -40,6 +40,7 @@ inline fn get_arch_text(arch: std.Target.Cpu.Arch) []const u8 {
         .x86_64 => "x86_64",
         .aarch64 => "aarch64",
         .riscv64 => "riscv64",
+        .loongarch64 => "loongarch64",
         else => unreachable,
     };
 }
@@ -95,7 +96,7 @@ pub fn run(
         "../lib/x86_64",
     };
     const targets = [_]std.Target.Query{
-        .{ .os_tag = .linux, .cpu_arch = .aarch64, .abi = .android, .cpu_features_add = std.Target.aarch64.featureSet(&.{.v8a}) },
+        .{ .os_tag = .linux, .cpu_arch = .aarch64, .abi = .android, .cpu_features_add = std.Target.aarch64.featureSet(&.{ .neon, .v8a }) },
         .{ .os_tag = .linux, .cpu_arch = .riscv64, .abi = .android },
         .{ .os_tag = .linux, .cpu_arch = .x86_64, .abi = .android },
     };
@@ -119,7 +120,7 @@ pub fn run(
         "liblua.a", //custom
     };
 
-    const linux_system_lib_names = comptime [_][]const u8{
+    const linux_lib_names = comptime [_][]const u8{
         "libwebp.a",
         "libwebpdemux.a",
         "libfreetype.a",
@@ -129,15 +130,15 @@ pub fn run(
         "libvorbis.a",
         "libvorbisenc.a",
         "libvorbisfile.a",
-        "libvulkan.so",
-        "libwayland-client.so",
-        "libwayland-server.so",
-        "libwayland-cursor.so",
-    };
-    const linux_local_lib_names = comptime [_][]const u8{
         "liblua.a", //custom
-        "miniaudio.o",
+        "libminiaudio.a",
     };
+    // const linux_shared_lib_names = comptime [_][]const u8{
+    //     "libvulkan.so",
+    //     "libwayland-client.so",
+    //     "libwayland-server.so",
+    //     "libwayland-cursor.so",
+    // };
 
     var i: usize = 0;
     while (i < targets.len) : (i += 1) {
@@ -193,6 +194,8 @@ pub fn run(
             } });
             if (target.result.cpu.arch == .x86_64) {
                 target.result.cpu.features.addFeatureSet(std.Target.x86.featureSet(&.{.sse4_1}));
+            } else if (target.result.cpu.arch == .aarch64) {
+                target.result.cpu.features.addFeatureSet(std.Target.aarch64.featureSet(&.{ .neon, .v8a }));
             }
 
             result = b.addExecutable(.{
@@ -221,9 +224,14 @@ pub fn run(
 
             b.installArtifact(result);
         } else if (PLATFORM == XfitPlatform.linux) {
-            const target = b.standardTargetOptions(.{ .default_target = .{
+            var target = b.standardTargetOptions(.{ .default_target = .{
                 .os_tag = .linux,
             } });
+            if (target.result.cpu.arch == .x86_64) {
+                target.result.cpu.features.addFeatureSet(std.Target.x86.featureSet(&.{.sse4_1}));
+            } else if (target.result.cpu.arch == .aarch64) {
+                target.result.cpu.features.addFeatureSet(std.Target.aarch64.featureSet(&.{ .neon, .v8a }));
+            }
 
             result = b.addExecutable(.{
                 .target = target,
@@ -238,12 +246,12 @@ pub fn run(
                 result.subsystem = .Posix;
             }
 
-            for (linux_system_lib_names) |n| {
-                result.addObjectFile(.{ .cwd_relative = std.fmt.allocPrint(arena_allocator.allocator(), "/usr/lib/{s}-linux-gnu/{s}", .{ get_arch_text(target.result.cpu.arch), n }) catch unreachable });
-            }
-            for (linux_local_lib_names) |n| {
+            for (linux_lib_names) |n| {
                 result.addObjectFile(get_lazypath(b, std.fmt.allocPrint(arena_allocator.allocator(), "{s}/lib/linux/{s}/{s}", .{ engine_path, get_arch_text(target.result.cpu.arch), n }) catch unreachable));
             }
+            // for (linux_shared_lib_names) |n| {
+            //     result.addObjectFile(get_lazypath(b, std.fmt.allocPrint(arena_allocator.allocator(), "{s}/lib/linux/{s}", .{ engine_path, n }) catch unreachable));
+            // }
 
             callback(b, result, target);
 

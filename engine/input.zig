@@ -124,7 +124,7 @@ pub const key =
         Alt = __windows.win32.VK_MENU,
         _,
     }
-else if (xfit.platform == .android)
+else if (xfit.platform == .android) //TODO input linux
     enum(u16) {
         Unknown = __android.android.AKEYCODE_UNKNOWN,
 
@@ -456,8 +456,7 @@ else if (xfit.platform == .android)
         ProfileSwitch = __android.android.AKEYCODE_PROFILE_SWITCH,
         _,
     }
-else
-    @compileError("not support platform");
+else if (xfit.platform == .linux) enum(u16) {} else @compileError("not support platform");
 
 pub inline fn set_Lmouse_down_func(_func: *const fn (pos: math.point) void) void {
     @atomicStore(@TypeOf(__system.Lmouse_down_func), &__system.Lmouse_down_func, _func, std.builtin.AtomicOrder.monotonic);

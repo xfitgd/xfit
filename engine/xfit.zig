@@ -81,11 +81,21 @@ pub fn xfit_main(_allocator: std.mem.Allocator, _init_setting: *const init_setti
             herr3("xfit_init", e);
         };
     } else if (platform == .linux) {
-        __vulkan.vulkan_start();
+        if (subsystem == SubSystem.Console) {
+            root.xfit_init() catch |e| {
+                herr3("xfit_init", e);
+            };
 
-        root.xfit_init() catch |e| {
-            herr3("xfit_init", e);
-        };
+            root.xfit_destroy() catch |e| {
+                herr3("xfit_destroy", e);
+            };
+        } else {
+            __vulkan.vulkan_start();
+
+            root.xfit_init() catch |e| {
+                herr3("xfit_init", e);
+            };
+        }
     } else {
         @compileError("not support platform");
     }
