@@ -679,7 +679,7 @@ fn engine_handle_input(_event: ?*android.AInputEvent) i32 {
                     if (pointer_id < count) {
                         system.a_fn_call(__system.touch_down_func, .{ pointer_id, poses[pointer_id] }) catch {};
                     } else {
-                        @branchHint(.unlikely);
+                        @branchHint(.cold);
                         xfit.print("WARN engine_handle_input AMOTION_EVENT_ACTION_POINTER_DOWN out of range poses[{d}] value : {d}\n", .{ count, pointer_id });
                         return 0;
                     }
@@ -700,13 +700,13 @@ fn engine_handle_input(_event: ?*android.AInputEvent) i32 {
                 if (handle_input_buttons(_event, keycode, true)) return 1;
             }
             if (keycode < __system.KEY_SIZE) {
-                if (!__system.keys[keycode].load(std.builtin.AtomicOrder.monotonic)) {
-                    __system.keys[keycode].store(true, std.builtin.AtomicOrder.monotonic);
+                //다른 스레드에서 __system.keys[keyv]를 수정하지 않고 읽기만하니 weak로도 충분하다.
+                if (__system.keys[keycode].cmpxchgWeak(false, true, .monotonic, .monotonic) == null) {
                     //xfit.print_debug("input key_down {d}", .{keycode});
                     system.a_fn_call(__system.key_down_func, .{@as(input.key, @enumFromInt(keycode))}) catch {};
                 }
             } else {
-                @branchHint(.unlikely);
+                @branchHint(.cold);
                 xfit.print("WARN engine_handle_input AKEY_EVENT_ACTION_DOWN out of range __system.keys[{d}] value : {d}\n", .{ __system.KEY_SIZE, keycode });
                 return 0;
             }

@@ -477,8 +477,8 @@ fn WindowProc(hwnd: HWND, uMsg: u32, wParam: win32.WPARAM, lParam: win32.LPARAM)
         },
         win32.WM_KEYDOWN => {
             if (wParam < __system.KEY_SIZE) {
-                if (!__system.keys[wParam].load(std.builtin.AtomicOrder.monotonic)) {
-                    __system.keys[wParam].store(true, std.builtin.AtomicOrder.monotonic);
+                //다른 스레드에서 __system.keys[keyv]를 수정하지 않고 읽기만하니 weak로도 충분하다.
+                if (__system.keys[wParam].cmpxchgWeak(false, true, .monotonic, .monotonic) == null) {
                     //xfit.print_debug("input key_down {d}", .{wParam});
                     system.a_fn_call(__system.key_down_func, .{@as(input.key, @enumFromInt(wParam))}) catch {};
                 }

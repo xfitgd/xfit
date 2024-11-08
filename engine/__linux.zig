@@ -1,6 +1,7 @@
 const std = @import("std");
 const xfit = @import("xfit.zig");
 const system = @import("system.zig");
+const window = @import("window.zig");
 const input = @import("input.zig");
 const __system = @import("__system.zig");
 const __vulkan = @import("__vulkan.zig");
@@ -16,7 +17,7 @@ pub const c = @cImport({
 
 pub var display: ?*c.Display = null;
 pub var def_screen_idx: usize = 0;
-pub var window: c.Window = 0;
+pub var wnd: c.Window = 0;
 pub var screens: []?*c.Screen = undefined;
 pub var del_window: c.Atom = undefined;
 
@@ -66,7 +67,7 @@ pub fn linux_start() void {
 
     if (__system.init_set.screen_index > screens.len - 1) __system.init_set.screen_index = @intCast(def_screen_idx);
 
-    window = c.XCreateWindow(
+    wnd = c.XCreateWindow(
         display,
         @as(c_ulong, @intCast(c.RootWindow(display, __system.init_set.screen_index))),
         __system.init_set.window_x,
@@ -80,10 +81,10 @@ pub fn linux_start() void {
         0,
         null,
     );
-    _ = c.XSelectInput(display, window, c.KeyPressMask | c.KeyReleaseMask);
-    _ = c.XMapWindow(display, window);
+    _ = c.XSelectInput(display, wnd, c.KeyPressMask | c.KeyReleaseMask | c.ButtonReleaseMask | c.ButtonPressMask | c.StructureNotifyMask);
+    _ = c.XMapWindow(display, wnd);
     del_window = c.XInternAtom(display, "WM_DELETE_WINDOW", 0);
-    _ = c.XSetWMProtocols(display, window, &del_window, 1);
+    _ = c.XSetWMProtocols(display, wnd, &del_window, 1);
     _ = c.XFlush(display);
 
     input_thread = std.Thread.spawn(.{}, render_func, .{}) catch unreachable;
@@ -95,7 +96,7 @@ pub fn vulkan_linux_start(vkSurface: *__vulkan.vk.SurfaceKHR) void {
         __vulkan.vki.?.destroySurfaceKHR(vkSurface.*, null);
     }
     const xlibSurfaceCreateInfo: __vulkan.vk.XlibSurfaceCreateInfoKHR = .{
-        .window = window,
+        .window = wnd,
         .dpy = @ptrCast(display.?),
     };
     vkSurface.* = __vulkan.vki.?.createXlibSurfaceKHR(&xlibSurfaceCreateInfo, null) catch |e|
@@ -107,6 +108,21 @@ pub fn linux_loop() void {
     while (!xfit.exiting()) {
         _ = c.XNextEvent(display, &event);
         switch (event.type) {
+            c.ConfigureNotify => {
+                const w = window.window_width();
+                const h = window.window_height();
+                if (w != event.xconfigure.width or h != event.xconfigure.height) {
+                    @atomicStore(u32, &__system.init_set.window_width, @abs(event.xconfigure.width), std.builtin.AtomicOrder.monotonic);
+                    @atomicStore(u32, &__system.init_set.window_height, @abs(event.xconfigure.height), std.builtin.AtomicOrder.monotonic);
+
+                    if (__system.loop_start.load(.monotonic)) {
+                        root.xfit_size() catch |e| {
+                            xfit.herr3("xfit_size", e);
+                        };
+                        __system.size_update.store(true, .monotonic);
+                    }
+                }
+            },
             c.ClientMessage => {
                 if (event.xclient.data.l[0] == del_window) {
                     __system.exiting.store(true, std.builtin.AtomicOrder.release);
@@ -114,7 +130,38 @@ pub fn linux_loop() void {
                 }
             },
             c.KeyPress => {
-                system.a_fn_call(__system.key_down_func, .{@as(input.key, @enumFromInt(@as(u16, @intCast(c.XLookupKeysym(&event.xkey, 0)))))}) catch {};
+                const keyr = c.XLookupKeysym(&event.xkey, 0);
+                if (keyr > 0xffff) continue;
+                var keyv: u16 = @intCast(keyr);
+                const key: input.key = @enumFromInt(keyv);
+                if (keyv > 0xff and keyv < 0xff00) {
+                    @branchHint(.cold);
+                    xfit.print("WARN linux_loop KeyPress out of range __system.keys[{d}] value : {d}\n", .{ __system.KEY_SIZE, keyv });
+                    continue;
+                } else if (keyv >= 0xff00) {
+                    keyv = keyv - 0xff00 + 0xff;
+                }
+                //다른 스레드에서 __system.keys[keyv]를 수정하지 않고 읽기만하니 weak로도 충분하다.
+                if (__system.keys[keyv].cmpxchgWeak(false, true, .monotonic, .monotonic) == null) {
+                    //xfit.print_debug("input key_down {d}", .{wParam});
+                    system.a_fn_call(__system.key_down_func, .{key}) catch {};
+                }
+            },
+            c.KeyRelease => {
+                const keyr = c.XLookupKeysym(&event.xkey, 0);
+                if (keyr > 0xffff) continue;
+                var keyv: u16 = @intCast(keyr);
+                const key: input.key = @enumFromInt(keyv);
+                if (keyv > 0xff and keyv < 0xff00) {
+                    @branchHint(.cold);
+                    xfit.print("WARN linux_loop KeyRelease out of range __system.keys[{d}] value : {d}\n", .{ __system.KEY_SIZE, keyv });
+                    continue;
+                } else if (keyv >= 0xff00) {
+                    keyv = keyv - 0xff00 + 0xff;
+                }
+                __system.keys[keyv].store(false, std.builtin.AtomicOrder.monotonic);
+                //xfit.print_debug("input key_up {d}", .{wParam});
+                system.a_fn_call(__system.key_up_func, .{key}) catch {};
             },
             else => {},
         }
@@ -124,17 +171,17 @@ pub fn linux_loop() void {
 pub fn linux_close() void {
     var event: c.XEvent = undefined;
     event.xclient.type = c.ClientMessage;
-    event.xclient.window = window;
+    event.xclient.window = wnd;
     event.xclient.message_type = c.XInternAtom(display, "WM_PROTOCOLS", 1);
     event.xclient.format = 32;
     event.xclient.data.l[0] = @intCast(c.XInternAtom(display, "WM_DELETE_WINDOW", 0));
     event.xclient.data.l[1] = c.CurrentTime;
-    _ = c.XSendEvent(display, window, c.False, c.NoEventMask, &event);
+    _ = c.XSendEvent(display, wnd, c.False, c.NoEventMask, &event);
 }
 
 pub fn linux_destroy() void {
     input_thread.join();
-    _ = c.XDestroyWindow(display, window);
+    _ = c.XDestroyWindow(display, wnd);
     _ = c.XCloseDisplay(display);
 
     std.heap.c_allocator.free(screens);
