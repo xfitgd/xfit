@@ -271,6 +271,13 @@ pub inline fn set_error_handling_func(_func: *const fn (text: []u8, stack_trace:
     @atomicStore(@TypeOf(__system.error_handling_func), &__system.error_handling_func, _func, std.builtin.AtomicOrder.monotonic);
 }
 pub inline fn sleep(ns: u64) void {
+    if (platform == .windows and ns <= 100000000) { //0.1초이하는 임의로 정한 기준. 짧은 시간일수록 정확도를 챙긴다.
+        __windows.nanosleep(ns);
+    } else {
+        std.time.sleep(ns);
+    }
+}
+pub inline fn sleep_(ns: u64) void {
     if (platform == .windows) {
         __windows.nanosleep(ns);
     } else {
