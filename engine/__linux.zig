@@ -62,7 +62,7 @@ pub fn linux_start() void {
     _ = c.XSetWMProtocols(display, window, &del_window, 1);
     _ = c.XFlush(display);
 
-    input_thread = std.Thread.spawn(.{}, input_func, .{});
+    input_thread = std.Thread.spawn(.{}, input_func, .{}) catch unreachable;
 }
 
 pub fn vulkan_linux_start(vkSurface: *__vulkan.vk.SurfaceKHR) void {

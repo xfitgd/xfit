@@ -14,7 +14,7 @@ extern "C" {
 #endif
 
 #if !defined(MA_NO_LIBOPUS)
-#include <opusfile.h>
+#include <opus/opusfile.h>
 #endif
 
 #include <memory.h>
