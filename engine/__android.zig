@@ -510,7 +510,8 @@ fn engine_handle_cmd(_cmd: AppEvent) void {
 var input_state: general_input.INPUT_STATE = std.mem.zeroes(general_input.INPUT_STATE);
 
 fn handle_input_buttons(_event: ?*android.AInputEvent, keycode: u32, updown: bool) bool {
-    if (system.a_fn(__system.general_input_callback) == null) return false;
+    const general_input_callback = system.a_fn(__system.general_input_callback);
+    if (general_input_callback == null) return false;
     switch (keycode) {
         android.AKEYCODE_BUTTON_A => {
             if (input_state.buttons.A and updown) return false;
@@ -563,7 +564,7 @@ fn handle_input_buttons(_event: ?*android.AInputEvent, keycode: u32, updown: boo
         else => return false,
     }
     input_state.handle = @ptrFromInt(@as(usize, @intCast(android.AInputEvent_getDeviceId(_event))));
-    system.a_fn(__system.general_input_callback).?(input_state);
+    general_input_callback.?(input_state);
     return true;
 }
 
@@ -575,7 +576,8 @@ fn engine_handle_input(_event: ?*android.AInputEvent) i32 {
         const tool_type = android.AMotionEvent_getToolType(_event, 0);
         //https://github.com/gameplay3d/GamePlay/blob/master/gameplay/src/PlatformAndroid.cpp
         if ((src & android.AINPUT_SOURCE_JOYSTICK) != 0) {
-            if (system.a_fn(__system.general_input_callback) != null) {
+            const general_input_callback = system.a_fn(__system.general_input_callback);
+            if (general_input_callback != null) {
                 const xaxis = android.AMotionEvent_getAxisValue(_event, android.AMOTION_EVENT_AXIS_HAT_X, 0);
                 const yaxis = android.AMotionEvent_getAxisValue(_event, android.AMOTION_EVENT_AXIS_HAT_Y, 0);
 
@@ -621,7 +623,7 @@ fn engine_handle_input(_event: ?*android.AInputEvent) i32 {
 
                 input_state.handle = @ptrFromInt(@as(usize, @intCast(android.AInputEvent_getDeviceId(_event))));
 
-                system.a_fn(__system.general_input_callback).?(input_state);
+                general_input_callback.?(input_state);
             }
         } else {
             var count: u32 = undefined;
@@ -631,18 +633,18 @@ fn engine_handle_input(_event: ?*android.AInputEvent) i32 {
                 var mm = point{ android.AMotionEvent_getX(_event, 0), android.AMotionEvent_getY(_event, 0) };
                 mm = input.convert_set_mouse_pos(mm);
 
-                if (system.a_fn(__system.mouse_move_func) != null) system.a_fn(__system.mouse_move_func).?(mm);
+                system.a_fn_call(__system.mouse_move_func, .{mm}) catch {};
                 switch (act & android.AMOTION_EVENT_ACTION_MASK) {
                     android.AMOTION_EVENT_ACTION_DOWN => {
-                        if (system.a_fn(__system.Lmouse_down_func) != null) system.a_fn(__system.Lmouse_down_func).?(mm);
+                        system.a_fn_call(__system.Lmouse_down_func, .{mm}) catch {};
                     },
                     android.AMOTION_EVENT_ACTION_UP => {
-                        if (system.a_fn(__system.Lmouse_up_func) != null) system.a_fn(__system.Lmouse_up_func).?(mm);
+                        system.a_fn_call(__system.Lmouse_up_func, .{mm}) catch {};
                     },
                     android.AMOTION_EVENT_ACTION_SCROLL => {
                         const dt: i32 = @intFromFloat(android.AMotionEvent_getAxisValue(_event, android.AMOTION_EVENT_AXIS_VSCROLL, 0) * 100);
                         __system.mouse_scroll_dt.store(dt, std.builtin.AtomicOrder.monotonic);
-                        if (system.a_fn(__system.mouse_scroll_func) != null) system.a_fn(__system.mouse_scroll_func).?(dt);
+                        system.a_fn_call(__system.mouse_scroll_func, .{dt}) catch {};
                     },
                     else => {},
                 }
@@ -665,17 +667,17 @@ fn engine_handle_input(_event: ?*android.AInputEvent) i32 {
             const act = android.AMotionEvent_getAction(_event);
             switch (act & android.AMOTION_EVENT_ACTION_MASK) {
                 android.AMOTION_EVENT_ACTION_DOWN => {
-                    //if (system.a_fn(__system.Lmouse_down_func) != null) system.a_fn(__system.Lmouse_down_func).?(poses[0]);
-                    if (system.a_fn(__system.touch_down_func) != null) system.a_fn(__system.touch_down_func).?(0, poses[0]);
+                    //system.a_fn_call(__system.Lmouse_down_func, .{ poses[0] }) catch {};
+                    system.a_fn_call(__system.touch_down_func, .{ 0, poses[0] }) catch {};
                 },
                 android.AMOTION_EVENT_ACTION_UP => {
-                    //if (system.a_fn(__system.Lmouse_up_func) != null) system.a_fn(__system.Lmouse_up_func).?(poses[0]);
-                    if (system.a_fn(__system.touch_up_func) != null) system.a_fn(__system.touch_up_func).?(0, poses[0]);
+                    //system.a_fn_call(__system.Lmouse_up_func, .{ poses[0] }) catch {};
+                    system.a_fn_call(__system.touch_up_func, .{ 0, poses[0] }) catch {};
                 },
                 android.AMOTION_EVENT_ACTION_POINTER_DOWN => {
                     const pointer_id: u32 = @max(0, @min(9, (act & android.AMOTION_EVENT_ACTION_POINTER_INDEX_MASK) >> android.AMOTION_EVENT_ACTION_POINTER_INDEX_SHIFT));
                     if (pointer_id < count) {
-                        if (system.a_fn(__system.touch_down_func) != null) system.a_fn(__system.touch_down_func).?(pointer_id, poses[pointer_id]);
+                        system.a_fn_call(__system.touch_down_func, .{ pointer_id, poses[pointer_id] }) catch {};
                     } else {
                         @branchHint(.unlikely);
                         xfit.print("WARN engine_handle_input AMOTION_EVENT_ACTION_POINTER_DOWN out of range poses[{d}] value : {d}\n", .{ count, pointer_id });
@@ -684,7 +686,7 @@ fn engine_handle_input(_event: ?*android.AInputEvent) i32 {
                 },
                 android.AMOTION_EVENT_ACTION_POINTER_UP => {
                     const pointer_id: u32 = @max(0, @min(9, (act & android.AMOTION_EVENT_ACTION_POINTER_INDEX_MASK) >> android.AMOTION_EVENT_ACTION_POINTER_INDEX_SHIFT));
-                    if (system.a_fn(__system.touch_up_func) != null) system.a_fn(__system.touch_up_func).?(pointer_id, poses[pointer_id]);
+                    system.a_fn_call(__system.touch_up_func, .{ pointer_id, poses[pointer_id] }) catch {};
                 },
                 else => {},
             }
@@ -701,7 +703,7 @@ fn engine_handle_input(_event: ?*android.AInputEvent) i32 {
                 if (!__system.keys[keycode].load(std.builtin.AtomicOrder.monotonic)) {
                     __system.keys[keycode].store(true, std.builtin.AtomicOrder.monotonic);
                     //xfit.print_debug("input key_down {d}", .{keycode});
-                    if (system.a_fn(__system.key_down_func) != null) system.a_fn(__system.key_down_func).?(@enumFromInt(keycode));
+                    system.a_fn_call(__system.key_down_func, .{@as(input.key, @enumFromInt(keycode))}) catch {};
                 }
             } else {
                 @branchHint(.unlikely);
@@ -715,9 +717,9 @@ fn engine_handle_input(_event: ?*android.AInputEvent) i32 {
             if (keycode < __system.KEY_SIZE) {
                 __system.keys[keycode].store(false, std.builtin.AtomicOrder.monotonic);
                 //xfit.print_debug("input key_up {d}", .{keycode});
-                if (system.a_fn(__system.key_up_func) != null) system.a_fn(__system.key_up_func).?(@enumFromInt(keycode));
+                system.a_fn_call(__system.key_up_func, .{@as(input.key, @enumFromInt(keycode))}) catch {};
             } else {
-                @branchHint(.unlikely);
+                @branchHint(.cold);
                 xfit.print("WARN engine_handle_input AKEY_EVENT_ACTION_UP out of range __system.keys[{d}] value : {d}\n", .{ __system.KEY_SIZE, keycode });
                 return 0;
             }
@@ -725,13 +727,13 @@ fn engine_handle_input(_event: ?*android.AInputEvent) i32 {
             if (keycode < __system.KEY_SIZE) {
                 const cnt = android.AKeyEvent_getRepeatCount(_event);
                 var i: i32 = 0;
-                while (i < cnt) : (i += 1) {
+                while (i < cnt) : (i += 1) { //TODO 검증 필요
                     //xfit.print_debug("input key_multiple({d}) {d}", .{ i, keycode });
-                    if (system.a_fn(__system.key_down_func) != null) system.a_fn(__system.key_down_func).?(@enumFromInt(keycode));
-                    if (system.a_fn(__system.key_up_func) != null) system.a_fn(__system.key_up_func).?(@enumFromInt(keycode));
+                    system.a_fn_call(__system.key_down_func, .{@as(input.key, @enumFromInt(keycode))}) catch {};
+                    system.a_fn_call(__system.key_up_func, .{@as(input.key, @enumFromInt(keycode))}) catch {};
                 }
             } else {
-                @branchHint(.unlikely);
+                @branchHint(.cold);
                 xfit.print("WARN engine_handle_input AKEY_EVENT_ACTION_MULTIPLE out of range __system.keys[{d}] value : {d}\n", .{ __system.KEY_SIZE, keycode });
                 return 0;
             }
@@ -843,7 +845,7 @@ fn anrdoid_app_entry() void {
         if (app.inited) {
             __system.loop();
         }
-        if (system.a_fn(app.destroryRequested)) {
+        if (system.a_load(app.destroryRequested)) {
             destroy_android();
             break;
         }

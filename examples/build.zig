@@ -6,10 +6,10 @@ const xfit_build = @import("xfit_build");
 //크로스 플랫폼 빌드시 zig build -Dtarget=aarch64-windows(linux)
 //x86_64-windows(linux)
 // android platform need AndroidManifest.xml, keystore, (assets, res) folder in user project folder
-const PLATFORM = xfit_build.XfitPlatform.linux;
+const PLATFORM = xfit_build.XfitPlatform.windows;
 const OPTIMIZE = std.builtin.OptimizeMode.Debug;
 
-const EXAMPLE: EXAMPLES = EXAMPLES.CONSOLE;
+const EXAMPLE: EXAMPLES = EXAMPLES.GRAPHICS2D;
 //*
 
 const examples = [_][]const u8{

@@ -92,19 +92,9 @@ pub fn xfit_main(_allocator: std.mem.Allocator, _init_setting: *const init_setti
         } else {
             __linux.system_linux_start();
             __linux.linux_start();
-            __vulkan.vulkan_start();
-
-            root.xfit_init() catch |e| {
-                herr3("xfit_init", e);
-            };
 
             __linux.linux_loop();
 
-            root.xfit_destroy() catch |e| {
-                herr3("xfit_destroy", e);
-            };
-
-            __vulkan.vulkan_destroy();
             __linux.linux_destroy();
             __system.destroy();
 
@@ -164,7 +154,7 @@ pub fn print_error(comptime fmt: []const u8, args: anytype) void {
         std.debug.writeCurrentStackTrace(str2.writer(), debug_info, .no_color, @returnAddress()) catch return;
         std.debug.print("{s}\n{s}", .{ str, str2.items });
 
-        if (system.a_fn(__system.error_handling_func) != null) system.a_fn(__system.error_handling_func).?(str, str2.items);
+        system.a_fn_call(__system.error_handling_func, .{ str, str2.items }) catch {};
         // fs.open("xfit_err.log", .{ .truncate = false }) catch fs.open("xfit_err.log", .{ .exclusive = true }) catch  return;
     } else {
         const str = std.fmt.allocPrint(std.heap.c_allocator, "{s} @ " ++ fmt ++ " ", .{now_str} ++ args) catch return;
@@ -185,7 +175,7 @@ pub fn print_error(comptime fmt: []const u8, args: anytype) void {
         str2.append(0) catch return;
         _ = __android.android.__android_log_write(__android.android.ANDROID_LOG_ERROR, "xfit", str2.items.ptr);
 
-        if (system.a_fn(__system.error_handling_func) != null) system.a_fn(__system.error_handling_func).?(str, str2.items);
+        system.a_fn_call(__system.error_handling_func, .{ str, str2.items }) catch {};
     }
     // fs.seekFromEnd(0) catch return;
     // _ = fs.write(str) catch return;
@@ -303,7 +293,12 @@ pub inline fn console_cls() void {
         write("\x1Bc");
     }
 }
+
+var exit_mutex: std.Thread.Mutex = .{};
 pub fn exit() void {
+    exit_mutex.lock();
+    defer exit_mutex.unlock();
+    if (__system.exiting.load(.acquire)) return;
     if (subsystem == .Console) {
         std.posix.exit(0);
         return;
@@ -313,6 +308,9 @@ pub fn exit() void {
     } else if (platform == .android) {
         __system.exiting.store(true, .release);
         @atomicStore(bool, &__android.app.destroryRequested, true, .monotonic);
+    } else if (platform == .linux) {
+        __system.exiting.store(true, .release);
+        __linux.linux_close();
     }
 }
 

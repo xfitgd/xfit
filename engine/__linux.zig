@@ -1,13 +1,17 @@
 const std = @import("std");
 const xfit = @import("xfit.zig");
 const system = @import("system.zig");
+const input = @import("input.zig");
 const __system = @import("__system.zig");
 const __vulkan = @import("__vulkan.zig");
 const __vulkan_allocator = @import("__vulkan_allocator.zig");
+const root = @import("root");
 
 pub const c = @cImport({
+    @cDefine("XK_LATIN1", "1");
+    @cDefine("XK_MISCELLANY", "1");
     @cInclude("X11/Xlib.h");
-    @cInclude("linux/input.h");
+    @cInclude("X11/keysym.h");
 });
 
 pub var display: ?*c.Display = null;
@@ -29,10 +33,29 @@ pub fn system_linux_start() void {
     }
 }
 
-fn input_func() void {
-    //var ring = std.os.linux.IoUring.init(32, 0) catch |e| xfit.herr3("input_func IoUring.init", e);
+fn render_func() void {
+    //var ring = std.os.linux.IoUring.init(64, 0) catch |e| xfit.herr3("input_func IoUring.init", e);
+    //var sqe = ring.get_sqe() catch |e| xfit.herr3("input_func ring.get_sqe", e);
+    __vulkan.vulkan_start();
 
-    while (!xfit.exiting()) {}
+    root.xfit_init() catch |e| {
+        xfit.herr3("xfit_init", e);
+    };
+
+    __vulkan_allocator.execute_and_wait_all_op();
+
+    while (!xfit.exiting()) {
+        __system.loop();
+    }
+    __vulkan_allocator.execute_and_wait_all_op();
+
+    __vulkan.wait_device_idle();
+
+    root.xfit_destroy() catch |e| {
+        xfit.herr3("xfit_destroy", e);
+    };
+
+    __vulkan.vulkan_destroy();
 }
 
 pub fn linux_start() void {
@@ -57,12 +80,13 @@ pub fn linux_start() void {
         0,
         null,
     );
+    _ = c.XSelectInput(display, window, c.KeyPressMask | c.KeyReleaseMask);
     _ = c.XMapWindow(display, window);
     del_window = c.XInternAtom(display, "WM_DELETE_WINDOW", 0);
     _ = c.XSetWMProtocols(display, window, &del_window, 1);
     _ = c.XFlush(display);
 
-    input_thread = std.Thread.spawn(.{}, input_func, .{}) catch unreachable;
+    input_thread = std.Thread.spawn(.{}, render_func, .{}) catch unreachable;
 }
 
 pub fn vulkan_linux_start(vkSurface: *__vulkan.vk.SurfaceKHR) void {
@@ -79,34 +103,39 @@ pub fn vulkan_linux_start(vkSurface: *__vulkan.vk.SurfaceKHR) void {
 }
 
 pub fn linux_loop() void {
-    __vulkan_allocator.execute_and_wait_all_op();
-
     var event: c.XEvent = undefined;
-    while (true) {
-        while (0 < c.XPending(display)) {
-            _ = c.XNextEvent(display, &event);
-            switch (event.type) {
-                c.ClientMessage => {
-                    if (event.xclient.data.l[0] == del_window) {
-                        __system.exiting.store(true, std.builtin.AtomicOrder.release);
-                        _ = c.XDestroyWindow(event.xclient.display, event.xclient.window);
-                        return;
-                    }
-                },
-                else => {},
-            }
+    while (!xfit.exiting()) {
+        _ = c.XNextEvent(display, &event);
+        switch (event.type) {
+            c.ClientMessage => {
+                if (event.xclient.data.l[0] == del_window) {
+                    __system.exiting.store(true, std.builtin.AtomicOrder.release);
+                    return;
+                }
+            },
+            c.KeyPress => {
+                system.a_fn_call(__system.key_down_func, .{@as(input.key, @enumFromInt(@as(u16, @intCast(c.XLookupKeysym(&event.xkey, 0)))))}) catch {};
+            },
+            else => {},
         }
-
-        __system.loop();
     }
-    __vulkan_allocator.execute_and_wait_all_op();
+}
 
-    __vulkan.wait_device_idle();
+pub fn linux_close() void {
+    var event: c.XEvent = undefined;
+    event.xclient.type = c.ClientMessage;
+    event.xclient.window = window;
+    event.xclient.message_type = c.XInternAtom(display, "WM_PROTOCOLS", 1);
+    event.xclient.format = 32;
+    event.xclient.data.l[0] = @intCast(c.XInternAtom(display, "WM_DELETE_WINDOW", 0));
+    event.xclient.data.l[1] = c.CurrentTime;
+    _ = c.XSendEvent(display, window, c.False, c.NoEventMask, &event);
 }
 
 pub fn linux_destroy() void {
     input_thread.join();
-
+    _ = c.XDestroyWindow(display, window);
     _ = c.XCloseDisplay(display);
+
     std.heap.c_allocator.free(screens);
 }

@@ -24,8 +24,35 @@ pub inline fn get_processor_core_len() u32 {
     return __system.processor_core_len;
 }
 
+pub inline fn a_load(value: anytype) @TypeOf(value) {
+    return @atomicLoad(@TypeOf(value), &value, std.builtin.AtomicOrder.monotonic);
+}
 pub inline fn a_fn(func: anytype) @TypeOf(func) {
     return @atomicLoad(@TypeOf(func), &func, std.builtin.AtomicOrder.monotonic);
+}
+
+pub const a_fn_error = error{null_func};
+
+fn a_fn_call_return_type(func_type: type) type {
+    if (@typeInfo(func_type) == .optional) {
+        const child = @typeInfo(@typeInfo(func_type).optional.child);
+        if (child == .pointer) {
+            return @typeInfo(child.pointer.child).@"fn".return_type.?;
+        }
+        return child.@"fn".return_type.?;
+    } else if (@typeInfo(func_type) == .pointer) {
+        return @typeInfo(@typeInfo(func_type).pointer.child).@"fn".return_type.?;
+    }
+    return @typeInfo(func_type).@"fn".return_type.?;
+}
+
+pub inline fn a_fn_call(func: anytype, args: anytype) a_fn_error!a_fn_call_return_type(@TypeOf(func)) {
+    const res = a_fn(func);
+    if (@typeInfo(@TypeOf(res)) == .optional) {
+        if (res == null) return a_fn_error.null_func;
+        return @call(.auto, res.?, args);
+    }
+    return @call(.auto, res, args);
 }
 
 pub const platform_version = struct {
