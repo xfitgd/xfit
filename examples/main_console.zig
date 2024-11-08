@@ -15,6 +15,7 @@ pub fn xfit_init() !void {
     xfit.write("exit.\n");
 
     xfit.console_pause();
+    xfit.console_cls();
 }
 
 pub fn xfit_update() !void {}

@@ -300,7 +300,7 @@ pub inline fn console_cls() void {
     if (platform == .windows) {
         _ = __system._system("cls");
     } else if (platform == .linux) {
-        _ = __system._system("clear");
+        write("\x1Bc");
     }
 }
 pub fn exit() void {
