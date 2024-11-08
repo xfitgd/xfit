@@ -35,13 +35,15 @@ fn callback(b: *std.Build, result: *std.Build.Step.Compile, target: std.Build.Re
 pub fn build(b: *std.Build) void {
     const platform = b.option(xfit_build.XfitPlatform, "platform", "build platform") orelse PLATFORM;
     b.release_mode = .fast;
-    xfit_build.run(
-        b,
-        "XfitTest",
-        b.path(examples[@intFromEnum(EXAMPLE)]),
-        platform,
-        b.standardOptimizeOption(.{ .preferred_optimize_mode = OPTIMIZE }),
-        callback,
-        EXAMPLE == .CONSOLE,
-    );
+
+    const option = xfit_build.run_option{
+        .name = "XfitTest",
+        .root_source_file = b.*.path(examples[@intFromEnum(EXAMPLE)]),
+        .PLATFORM = platform,
+        .OPTIMIZE = b.standardOptimizeOption(.{ .preferred_optimize_mode = OPTIMIZE }),
+        .callback = callback,
+        .is_console = EXAMPLE == .CONSOLE,
+        .ANDROID_KEYSTORE = "debug.keystore",
+    };
+    xfit_build.run(b, option);
 }

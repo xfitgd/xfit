@@ -86,7 +86,7 @@ pub fn button_(_msaa: bool) type {
 
         fn update_color(self: *Self) void {
             for (self.*.srcs) |v| {
-                if (v.*.up_color == null or v.*.src.vertices.node.res == null or v.*.src.indices.node.res == null) continue;
+                if (v.*.up_color == null or v.*.src.vertices.node.res == .null_handle or v.*.src.indices.node.res == .null_handle) continue;
                 if (self.*.state == .UP) {
                     v.*.src.color = v.*.up_color.?;
                     v.*.src.copy_color_update();
@@ -241,24 +241,43 @@ pub fn button_(_msaa: bool) type {
         pub inline fn deinit_callback(self: *Self, callback: ?*const fn (caller: *anyopaque) void) void {
             self.*.transform.__deinit(callback);
         }
-        pub fn __draw(self: *Self, cmd: vk.VkCommandBuffer) void {
+        pub fn __draw(self: *Self, cmd: vk.CommandBuffer) void {
+            __vulkan.load_instance_and_device();
             for (self.*.srcs) |_src| {
                 const src = &_src.*.src;
-                if (src.*.vertices.node.res == null or src.*.indices.node.res == null) continue;
-                vk.vkCmdBindPipeline(cmd, vk.VK_PIPELINE_BIND_POINT_GRAPHICS, if (_msaa) __vulkan.shape_color_2d_pipeline_set.pipeline else __vulkan.pixel_shape_color_2d_pipeline_set.pipeline);
+                if (src.*.vertices.node.res == .null_handle or src.*.indices.node.res == .null_handle) continue;
+                __vulkan.vkd.?.cmdBindPipeline(cmd, .graphics, if (_msaa) __vulkan.shape_color_2d_pipeline_set.pipeline else __vulkan.pixel_shape_color_2d_pipeline_set.pipeline);
 
-                vk.vkCmdBindDescriptorSets(cmd, vk.VK_PIPELINE_BIND_POINT_GRAPHICS, __vulkan.shape_color_2d_pipeline_set.pipelineLayout, 0, 1, &self.*.__set.__set, 0, null);
+                __vulkan.vkd.?.cmdBindDescriptorSets(
+                    cmd,
+                    .graphics,
+                    __vulkan.shape_color_2d_pipeline_set.pipelineLayout,
+                    0,
+                    1,
+                    @ptrCast(&self.*.__set.__set),
+                    0,
+                    null,
+                );
 
-                const offsets: vk.VkDeviceSize = 0;
-                vk.vkCmdBindVertexBuffers(cmd, 0, 1, &src.*.vertices.node.res, &offsets);
+                const offsets: vk.DeviceSize = 0;
+                __vulkan.vkd.?.cmdBindVertexBuffers(cmd, 0, 1, @ptrCast(&src.*.vertices.node.res), @ptrCast(&offsets));
 
-                vk.vkCmdBindIndexBuffer(cmd, src.*.indices.node.res, 0, vk.VK_INDEX_TYPE_UINT32);
-                vk.vkCmdDrawIndexed(cmd, src.*.indices.node.buffer_option.len / graphics.get_idx_type_size(src.*.indices.idx_type), 1, 0, 0, 0);
+                __vulkan.vkd.?.cmdBindIndexBuffer(cmd, src.*.indices.node.res, 0, .uint32);
+                __vulkan.vkd.?.cmdDrawIndexed(cmd, src.*.indices.node.buffer_option.len / graphics.get_idx_type_size(src.*.indices.idx_type), 1, 0, 0, 0);
 
-                vk.vkCmdBindPipeline(cmd, vk.VK_PIPELINE_BIND_POINT_GRAPHICS, if (_msaa) __vulkan.quad_shape_2d_pipeline_set.pipeline else __vulkan.pixel_quad_shape_2d_pipeline_set.pipeline);
+                __vulkan.vkd.?.cmdBindPipeline(cmd, .graphics, if (_msaa) __vulkan.quad_shape_2d_pipeline_set.pipeline else __vulkan.pixel_quad_shape_2d_pipeline_set.pipeline);
 
-                vk.vkCmdBindDescriptorSets(cmd, vk.VK_PIPELINE_BIND_POINT_GRAPHICS, __vulkan.quad_shape_2d_pipeline_set.pipelineLayout, 0, 1, &src.*.__set.__set, 0, null);
-                vk.vkCmdDraw(cmd, 6, 1, 0, 0);
+                __vulkan.vkd.?.cmdBindDescriptorSets(
+                    cmd,
+                    .graphics,
+                    __vulkan.quad_shape_2d_pipeline_set.pipelineLayout,
+                    0,
+                    1,
+                    @ptrCast(&src.*.__set.__set),
+                    0,
+                    null,
+                );
+                __vulkan.vkd.?.cmdDraw(cmd, 6, 1, 0, 0);
             }
         }
     };

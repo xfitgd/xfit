@@ -1,4 +1,42 @@
-pub const color_format = enum { RGB, BGR, RGBA, BGRA, ARGB, ABGR, Gray, RGB16, BGR16, RGBA16, BGRA16, ARGB16, ABGR16, Gray16, RGB32, BGR32, RGBA32, BGRA32, ARGB32, ABGR32, Gray32, RGB32F, BGR32F, RGBA32F, BGRA32F, ARGB32F, ABGR32F, Gray32F };
+const __vulkan = @import("__vulkan.zig");
+
+pub const color_format = enum {
+    RGB,
+    BGR,
+    RGBA,
+    BGRA,
+    ARGB,
+    ABGR,
+    Gray,
+    RGB16,
+    BGR16,
+    RGBA16,
+    BGRA16,
+    ARGB16,
+    ABGR16,
+    Gray16,
+    RGB32,
+    BGR32,
+    RGBA32,
+    BGRA32,
+    ARGB32,
+    ABGR32,
+    Gray32,
+    RGB32F,
+    BGR32F,
+    RGBA32F,
+    BGRA32F,
+    ARGB32F,
+    ABGR32F,
+    Gray32F,
+    pub inline fn default() color_format {
+        return switch (__vulkan.format.format) {
+            .r8g8b8a8_unorm, .r8g8b8a8_srgb => .RGBA,
+            .b8g8r8a8_unorm, .b8g8r8a8_srgb => .BGRA,
+            else => .RGBA,
+        };
+    }
+};
 
 const std = @import("std");
 const mem = @import("mem.zig");

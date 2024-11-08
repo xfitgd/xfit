@@ -16,6 +16,7 @@ config: ?union(enum) {
 
 __anim_dec: *cwebp.WebPAnimDecoder = undefined,
 anim_info: cwebp.WebPAnimInfo = undefined,
+out_fmt: image_util.color_format = undefined,
 
 pub const webp_error = error{
     ///load_header
@@ -73,7 +74,7 @@ pub fn deinit(self: *Self) void {
 }
 
 ///for decoding
-pub fn load_header(self: *Self, data: []const u8) webp_error!void {
+pub fn load_header(self: *Self, data: []const u8, out_fmt: image_util.color_format) webp_error!void {
     deinit(self);
     self.*.config = .{
         .decode = undefined,
@@ -84,10 +85,19 @@ pub fn load_header(self: *Self, data: []const u8) webp_error!void {
 
     self.*.config.?.decode.options.scaled_width = self.*.config.?.decode.input.width;
     self.*.config.?.decode.options.scaled_height = self.*.config.?.decode.input.height;
+    switch (out_fmt) {
+        .RGBA => self.*.config.?.decode.output.colorspace = cwebp.MODE_RGBA,
+        .ARGB => self.*.config.?.decode.output.colorspace = cwebp.MODE_ARGB,
+        .BGRA => self.*.config.?.decode.output.colorspace = cwebp.MODE_BGRA,
+        .RGB => self.*.config.?.decode.output.colorspace = cwebp.MODE_RGB,
+        .BGR => self.*.config.?.decode.output.colorspace = cwebp.MODE_BGR,
+        else => return webp_error.unsupport_decode_fmt_error,
+    }
+    self.*.out_fmt = out_fmt;
 }
 
 ///for anim decoding
-pub fn load_anim_header(self: *Self, data: []const u8) webp_error!void {
+pub fn load_anim_header(self: *Self, data: []const u8, out_fmt: image_util.color_format) webp_error!void {
     deinit(self);
     self.*.config = .{
         .decode_anim = undefined,
@@ -97,23 +107,24 @@ pub fn load_anim_header(self: *Self, data: []const u8) webp_error!void {
         .bytes = data.ptr,
         .size = data.len,
     };
+    switch (out_fmt) {
+        .RGBA => self.*.config.?.decode_anim.color_mode = cwebp.MODE_RGBA,
+        .ARGB => self.*.config.?.decode_anim.color_mode = cwebp.MODE_ARGB,
+        .BGRA => self.*.config.?.decode_anim.color_mode = cwebp.MODE_BGRA,
+        .RGB => self.*.config.?.decode_anim.color_mode = cwebp.MODE_RGB,
+        .BGR => self.*.config.?.decode_anim.color_mode = cwebp.MODE_BGR,
+        else => return webp_error.unsupport_decode_fmt_error,
+    }
+    self.*.out_fmt = out_fmt;
     self.*.__anim_dec = cwebp.WebPAnimDecoderNew(&wd, &self.*.config.?.decode_anim) orelse return webp_error.WebPAnimDecoderNew_error;
     _ = cwebp.WebPAnimDecoderGetInfo(self.*.__anim_dec, &self.*.anim_info);
 }
 
-pub fn decode(self: *Self, out_fmt: image_util.color_format, data: []const u8, out_data: []u8) webp_error!void {
+pub fn decode(self: *Self, data: []const u8, out_data: []u8) webp_error!void {
     if (self.*.config == null) return webp_error.not_load_header;
 
-    const bit = @divExact(image_util.bit(out_fmt), 8);
+    const bit = @divExact(image_util.bit(self.*.out_fmt), 8);
     if (self.*.config.? == .decode) {
-        switch (out_fmt) {
-            .RGBA => self.*.config.?.decode.output.colorspace = cwebp.MODE_RGBA,
-            .ARGB => self.*.config.?.decode.output.colorspace = cwebp.MODE_ARGB,
-            .BGRA => self.*.config.?.decode.output.colorspace = cwebp.MODE_BGRA,
-            .RGB => self.*.config.?.decode.output.colorspace = cwebp.MODE_RGB,
-            .BGR => self.*.config.?.decode.output.colorspace = cwebp.MODE_BGR,
-            else => return webp_error.unsupport_decode_fmt_error,
-        }
         self.*.config.?.decode.output.u.RGBA.rgba = out_data.ptr;
         self.*.config.?.decode.output.u.RGBA.stride = self.*.config.?.decode.input.width * @as(c_int, @intCast(bit));
         self.*.config.?.decode.output.u.RGBA.size = @max(0, self.*.config.?.decode.output.u.RGBA.stride * self.*.config.?.decode.input.height);

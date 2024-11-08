@@ -112,19 +112,21 @@ pub fn get_AssetManager() ?*android.AAssetManager {
     return app.activity.?.*.assetManager;
 }
 
-pub fn vulkan_android_start(vkInstance: __vulkan.vk.VkInstance, vkSurface: *__vulkan.vk.VkSurfaceKHR) void {
+pub fn vulkan_android_start(vkSurface: *__vulkan.vk.SurfaceKHR) void {
+    __vulkan.load_instance_and_device();
     if (vkSurface.* != null) {
-        __vulkan.vk.vkDestroySurfaceKHR(@ptrCast(vkInstance), @as(*__vulkan.vk.VkSurfaceKHR, @ptrCast(vkSurface)).*, null);
+        __vulkan.vki.?.destroySurfaceKHR(vkSurface.*, null);
     }
-    const androidSurfaceCreateInfo: __vulkan.vk.VkAndroidSurfaceCreateInfoKHR = .{ .window = @ptrCast(app.window), .flags = 0 };
-    const result = __vulkan.vk.vkCreateAndroidSurfaceKHR(@ptrCast(vkInstance), &androidSurfaceCreateInfo, null, @ptrCast(vkSurface));
 
-    xfit.herr(result == __vulkan.vk.VK_SUCCESS, "vkCreateAndroidSurfaceKHR code : {d}", .{result});
+    const androidSurfaceCreateInfo: __vulkan.vk.AndroidSurfaceCreateInfoKHR = .{ .window = @ptrCast(app.window) };
+    vkSurface.* = __vulkan.vki.?.createAndroidSurfaceKHR(&androidSurfaceCreateInfo, null) catch |e|
+        xfit.herr3("vkCreateAndroidSurfaceKHR", e);
 }
 
 fn destroy_android() void {
-    __vulkan.wait_device_idle();
     __vulkan_allocator.execute_and_wait_all_op();
+
+    __vulkan.wait_device_idle();
 
     root.xfit_destroy() catch |e| {
         xfit.herr3("xfit_destroy", e);
@@ -495,7 +497,7 @@ fn engine_handle_cmd(_cmd: AppEvent) void {
             };
         },
         AppEvent.APP_CMD_WINDOW_RESIZED => {
-            var prop: vk.VkSurfaceCapabilitiesKHR = undefined;
+            var prop: vk.SurfaceCapabilitiesKHR = undefined;
             _ = vk.vkGetPhysicalDeviceSurfaceCapabilitiesKHR(__vulkan.vk_physical_device, __vulkan.vkSurface, &prop);
             if (prop.currentExtent.width != __vulkan.vkExtent.width or prop.currentExtent.height != __vulkan.vkExtent.height) {
                 __system.size_update.store(true, .monotonic);

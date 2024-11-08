@@ -185,7 +185,7 @@ pub const iobject = union(iobject_type) {
             inline else => |*case| case.*.update(),
         }
     }
-    pub inline fn __draw(self: *Self, cmd: vk.VkCommandBuffer) void {
+    pub inline fn __draw(self: *Self, cmd: vk.CommandBuffer) void {
         switch (self.*) {
             inline else => |*case| case.*.__draw(cmd),
         }
@@ -486,7 +486,7 @@ pub const texture = struct {
     const Self = @This();
     __image: vulkan_res_node(.texture) = .{},
     pixels: ?[]u8 = undefined,
-    sampler: vk.VkSampler,
+    sampler: vk.Sampler,
     __set: descriptor_set,
     __check_init: mem.check_init = .{},
 
@@ -535,10 +535,10 @@ pub const texture = struct {
 pub inline fn get_default_quad_image_vertices() *vertices(tex_vertex_2d) {
     return &__vulkan.quad_image_vertices;
 }
-pub inline fn get_default_linear_sampler() vk.VkSampler {
+pub inline fn get_default_linear_sampler() vk.Sampler {
     return __vulkan.linear_sampler;
 }
-pub inline fn get_default_nearest_sampler() vk.VkSampler {
+pub inline fn get_default_nearest_sampler() vk.Sampler {
     return __vulkan.nearest_sampler;
 }
 
@@ -547,7 +547,7 @@ pub const texture_array = struct {
     __image: vulkan_res_node(.texture) = .{},
     ///1차원 배열에 순차적으로 이미지 프레임 데이터들을 배치
     pixels: ?[]u8 = undefined,
-    sampler: vk.VkSampler,
+    sampler: vk.Sampler,
     __set: descriptor_set,
     __check_init: mem.check_init = .{},
 
@@ -598,7 +598,7 @@ pub const tile_texture_array = struct {
     __image: vulkan_res_node(.texture) = .{},
     ///1차원 배열에 순차적으로 이미지 프레임 데이터들을 배치
     alloc_pixels: []u8 = undefined,
-    sampler: vk.VkSampler,
+    sampler: vk.Sampler,
     __set: descriptor_set,
     __check_init: mem.check_init = .{},
 
@@ -780,25 +780,51 @@ pub fn shape_(_msaa: bool) type {
         pub fn deinit_callback(self: *Self, callback: ?*const fn (caller: *anyopaque) void) void {
             self.*.transform.__deinit(callback);
         }
-        pub fn __draw(self: *Self, cmd: vk.VkCommandBuffer) void {
+        pub fn __draw(self: *Self, cmd: vk.CommandBuffer) void {
             self.*.transform.__check_init.check_inited();
+            __vulkan.load_instance_and_device();
             for (&[_][]const *shape_source{ &[_]*shape_source{self.*.src}, self.*.extra_src orelse &[_]*shape_source{} }) |srcs| {
                 for (srcs) |src| {
-                    if (src.*.vertices.node.res == null or src.*.indices.node.res == null) continue;
-                    vk.vkCmdBindPipeline(cmd, vk.VK_PIPELINE_BIND_POINT_GRAPHICS, if (_msaa) __vulkan.shape_color_2d_pipeline_set.pipeline else __vulkan.pixel_shape_color_2d_pipeline_set.pipeline);
+                    if (src.*.vertices.node.res == .null_handle or src.*.indices.node.res == .null_handle) continue;
+                    __vulkan.vkd.?.cmdBindPipeline(cmd, .graphics, if (_msaa) __vulkan.shape_color_2d_pipeline_set.pipeline else __vulkan.pixel_shape_color_2d_pipeline_set.pipeline);
 
-                    vk.vkCmdBindDescriptorSets(cmd, vk.VK_PIPELINE_BIND_POINT_GRAPHICS, __vulkan.shape_color_2d_pipeline_set.pipelineLayout, 0, 1, &self.*.__set.__set, 0, null);
+                    __vulkan.vkd.?.cmdBindDescriptorSets(
+                        cmd,
+                        .graphics,
+                        __vulkan.shape_color_2d_pipeline_set.pipelineLayout,
+                        0,
+                        1,
+                        @ptrCast(&self.*.__set.__set),
+                        0,
+                        null,
+                    );
 
-                    const offsets: vk.VkDeviceSize = 0;
-                    vk.vkCmdBindVertexBuffers(cmd, 0, 1, &src.*.vertices.node.res, &offsets);
+                    const offsets: vk.DeviceSize = 0;
+                    __vulkan.vkd.?.cmdBindVertexBuffers(cmd, 0, 1, @ptrCast(&src.*.vertices.node.res), @ptrCast(&offsets));
 
-                    vk.vkCmdBindIndexBuffer(cmd, src.*.indices.node.res, 0, vk.VK_INDEX_TYPE_UINT32);
-                    vk.vkCmdDrawIndexed(cmd, src.*.indices.node.buffer_option.len / get_idx_type_size(self.*.src.*.indices.idx_type), 1, 0, 0, 0);
+                    __vulkan.vkd.?.cmdBindIndexBuffer(cmd, src.*.indices.node.res, 0, .uint32);
+                    __vulkan.vkd.?.cmdDrawIndexed(
+                        cmd,
+                        src.*.indices.node.buffer_option.len / get_idx_type_size(self.*.src.*.indices.idx_type),
+                        1,
+                        0,
+                        0,
+                        0,
+                    );
 
-                    vk.vkCmdBindPipeline(cmd, vk.VK_PIPELINE_BIND_POINT_GRAPHICS, if (_msaa) __vulkan.quad_shape_2d_pipeline_set.pipeline else __vulkan.pixel_quad_shape_2d_pipeline_set.pipeline);
+                    __vulkan.vkd.?.cmdBindPipeline(cmd, .graphics, if (_msaa) __vulkan.quad_shape_2d_pipeline_set.pipeline else __vulkan.pixel_quad_shape_2d_pipeline_set.pipeline);
 
-                    vk.vkCmdBindDescriptorSets(cmd, vk.VK_PIPELINE_BIND_POINT_GRAPHICS, __vulkan.quad_shape_2d_pipeline_set.pipelineLayout, 0, 1, &src.*.__set.__set, 0, null);
-                    vk.vkCmdDraw(cmd, 6, 1, 0, 0);
+                    __vulkan.vkd.?.cmdBindDescriptorSets(
+                        cmd,
+                        .graphics,
+                        __vulkan.quad_shape_2d_pipeline_set.pipelineLayout,
+                        0,
+                        1,
+                        @ptrCast(&src.*.__set.__set),
+                        0,
+                        null,
+                    );
+                    __vulkan.vkd.?.cmdDraw(cmd, 6, 1, 0, 0);
                 }
             }
         }
@@ -854,23 +880,24 @@ pub const image = struct {
 
         self.*.update();
     }
-    pub fn __draw(self: *Self, cmd: vk.VkCommandBuffer) void {
+    pub fn __draw(self: *Self, cmd: vk.CommandBuffer) void {
         self.*.transform.__check_init.check_inited();
         self.*.src.*.__check_init.check_inited();
-        vk.vkCmdBindPipeline(cmd, vk.VK_PIPELINE_BIND_POINT_GRAPHICS, __vulkan.tex_2d_pipeline_set.pipeline);
+        __vulkan.load_instance_and_device();
+        __vulkan.vkd.?.cmdBindPipeline(cmd, .graphics, __vulkan.tex_2d_pipeline_set.pipeline);
 
-        vk.vkCmdBindDescriptorSets(
+        __vulkan.vkd.?.cmdBindDescriptorSets(
             cmd,
-            vk.VK_PIPELINE_BIND_POINT_GRAPHICS,
+            .graphics,
             __vulkan.tex_2d_pipeline_set.pipelineLayout,
             0,
             2,
-            &[_]vk.VkDescriptorSet{ self.*.__set.__set, self.*.src.*.__set.__set },
+            &[_]vk.DescriptorSet{ self.*.__set.__set, self.*.src.*.__set.__set },
             0,
             null,
         );
 
-        vk.vkCmdDraw(cmd, 6, 1, 0, 0);
+        __vulkan.vkd.?.cmdDraw(cmd, 6, 1, 0, 0);
     }
     pub fn init(_src: *texture) Self {
         const self = Self{
@@ -988,23 +1015,24 @@ pub const animate_image = struct {
 
         self.*.update();
     }
-    pub fn __draw(self: *Self, cmd: vk.VkCommandBuffer) void {
+    pub fn __draw(self: *Self, cmd: vk.CommandBuffer) void {
         self.*.transform.__check_init.check_inited();
         self.*.src.*.__check_init.check_inited();
-        vk.vkCmdBindPipeline(cmd, vk.VK_PIPELINE_BIND_POINT_GRAPHICS, __vulkan.animate_tex_2d_pipeline_set.pipeline);
+        __vulkan.load_instance_and_device();
+        __vulkan.vkd.?.cmdBindPipeline(cmd, .graphics, __vulkan.animate_tex_2d_pipeline_set.pipeline);
 
-        vk.vkCmdBindDescriptorSets(
+        __vulkan.vkd.?.cmdBindDescriptorSets(
             cmd,
-            vk.VK_PIPELINE_BIND_POINT_GRAPHICS,
+            .graphics,
             __vulkan.animate_tex_2d_pipeline_set.pipelineLayout,
             0,
             2,
-            &[_]vk.VkDescriptorSet{ self.*.__set.__set, self.*.src.*.__set.__set },
+            &[_]vk.DescriptorSet{ self.*.__set.__set, self.*.src.*.__set.__set },
             0,
             null,
         );
 
-        vk.vkCmdDraw(cmd, 6, 1, 0, 0);
+        __vulkan.vkd.?.cmdDraw(cmd, 6, 1, 0, 0);
     }
     pub fn init(_src: *texture_array) Self {
         const self = Self{
@@ -1075,23 +1103,24 @@ pub const tile_image = struct {
 
         self.*.update();
     }
-    pub fn __draw(self: *Self, cmd: vk.VkCommandBuffer) void {
+    pub fn __draw(self: *Self, cmd: vk.CommandBuffer) void {
         self.*.transform.__check_init.check_inited();
         self.*.src.*.__check_init.check_inited();
-        vk.vkCmdBindPipeline(cmd, vk.VK_PIPELINE_BIND_POINT_GRAPHICS, __vulkan.animate_tex_2d_pipeline_set.pipeline);
+        __vulkan.load_instance_and_device();
+        __vulkan.vkd.?.cmdBindPipeline(cmd, .graphics, __vulkan.animate_tex_2d_pipeline_set.pipeline);
 
-        vk.vkCmdBindDescriptorSets(
+        __vulkan.vkd.?.cmdBindDescriptorSets(
             cmd,
-            vk.VK_PIPELINE_BIND_POINT_GRAPHICS,
+            .graphics,
             __vulkan.animate_tex_2d_pipeline_set.pipelineLayout,
             0,
             2,
-            &[_]vk.VkDescriptorSet{ self.*.__set.__set, self.*.src.*.__set.__set },
+            &[_]vk.DescriptorSet{ self.*.__set.__set, self.*.src.*.__set.__set },
             0,
             null,
         );
 
-        vk.vkCmdDraw(cmd, 6, 1, 0, 0);
+        __vulkan.vkd.?.cmdDraw(cmd, 6, 1, 0, 0);
     }
     pub fn init(_tile_idx: u32, _src: *tile_texture_array) Self {
         const self = Self{

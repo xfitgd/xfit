@@ -52,17 +52,17 @@ var render_thread_sem: std.Thread.Semaphore = .{};
 ///X를 직접 눌러 껏을땐 false exit 호출시 true
 var manual_window_destroyed: bool = false;
 
-pub fn vulkan_windows_start(vkInstance: __vulkan.vk.VkInstance, vkSurface: *__vulkan.vk.VkSurfaceKHR) void {
-    if (vkSurface.* != null) {
-        __vulkan.vk.vkDestroySurfaceKHR(vkInstance, vkSurface.*, null);
+pub fn vulkan_windows_start(vkSurface: *__vulkan.vk.SurfaceKHR) void {
+    __vulkan.load_instance_and_device();
+    if (vkSurface.* != .null_handle) {
+        __vulkan.vki.?.destroySurfaceKHR(vkSurface.*, null);
     }
-    const win32SurfaceCreateInfo: __vulkan.vk.VkWin32SurfaceCreateInfoKHR = .{
-        .hwnd = hWnd,
-        .hinstance = hInstance,
-        .flags = 0,
+    const win32SurfaceCreateInfo: __vulkan.vk.Win32SurfaceCreateInfoKHR = .{
+        .hwnd = @ptrCast(hWnd),
+        .hinstance = @ptrCast(hInstance),
     };
-    const result = __vulkan.vk.vkCreateWin32SurfaceKHR(vkInstance, &win32SurfaceCreateInfo, null, vkSurface);
-    xfit.herr(result == __vulkan.vk.VK_SUCCESS, "vulkan_windows_start.vkCreateWin32SurfaceKHR {d}", .{result});
+    vkSurface.* = __vulkan.vki.?.createWin32SurfaceKHR(&win32SurfaceCreateInfo, null) catch |e|
+        xfit.herr3("vulkan_windows_startCreateWin32SurfaceKHR", e);
 }
 
 pub fn system_windows_start() void {
@@ -178,23 +178,23 @@ pub fn windows_start() void {
     var window_height: u32 = __system.init_set.window_height;
 
     if (__system.init_set.screen_mode != xfit.screen_mode.WINDOW) {
-        if (__system.init_set.screen_index == xfit.init_setting.PRIMARY_SCREEN_INDEX) {
-            window_x = __system.primary_monitor.*.rect.left;
-            window_y = __system.primary_monitor.*.rect.top;
-            window_width = @intCast(__system.primary_monitor.*.rect.width());
-            window_height = @intCast(__system.primary_monitor.*.rect.height());
-            if (__system.init_set.screen_mode == xfit.screen_mode.FULLSCREEN) {
-                change_fullscreen(__system.primary_monitor, __system.primary_monitor.*.primary_resolution.?);
+        if (__system.monitors.items.len <= __system.init_set.screen_index) {
+            var i: u32 = 0;
+            for (__system.monitors.items) |e| {
+                if (e.__hmonitor == __system.primary_monitor.*.__hmonitor) {
+                    __system.init_set.screen_index = i;
+                    break;
+                }
+                i += 1;
             }
-        } else {
-            if (__system.monitors.items.len <= __system.init_set.screen_index) __system.init_set.screen_index = @intCast(__system.monitors.items.len - 1);
-            window_x = __system.monitors.items[__system.init_set.screen_index].rect.left;
-            window_y = __system.monitors.items[__system.init_set.screen_index].rect.top;
-            window_width = @intCast(__system.monitors.items[__system.init_set.screen_index].rect.width());
-            window_height = @intCast(__system.monitors.items[__system.init_set.screen_index].rect.height());
-            if (__system.init_set.screen_mode == xfit.screen_mode.FULLSCREEN) {
-                change_fullscreen(&__system.monitors.items[__system.init_set.screen_index], __system.monitors.items[__system.init_set.screen_index].primary_resolution.?);
-            }
+            if (i == __system.monitors.items.len) xfit.herrm("__windows i == __system.monitors.items.len");
+        }
+        window_x = __system.monitors.items[__system.init_set.screen_index].rect.left;
+        window_y = __system.monitors.items[__system.init_set.screen_index].rect.top;
+        window_width = @intCast(__system.monitors.items[__system.init_set.screen_index].rect.width());
+        window_height = @intCast(__system.monitors.items[__system.init_set.screen_index].rect.height());
+        if (__system.init_set.screen_mode == xfit.screen_mode.FULLSCREEN) {
+            change_fullscreen(&__system.monitors.items[__system.init_set.screen_index], __system.monitors.items[__system.init_set.screen_index].primary_resolution.?);
         }
         __system.prev_window = .{
             .x = window_x,

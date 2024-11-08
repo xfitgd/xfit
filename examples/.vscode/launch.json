@@ -10,6 +10,15 @@
             "console": "integratedTerminal",
             "preLaunchTask": "build zig"
         },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug (Linux)",
+            "program": "${workspaceFolder}/zig-out/bin/XfitTest",
+            "args": [],
+            "cwd": "${workspaceFolder}/assets",
+            "preLaunchTask": "build zig",
+        },
         //Use CodeLLDB and Android Debug https://marketplace.visualstudio.com/items?itemName=nisargjhaveri.android-debug
         {
             "name": "Android",

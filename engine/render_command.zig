@@ -20,7 +20,7 @@ const __render_command = @import("__render_command.zig");
 pub const MAX_FRAME: usize = 3;
 
 __refesh: [MAX_FRAME]bool = .{true} ** MAX_FRAME,
-__command_buffers: [MAX_FRAME][]vk.VkCommandBuffer = undefined,
+__command_buffers: [MAX_FRAME][]vk.CommandBuffer = undefined,
 scene: ?[]*graphics.iobject = null,
 const Self = @This();
 
@@ -28,23 +28,19 @@ pub fn init() *Self {
     const self = __system.allocator.create(Self) catch
         xfit.herrm("__system.allocator.create render_command");
     self.* = .{};
+    __vulkan.load_instance_and_device();
     for (&self.*.__command_buffers) |*cmd| {
-        cmd.* = __system.allocator.alloc(vk.VkCommandBuffer, __vulkan.get_swapchain_image_length()) catch
+        cmd.* = __system.allocator.alloc(vk.CommandBuffer, __vulkan.get_swapchain_image_length()) catch
             xfit.herrm("render_command.__command_buffers.alloc");
 
-        const allocInfo: vk.VkCommandBufferAllocateInfo = .{
-            .commandPool = __vulkan.vkCommandPool,
-            .level = vk.VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-            .commandBufferCount = @intCast(__vulkan.get_swapchain_image_length()),
-            .sType = vk.VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+        const allocInfo: vk.CommandBufferAllocateInfo = .{
+            .command_pool = __vulkan.vkCommandPool,
+            .level = .primary,
+            .command_buffer_count = @intCast(__vulkan.get_swapchain_image_length()),
         };
 
-        const result = vk.vkAllocateCommandBuffers(
-            __vulkan.vkDevice,
-            &allocInfo,
-            cmd.*.ptr,
-        );
-        xfit.herr(result == vk.VK_SUCCESS, "render_command vkAllocateCommandBuffers vkCommandPool : {d}", .{result});
+        __vulkan.vkd.?.allocateCommandBuffers(&allocInfo, cmd.*.ptr) catch |e|
+            xfit.herr3("render_command vkAllocateCommandBuffers vkCommandPool", e);
     }
     __render_command.mutex.lock();
     __render_command.render_cmd_list.?.append(self) catch xfit.herrm(" render_cmd_list.append(&self)");
@@ -52,8 +48,9 @@ pub fn init() *Self {
     return self;
 }
 pub fn deinit(self: *Self) void {
+    __vulkan.load_instance_and_device();
     for (&self.__command_buffers) |*cmd| {
-        vk.vkFreeCommandBuffers(__vulkan.vkDevice, __vulkan.vkCommandPool, @intCast(__vulkan.get_swapchain_image_length()), cmd.*.ptr);
+        __vulkan.vkd.?.freeCommandBuffers(__vulkan.vkCommandPool, @intCast(__vulkan.get_swapchain_image_length()), cmd.*.ptr);
         __system.allocator.free(cmd.*);
     }
     var i: usize = 0;

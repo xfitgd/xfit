@@ -139,21 +139,21 @@ pub fn xfit_init() !void {
     defer allocator.free(data);
     var img_decoder: webp = .{};
     defer img_decoder.deinit();
-    img_decoder.load_header(data) catch |e| xfit.herr3("test.webp loadheader fail", e);
+    img_decoder.load_header(data, image_util.color_format.default()) catch |e| xfit.herr3("test.webp loadheader fail", e);
 
     image_src = graphics.texture.init();
     const image_pixels = try allocator.alloc(u8, img_decoder.width() * img_decoder.height() * 4);
-    img_decoder.decode(.RGBA, data, image_pixels) catch |e| xfit.herr3("test.webp decode", e);
+    img_decoder.decode(data, image_pixels) catch |e| xfit.herr3("test.webp decode", e);
     image_src.build(img_decoder.width(), img_decoder.height(), image_pixels);
 
     const anim_data = file_.read_file("wasp.webp", allocator) catch |e| xfit.herr3("wasp.webp read_file", e);
     defer allocator.free(anim_data);
-    img_decoder.load_anim_header(anim_data) catch |e| xfit.herr3("wasp.webp load_anim_header fail", e);
+    img_decoder.load_anim_header(anim_data, image_util.color_format.default()) catch |e| xfit.herr3("wasp.webp load_anim_header fail", e);
 
     anim_image_src = graphics.texture_array.init();
     anim_image_src.sampler = graphics.get_default_nearest_sampler();
     const anim_pixels = try allocator.alloc(u8, img_decoder.size(.RGBA));
-    img_decoder.decode(.RGBA, data, anim_pixels) catch |e| xfit.herr3("wasp.webp decode", e);
+    img_decoder.decode(data, anim_pixels) catch |e| xfit.herr3("wasp.webp decode", e);
     anim_image_src.build(img_decoder.width(), img_decoder.height(), img_decoder.frame_count(), anim_pixels);
 
     img.* = .{ ._image = graphics.image.init(&image_src) };

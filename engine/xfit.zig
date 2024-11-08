@@ -90,11 +90,29 @@ pub fn xfit_main(_allocator: std.mem.Allocator, _init_setting: *const init_setti
                 herr3("xfit_destroy", e);
             };
         } else {
+            __linux.system_linux_start();
+            __linux.linux_start();
             __vulkan.vulkan_start();
 
             root.xfit_init() catch |e| {
                 herr3("xfit_init", e);
             };
+
+            __linux.linux_loop();
+
+            root.xfit_destroy() catch |e| {
+                herr3("xfit_destroy", e);
+            };
+
+            __vulkan.vulkan_destroy();
+            __linux.linux_destroy();
+            __system.destroy();
+
+            root.xfit_clean() catch |e| {
+                herr3("xfit_clean", e);
+            };
+
+            __system.real_destroy();
         }
     } else {
         @compileError("not support platform");
@@ -124,7 +142,7 @@ pub inline fn herr(errtest: bool, comptime fmt: []const u8, args: anytype) void 
     }
 }
 
-pub inline fn herr3(funcion_name: []const u8, err: anytype) void {
+pub inline fn herr3(funcion_name: []const u8, err: anyerror) void {
     print_error("ERR {s} {s}\n", .{ funcion_name, @errorName(err) });
     unreachable;
 }
@@ -261,10 +279,22 @@ pub inline fn sleep(ns: u64) void {
 }
 
 pub inline fn console_pause() void {
-    _ = __system._system("pause");
+    if (platform == .windows) {
+        _ = __system._system("pause");
+    } else if (platform == .linux) {
+        const conio_c = @cImport({
+            @cInclude("conio.h");
+        });
+        write("Press any key to continue...\n");
+        _ = conio_c.getch();
+    }
 }
 pub inline fn console_cls() void {
-    _ = __system._system("cls");
+    if (platform == .windows) {
+        _ = __system._system("cls");
+    } else if (platform == .linux) {
+        _ = __system._system("clear");
+    }
 }
 pub fn exit() void {
     if (subsystem == .Console) {
