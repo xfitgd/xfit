@@ -44,7 +44,6 @@ pub fn build(b: *std.Build) void {
         .callback = callback,
         .is_console = EXAMPLE == .CONSOLE,
         .ANDROID_KEYSTORE = "debug.keystore",
-        .enable_log = false,
     };
     xfit_build.run(b, option);
 }
