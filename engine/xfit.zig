@@ -347,7 +347,7 @@ pub const init_setting = struct {
     ///nanosec 단위 1프레임당 1sec = 1000000000 nanosec
     maxframe: u64 = 0,
     refleshrate: u32 = 0,
-    vSync: bool = false,
+    vSync: bool = true,
 };
 
 ///nanosec 1 / 1000000000 sec

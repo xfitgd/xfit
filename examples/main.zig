@@ -426,7 +426,6 @@ pub fn main() !void {
         .window_width = 640,
         .window_height = 480,
         .use_console = true,
-        .vSync = true,
     };
     gpa = std.heap.GeneralPurposeAllocator(.{}).init;
     allocator = gpa.allocator(); //must init in main
