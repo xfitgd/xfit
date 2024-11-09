@@ -116,13 +116,13 @@ pub const multi_player = struct {
 pub const player = struct {
     obj: animate_object,
     playing: bool = false,
-    target_fps: f32 = 30,
-    __playing_dt: f32 = 0,
+    target_fps: f64 = 30,
+    __playing_dt: f64 = 0,
     loop: bool = true,
 
     pub fn update(self: *player, _dt: f64) void {
         if (self.*.playing) {
-            const dt: f32 = @floatCast(_dt);
+            const dt: f64 = _dt;
             self.*.__playing_dt += dt;
             while (self.*.__playing_dt >= 1 / self.*.target_fps) : (self.*.__playing_dt -= 1 / self.*.target_fps) {
                 if (self.*.loop or self.*.obj.cur_frame() < self.*.obj.get_tex_count_build() - 1) {

@@ -255,7 +255,12 @@ fn chooseSwapSurfaceFormat(availableFormats: []vk.SurfaceFormatKHR) vk.SurfaceFo
 fn chooseSwapPresentMode(availablePresentModes: []vk.PresentModeKHR, _vSync: bool) vk.PresentModeKHR {
     if (_vSync) return vk.PresentModeKHR.fifo_khr;
     for (availablePresentModes) |value| {
-        if (value == vk.PresentModeKHR.immediate_khr) { //VK_PRESENT_MODE_MAILBOX_KHR
+        if (value == vk.PresentModeKHR.mailbox_khr) {
+            return value;
+        }
+    }
+    for (availablePresentModes) |value| {
+        if (value == vk.PresentModeKHR.immediate_khr) {
             return value;
         }
     }

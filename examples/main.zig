@@ -343,7 +343,7 @@ fn move_callback() !bool {
     dx += 1;
     if (dx >= 200) {
         dx = 0;
-        //xfit.print("{d}\n", .{system.dt()});
+        xfit.print("{d}\n", .{xfit.dt()});
     }
     update_mutex.unlock();
 
@@ -426,6 +426,7 @@ pub fn main() !void {
         .window_width = 640,
         .window_height = 480,
         .use_console = true,
+        .vSync = true,
     };
     gpa = std.heap.GeneralPurposeAllocator(.{}).init;
     allocator = gpa.allocator(); //must init in main

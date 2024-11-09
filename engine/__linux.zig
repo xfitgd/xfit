@@ -3,6 +3,7 @@ const xfit = @import("xfit.zig");
 const system = @import("system.zig");
 const window = @import("window.zig");
 const input = @import("input.zig");
+const math = @import("math.zig");
 const __system = @import("__system.zig");
 const __vulkan = @import("__vulkan.zig");
 const __vulkan_allocator = @import("__vulkan_allocator.zig");
@@ -13,12 +14,13 @@ pub const c = @cImport({
     @cDefine("XK_MISCELLANY", "1");
     @cInclude("X11/Xlib.h");
     @cInclude("X11/keysym.h");
+    @cInclude("X11/extensions/Xrandr.h");
 });
 
 pub var display: ?*c.Display = null;
 pub var def_screen_idx: usize = 0;
 pub var wnd: c.Window = 0;
-pub var screens: []?*c.Screen = undefined;
+pub var screens: ?*c.XRRScreenResources = undefined;
 pub var del_window: c.Atom = undefined;
 
 var input_thread: std.Thread = undefined;
@@ -27,10 +29,26 @@ pub fn system_linux_start() void {
     display = c.XOpenDisplay(null);
     if (display == null) xfit.herrm("system_linux_start XOpenDisplay");
     def_screen_idx = @max(0, c.DefaultScreen(display));
-    screens = std.heap.c_allocator.alloc(?*c.Screen, @max(0, c.ScreenCount(display))) catch unreachable;
+    screens = c.XRRGetScreenResources(display, c.DefaultRootWindow(display));
+
     var i: usize = 0;
-    while (i < screens.len) : (i += 1) {
-        screens[i] = c.ScreenOfDisplay(display, i);
+    while (i < screens.?.*.ncrtc) : (i += 1) {
+        const crtc_info = c.XRRGetCrtcInfo(display, screens, screens.?.*.crtcs[i]);
+        defer c.XRRFreeCrtcInfo(crtc_info);
+
+        __system.monitors.append(system.monitor_info{
+            .is_primary = i == def_screen_idx,
+            .rect = math.recti.init(
+                crtc_info.*.x,
+                crtc_info.*.x + @as(c_int, @intCast(crtc_info.*.width)),
+                crtc_info.*.y,
+                crtc_info.*.y + @as(c_int, @intCast(crtc_info.*.height)),
+            ),
+            .resolutions = std.ArrayList(system.screen_info).init(std.heap.c_allocator),
+        }) catch |e| xfit.herr3("MonitorEnumProc __system.monitors.append", e);
+        const last = &__system.monitors.items[__system.monitors.items.len - 1];
+        if (last.*.is_primary) __system.primary_monitor = last;
+        //TODO resolutions add and primary_resolution
     }
 }
 
@@ -65,7 +83,7 @@ pub fn linux_start() void {
     if (__system.init_set.window_x == xfit.init_setting.DEF_POS) __system.init_set.window_x = 0;
     if (__system.init_set.window_y == xfit.init_setting.DEF_POS) __system.init_set.window_y = 0;
 
-    if (__system.init_set.screen_index > screens.len - 1) __system.init_set.screen_index = @intCast(def_screen_idx);
+    if (__system.init_set.screen_index > screens.?.*.ncrtc - 1) __system.init_set.screen_index = @intCast(def_screen_idx);
 
     wnd = c.XCreateWindow(
         display,
@@ -81,7 +99,7 @@ pub fn linux_start() void {
         0,
         null,
     );
-    _ = c.XSelectInput(display, wnd, c.KeyPressMask | c.KeyReleaseMask | c.ButtonReleaseMask | c.ButtonPressMask | c.StructureNotifyMask);
+    _ = c.XSelectInput(display, wnd, c.KeyPressMask | c.KeyReleaseMask | c.ButtonReleaseMask | c.ButtonPressMask | c.PointerMotionMask | c.StructureNotifyMask);
     _ = c.XMapWindow(display, wnd);
     del_window = c.XInternAtom(display, "WM_DELETE_WINDOW", 0);
     _ = c.XSetWMProtocols(display, wnd, &del_window, 1);
@@ -111,9 +129,11 @@ pub fn linux_loop() void {
             c.ConfigureNotify => {
                 const w = window.window_width();
                 const h = window.window_height();
+                const x = window.window_x();
+                const y = window.window_y();
                 if (w != event.xconfigure.width or h != event.xconfigure.height) {
-                    @atomicStore(u32, &__system.init_set.window_width, @abs(event.xconfigure.width), std.builtin.AtomicOrder.monotonic);
-                    @atomicStore(u32, &__system.init_set.window_height, @abs(event.xconfigure.height), std.builtin.AtomicOrder.monotonic);
+                    @atomicStore(u32, &__system.init_set.window_width, @abs(event.xconfigure.width), .monotonic);
+                    @atomicStore(u32, &__system.init_set.window_height, @abs(event.xconfigure.height), .monotonic);
 
                     if (__system.loop_start.load(.monotonic)) {
                         root.xfit_size() catch |e| {
@@ -121,6 +141,12 @@ pub fn linux_loop() void {
                         };
                         __system.size_update.store(true, .monotonic);
                     }
+                }
+                if (x != event.xconfigure.x or y != event.xconfigure.y) {
+                    @atomicStore(i32, &__system.init_set.window_x, event.xconfigure.x, .monotonic);
+                    @atomicStore(i32, &__system.init_set.window_y, event.xconfigure.y, .monotonic);
+
+                    system.a_fn_call(__system.window_move_func, .{}) catch {};
                 }
             },
             c.ClientMessage => {
@@ -163,6 +189,46 @@ pub fn linux_loop() void {
                 //xfit.print_debug("input key_up {d}", .{wParam});
                 system.a_fn_call(__system.key_up_func, .{key}) catch {};
             },
+            c.ButtonPress, c.ButtonRelease => |e| {
+                switch (event.xbutton.button) {
+                    1 => {
+                        __system.Lmouse_click.store(e == c.ButtonPress, std.builtin.AtomicOrder.monotonic);
+                        const mm = input.convert_set_mouse_pos(.{ @floatFromInt(event.xbutton.x), @floatFromInt(event.xbutton.y) });
+                        system.a_fn_call(if (e == c.ButtonPress) __system.Lmouse_down_func else __system.Lmouse_up_func, .{mm}) catch {};
+                    },
+                    2 => {
+                        __system.Mmouse_click.store(e == c.ButtonPress, std.builtin.AtomicOrder.monotonic);
+                        const mm = input.convert_set_mouse_pos(.{ @floatFromInt(event.xbutton.x), @floatFromInt(event.xbutton.y) });
+                        system.a_fn_call(if (e == c.ButtonPress) __system.Mmouse_down_func else __system.Mmouse_up_func, .{mm}) catch {};
+                    },
+                    3 => {
+                        __system.Rmouse_click.store(e == c.ButtonPress, std.builtin.AtomicOrder.monotonic);
+                        const mm = input.convert_set_mouse_pos(.{ @floatFromInt(event.xbutton.x), @floatFromInt(event.xbutton.y) });
+                        system.a_fn_call(if (e == c.ButtonPress) __system.Rmouse_down_func else __system.Rmouse_up_func, .{mm}) catch {};
+                    },
+                    //8 => {}, Back
+                    //9 => {}, Front
+                    else => {},
+                }
+            },
+            c.MotionNotify => {
+                const w = window.window_width();
+                const h = window.window_height();
+                const mm = input.convert_set_mouse_pos(.{ @floatFromInt(event.xmotion.x), @floatFromInt(event.xmotion.y) });
+                @atomicStore(f64, @as(*f64, @ptrCast(&__system.cursor_pos)), @bitCast(mm), .monotonic);
+                if (input.is_mouse_out()) {
+                    if (event.xmotion.x >= 0 and event.xmotion.y >= 0 and event.xmotion.x <= w and event.xmotion.y <= h) {
+                        __system.mouse_out.store(false, .monotonic);
+                        system.a_fn_call(__system.mouse_hover_func, .{}) catch {};
+                    }
+                } else {
+                    if (event.xmotion.x < 0 or event.xmotion.y < 0 or event.xmotion.x > w or event.xmotion.y > h) {
+                        __system.mouse_out.store(true, .monotonic);
+                        system.a_fn_call(__system.mouse_leave_func, .{}) catch {};
+                    }
+                }
+                system.a_fn_call(__system.mouse_move_func, .{mm}) catch {};
+            },
             else => {},
         }
     }
@@ -184,5 +250,5 @@ pub fn linux_destroy() void {
     _ = c.XDestroyWindow(display, wnd);
     _ = c.XCloseDisplay(display);
 
-    std.heap.c_allocator.free(screens);
+    c.XRRFreeScreenResources(screens);
 }

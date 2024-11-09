@@ -179,9 +179,8 @@ pub fn loop() void {
         S.now = S.start;
         loop_start.store(true, .monotonic);
     } else {
-        const n = std.time.Instant.now() catch |e| xfit.herr3(" const n = std.time.Instant.now()", e);
+        var n = std.time.Instant.now() catch |e| xfit.herr3(" const n = std.time.Instant.now()", e);
         var _delta_time = n.since(S.now);
-        S.now = n;
         @atomicStore(u64, &program_time, n.since(S.start), .monotonic);
         var maxframe: u64 = xfit.get_maxframe_u64();
 
@@ -198,8 +197,10 @@ pub fn loop() void {
                     xfit.sleep(maxf - _delta_time);
                 }
             }
-            _delta_time = maxf;
+            n = std.time.Instant.now() catch |e| xfit.herr3(" const n = std.time.Instant.now()", e);
+            _delta_time = n.since(S.now);
         }
+        S.now = n;
         @atomicStore(u64, &delta_time, _delta_time, .monotonic);
     }
     root.xfit_update() catch |e| {

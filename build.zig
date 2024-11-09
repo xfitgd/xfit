@@ -151,6 +151,7 @@ pub fn run(
         "libavif.a",
         "libz.so",
         "libX11.so",
+        "libXrandr.so",
     };
 
     var i: usize = 0;

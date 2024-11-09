@@ -661,3 +661,6 @@ pub fn convert_mouse_pos(mouse_pos: math.point) math.point {
     const mm = math.point{ mx - w, -my + h };
     return mm;
 }
+pub inline fn is_mouse_out() bool {
+    return __system.mouse_out.load(.monotonic);
+}
