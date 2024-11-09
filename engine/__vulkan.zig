@@ -244,26 +244,38 @@ fn chooseSwapExtent(capabilities: vk.SurfaceCapabilitiesKHR) vk.Extent2D {
 
 fn chooseSwapSurfaceFormat(availableFormats: []vk.SurfaceFormatKHR) vk.SurfaceFormatKHR {
     for (availableFormats) |value| {
-        if (value.format == .r8g8b8a8_srgb and value.color_space == .srgb_nonlinear_khr) return value;
+        if (value.format == .r8g8b8a8_srgb and value.color_space == .srgb_nonlinear_khr) {
+            xfit.print_log("XFIT SYSLOG : vulkan swapchain format : {}, colorspace : {}\n", .{ value.format, value.color_space });
+            return value;
+        }
     }
     for (availableFormats) |value| {
-        if (__vulkan_allocator.texture_format.__has_color(value.format) != null) return value;
+        if (__vulkan_allocator.texture_format.__has_color(value.format) != null) {
+            xfit.print_log("XFIT SYSLOG : vulkan swapchain format : {}, colorspace : {}\n", .{ value.format, value.color_space });
+            return value;
+        }
     }
     xfit.herrm("chooseSwapSurfaceFormat unsupported");
 }
 
 fn chooseSwapPresentMode(availablePresentModes: []vk.PresentModeKHR, _vSync: bool) vk.PresentModeKHR {
-    if (_vSync) return vk.PresentModeKHR.fifo_khr;
+    if (_vSync) {
+        xfit.write_log("XFIT SYSLOG : vulkan present mode fifo_khr vsync default\n");
+        return vk.PresentModeKHR.fifo_khr;
+    }
     for (availablePresentModes) |value| {
         if (value == vk.PresentModeKHR.mailbox_khr) {
+            xfit.write_log("XFIT SYSLOG : vulkan present mode mailbox_khr\n");
             return value;
         }
     }
     for (availablePresentModes) |value| {
         if (value == vk.PresentModeKHR.immediate_khr) {
+            xfit.write_log("XFIT SYSLOG : vulkan present mode immediate_khr\n");
             return value;
         }
     }
+    xfit.write_log("XFIT SYSLOG : vulkan present mode fifo_khr other not supported so default\n");
     return vk.PresentModeKHR.fifo_khr;
 }
 inline fn create_frag_shader_state(frag_module: vk.ShaderModule) vk.PipelineShaderStageCreateInfo {
@@ -343,6 +355,7 @@ pub var surfaceCap: vk.SurfaceCapabilitiesKHR = undefined;
 
 var formats: []vk.SurfaceFormatKHR = undefined;
 pub var format: vk.SurfaceFormatKHR = undefined;
+pub var presentMode: vk.PresentModeKHR = undefined;
 
 pub var linear_sampler: vk.Sampler = undefined;
 pub var nearest_sampler: vk.Sampler = undefined;
@@ -360,7 +373,7 @@ const apis: []const vk.ApiInfo = &.{
     //vk.features.version_1_1,
     vk.extensions.khr_surface,
     vk.extensions.khr_swapchain,
-    vk.extensions.ext_debug_utils,
+    if (xfit.dbg) vk.extensions.ext_debug_utils else .{},
     vk.extensions.ext_full_screen_exclusive,
     //vk.extensions.khr_get_surface_capabilities_2,
     vk.extensions.khr_swapchain,
@@ -880,6 +893,8 @@ pub fn vulkan_start() void {
 
         if (validation_layer_support and xfit.dbg) {
             extension_names.append(vk.extensions.ext_debug_utils.name.ptr) catch |e| xfit.herr3("vulkan_start.extension_names.append(vk.VK_EXT_DEBUG_UTILS_EXTENSION_NAME)", e);
+
+            xfit.write_log("XFIT SYSLOG : vulkan validation layer enable\n");
         } else {
             validation_layer_support = false;
         }
@@ -917,7 +932,7 @@ pub fn vulkan_start() void {
         vki = Instance.init(vkInstance, &instance_wrap);
     }
 
-    if (validation_layer_support) {
+    if (validation_layer_support and xfit.dbg) {
         const create_info = vk.DebugUtilsMessengerCreateInfoEXT{
             .message_severity = .{ .verbose_bit_ext = true, .warning_bit_ext = true, .error_bit_ext = true },
             .message_type = .{ .general_bit_ext = true, .validation_bit_ext = true, .performance_bit_ext = true },
@@ -998,11 +1013,11 @@ pub fn vulkan_start() void {
     {
         var deviceExtensionCount: u32 = 0;
         _ = vki.?.enumerateDeviceExtensionProperties(vk_physical_device, null, &deviceExtensionCount, null) catch |e|
-            xfit.herr3("__vulkan_start createDebugUtilsMessengerEXT", e);
+            xfit.herr3("__vulkan_start enumerateDeviceExtensionProperties", e);
         const extensions = std.heap.c_allocator.alloc(vk.ExtensionProperties, deviceExtensionCount) catch xfit.herrm("vulkan_start extensions alloc");
         defer std.heap.c_allocator.free(extensions);
         _ = vki.?.enumerateDeviceExtensionProperties(vk_physical_device, null, &deviceExtensionCount, extensions.ptr) catch |e|
-            xfit.herr3("__vulkan_start createDebugUtilsMessengerEXT", e);
+            xfit.herr3("__vulkan_start enumerateDeviceExtensionProperties", e);
 
         var device_extension_names = ArrayList([*:0]const u8).init(std.heap.c_allocator);
         defer device_extension_names.deinit();
@@ -1059,7 +1074,7 @@ pub fn vulkan_start() void {
 
     __vulkan_allocator.init();
 
-    create_swapchain_and_imageviews();
+    create_swapchain_and_imageviews(true);
 
     var sampler_info: vk.SamplerCreateInfo = .{
         .address_mode_u = .repeat,
@@ -1619,7 +1634,7 @@ pub fn vulkan_destroy() void {
 
     vkd.?.destroyDevice(null);
 
-    if (vkDebugMessenger != .null_handle) {
+    if (vkDebugMessenger != .null_handle and xfit.dbg) {
         vki.?.destroyDebugUtilsMessengerEXT(vkDebugMessenger, null);
     }
     vki.?.destroyInstance(null);
@@ -1813,7 +1828,7 @@ pub fn refresh_pre_matrix() void {
     }
 }
 
-fn create_swapchain_and_imageviews() void {
+fn create_swapchain_and_imageviews(comptime program_start: bool) void {
     var formatCount: u32 = 0;
     _ = vki.?.getPhysicalDeviceSurfaceFormatsKHR(vk_physical_device, vkSurface, &formatCount, null) catch unreachable;
     xfit.herrm2(formatCount != 0, "__vulkan.create_swapchain_and_imageviews.formatCount 0");
@@ -1867,8 +1882,10 @@ fn create_swapchain_and_imageviews() void {
         @atomicStore(u32, &__system.init_set.window_height, @intCast(vkExtent.height), std.builtin.AtomicOrder.monotonic);
     }
 
-    format = chooseSwapSurfaceFormat(formats);
-    const presentMode = chooseSwapPresentMode(presentModes, __system.init_set.vSync);
+    if (program_start) {
+        format = chooseSwapSurfaceFormat(formats);
+        presentMode = chooseSwapPresentMode(presentModes, __system.init_set.vSync);
+    }
 
     var imageCount = surfaceCap.min_image_count + 1;
     if (surfaceCap.max_image_count > 0 and imageCount > surfaceCap.max_image_count) {
@@ -2018,7 +2035,7 @@ pub fn recreate_swapchain() void {
     }
 
     cleanup_swapchain();
-    create_swapchain_and_imageviews();
+    create_swapchain_and_imageviews(false);
     if (vkExtent.width <= 0 or vkExtent.height <= 0) {
         fullscreen_mutex.unlock();
 

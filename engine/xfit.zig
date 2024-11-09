@@ -42,6 +42,7 @@ pub const XfitPlatform = @TypeOf(platform);
 pub const SubSystem = @TypeOf(subsystem);
 
 pub const dbg = builtin.mode == .Debug;
+pub const enable_log: bool = @import("build_options").enable_log;
 
 pub const __android_entry = if (platform == .android) __android.android.ANativeActivity_createFunc else {};
 //
@@ -203,6 +204,14 @@ pub fn write(_str: []const u8) void {
         defer std.heap.c_allocator.free(str);
         _ = __android.android.__android_log_write(__android.android.ANDROID_LOG_VERBOSE, "xfit", str.ptr);
     }
+}
+pub inline fn print_log(comptime fmt: []const u8, args: anytype) void {
+    if (!enable_log) return;
+    print(fmt, args);
+}
+pub fn write_log(_str: []const u8) void {
+    if (!enable_log) return;
+    write(_str);
 }
 pub fn print_with_time(comptime fmt: []const u8, args: anytype) void {
     const now_str = datetime.Datetime.now().formatHttp(std.heap.c_allocator) catch return;

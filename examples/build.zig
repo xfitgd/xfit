@@ -7,7 +7,7 @@ const xfit_build = @import("xfit_build");
 //x86_64-windows(linux)
 // android platform need AndroidManifest.xml, keystore, (assets, res) folder in user project folder
 const PLATFORM = xfit_build.XfitPlatform.linux;
-const OPTIMIZE = std.builtin.OptimizeMode.Debug;
+const OPTIMIZE = std.builtin.OptimizeMode.ReleaseFast;
 
 const EXAMPLE: EXAMPLES = EXAMPLES.GRAPHICS2D;
 //*
@@ -44,6 +44,7 @@ pub fn build(b: *std.Build) void {
         .callback = callback,
         .is_console = EXAMPLE == .CONSOLE,
         .ANDROID_KEYSTORE = "debug.keystore",
+        .enable_log = false,
     };
     xfit_build.run(b, option);
 }

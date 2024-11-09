@@ -19,7 +19,7 @@ pub const XfitPlatform = enum(u32) {
 //* User Setting
 //크로스 플랫폼 빌드시 zig build -Dtarget=aarch64-windows(linux)
 //x86_64-windows(linux)
-const ANDROID_PATH = "C:/Android";
+const ANDROID_PATH = "/usr/local/Android";
 const ANDROID_NDK_PATH = std.fmt.comptimePrint("{s}/ndk/27.2.12479018", .{ANDROID_PATH});
 const ANDROID_VER = 35;
 const ANDROID_BUILD_TOOL_VER = "35.0.0";
@@ -55,6 +55,7 @@ pub const run_option = struct {
     callback: ?*const fn (*std.Build, *std.Build.Step.Compile, std.Build.ResolvedTarget) void = null,
     is_console: bool = false, //ignores for target mobile
     ANDROID_KEYSTORE: ?[]const u8 = null,
+    enable_log: bool = true,
 };
 
 pub fn run(
@@ -86,6 +87,7 @@ pub fn run(
 
     build_options.addOption(XfitPlatform, "platform", option.PLATFORM);
     build_options.addOption(std.Target.SubSystem, "subsystem", if (option.is_console) .Console else .Windows);
+    build_options.addOption(bool, "enable_log", option.enable_log);
 
     const arch_text = comptime [_][]const u8{
         "aarch64-linux-android",
