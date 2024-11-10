@@ -31,7 +31,7 @@ pub fn system_linux_start() void {
     def_screen_idx = @max(0, c.DefaultScreen(display));
     screens = c.XRRGetScreenResources(display, c.DefaultRootWindow(display));
 
-    var i: usize = 0;
+    var i: c_uint = 0;
     while (i < screens.?.*.ncrtc) : (i += 1) {
         const crtc_info = c.XRRGetCrtcInfo(display, screens, screens.?.*.crtcs[i]);
         defer c.XRRFreeCrtcInfo(crtc_info);
@@ -48,6 +48,9 @@ pub fn system_linux_start() void {
         }) catch |e| xfit.herr3("MonitorEnumProc __system.monitors.append", e);
         const last = &__system.monitors.items[__system.monitors.items.len - 1];
         if (last.*.is_primary) __system.primary_monitor = last;
+
+        var j: c_uint = 0;
+        while (j < crtc_info.*.noutput) : (j += 1) {}
         //TODO resolutions add and primary_resolution
     }
 }

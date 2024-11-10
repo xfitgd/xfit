@@ -7,7 +7,7 @@ const xfit_build = @import("xfit_build");
 //x86_64-windows(linux)
 // android platform need AndroidManifest.xml, keystore, (assets, res) folder in user project folder
 const PLATFORM = xfit_build.XfitPlatform.linux;
-const OPTIMIZE = std.builtin.OptimizeMode.ReleaseFast;
+const OPTIMIZE = std.builtin.OptimizeMode.Debug;
 
 const EXAMPLE: EXAMPLES = EXAMPLES.GRAPHICS2D;
 //*
