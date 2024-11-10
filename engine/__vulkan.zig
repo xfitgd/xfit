@@ -258,21 +258,29 @@ fn chooseSwapSurfaceFormat(availableFormats: []vk.SurfaceFormatKHR) vk.SurfaceFo
     xfit.herrm("chooseSwapSurfaceFormat unsupported");
 }
 
-fn chooseSwapPresentMode(availablePresentModes: []vk.PresentModeKHR, _vSync: bool) vk.PresentModeKHR {
-    if (_vSync) {
+fn chooseSwapPresentMode(availablePresentModes: []vk.PresentModeKHR, _vSync: xfit.vSync_mode) vk.PresentModeKHR {
+    if (_vSync == .double) {
         xfit.write_log("XFIT SYSLOG : vulkan present mode fifo_khr vsync default\n");
         return vk.PresentModeKHR.fifo_khr;
-    }
-    for (availablePresentModes) |value| {
-        if (value == vk.PresentModeKHR.mailbox_khr) {
-            xfit.write_log("XFIT SYSLOG : vulkan present mode mailbox_khr\n");
-            return value;
+    } else if (_vSync == .triple) {
+        for (availablePresentModes) |value| {
+            if (value == vk.PresentModeKHR.mailbox_khr) {
+                xfit.write_log("XFIT SYSLOG : vulkan present mode mailbox_khr\n");
+                return value;
+            }
         }
-    }
-    for (availablePresentModes) |value| {
-        if (value == vk.PresentModeKHR.immediate_khr) {
-            xfit.write_log("XFIT SYSLOG : vulkan present mode immediate_khr\n");
-            return value;
+        for (availablePresentModes) |value| {
+            if (value == vk.PresentModeKHR.immediate_khr) {
+                xfit.write_log("XFIT SYSLOG : vulkan present mode immediate_khr mailbox_khr instead\n");
+                return value;
+            }
+        }
+    } else {
+        for (availablePresentModes) |value| {
+            if (value == vk.PresentModeKHR.immediate_khr) {
+                xfit.write_log("XFIT SYSLOG : vulkan present mode immediate_khr\n");
+                return value;
+            }
         }
     }
     xfit.write_log("XFIT SYSLOG : vulkan present mode fifo_khr other not supported so default\n");
@@ -866,8 +874,9 @@ pub fn vulkan_start() void {
         _ = vkb.enumerateInstanceLayerProperties(&count, available_layers.ptr) catch unreachable;
 
         for (available_layers) |*value| {
-            inline for (layers, checkedl) |t, b| {
+            for (layers, checkedl) |t, b| {
                 if (!b.* and std.mem.eql(u8, t, value.*.layer_name[0..t.len])) {
+                    if (!xfit.dbg and b == &validation_layer_support) continue;
                     layers_names.append(t) catch xfit.herrm("__vulkan_start layer append");
                     b.* = true;
                 }
@@ -891,7 +900,7 @@ pub fn vulkan_start() void {
             }
         }
 
-        if (validation_layer_support and xfit.dbg) {
+        if (validation_layer_support) {
             extension_names.append(vk.extensions.ext_debug_utils.name.ptr) catch |e| xfit.herr3("vulkan_start.extension_names.append(vk.VK_EXT_DEBUG_UTILS_EXTENSION_NAME)", e);
 
             xfit.write_log("XFIT SYSLOG : vulkan validation layer enable\n");

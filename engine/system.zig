@@ -103,7 +103,7 @@ pub const platform_version = struct {
 pub const screen_info = struct {
     monitor: *monitor_info,
     size: math.pointu,
-    refleshrate: u32,
+    refleshrate: f64,
 };
 
 pub const monitor_info = struct {

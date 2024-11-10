@@ -179,26 +179,27 @@ pub fn loop() void {
         S.now = S.start;
         loop_start.store(true, .monotonic);
     } else {
+        var maxframe = xfit.get_maxframe();
+        if (ispause and maxframe == 0) {
+            maxframe = 60;
+        }
         var n = std.time.Instant.now() catch |e| xfit.herr3(" const n = std.time.Instant.now()", e);
         var _delta_time = n.since(S.now);
-        @atomicStore(u64, &program_time, n.since(S.start), .monotonic);
-        var maxframe: u64 = xfit.get_maxframe_u64();
-
-        if (ispause and maxframe == 0) {
-            maxframe = xfit.sec_to_nano_sec(60, 0);
-        }
 
         if (maxframe > 0) {
-            const maxf: u64 = @divTrunc((xfit.sec_to_nano_sec(1, 0) * xfit.sec_to_nano_sec(1, 0)), maxframe); //1000000000 / (maxframe / 1000000000); 나눗셈을 한번 줄임
+            const maxf: u64 = @intFromFloat((1.0 * (1.0 / maxframe)) * 1000000000); //1 / (maxframe / 1); 나눗셈을 한번 줄임
             if (maxf > _delta_time) {
                 if (ispause) {
-                    std.time.sleep(maxf - _delta_time); //대기상태라 정확도가 적어도 괜찮다.
+                    xfit.sleep(maxf - _delta_time); //대기상태라 정확도가 적어도 괜찮다.
                 } else {
-                    xfit.sleep(maxf - _delta_time);
+                    xfit.sleep_ex(maxf - _delta_time);
                 }
             }
             n = std.time.Instant.now() catch |e| xfit.herr3(" const n = std.time.Instant.now()", e);
+            @atomicStore(u64, &program_time, n.since(S.start), .monotonic);
             _delta_time = n.since(S.now);
+        } else {
+            @atomicStore(u64, &program_time, n.since(S.start), .monotonic);
         }
         S.now = n;
         @atomicStore(u64, &delta_time, _delta_time, .monotonic);

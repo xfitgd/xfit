@@ -245,7 +245,7 @@ pub fn xfit_init() !void {
     cmds[0] = cmd;
     graphics.render_cmd = cmds[0..cmds.len];
 
-    anim.obj.obj = objects.items[2];
+    anim.obj.obj = anim_img;
     anim.play();
 
     input.set_key_down_func(key_down);
@@ -426,6 +426,8 @@ pub fn main() !void {
         .window_width = 640,
         .window_height = 480,
         .use_console = true,
+        //.vSync = .none,
+        //.maxframe = 62, +2는 대충 오차 보정 값
     };
     gpa = std.heap.GeneralPurposeAllocator(.{}).init;
     allocator = gpa.allocator(); //must init in main

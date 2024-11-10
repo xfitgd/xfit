@@ -232,7 +232,13 @@ pub fn vertices(comptime vertexT: type) type {
             deinit_callback(self, callback);
             self.allocator.free(self.array.?);
         }
-        pub fn build(self: *Self, _flag: write_flag) !void {
+        pub inline fn build_gcpu(self: *Self, _flag: write_flag) geometry.polygon_error!void {
+            try self.*.__build(_flag, true);
+        }
+        pub inline fn build(self: *Self, _flag: write_flag) geometry.polygon_error!void {
+            try self.*.__build(_flag, false);
+        }
+        pub fn __build(self: *Self, _flag: write_flag, comptime use_gcpu_mem: bool) geometry.polygon_error!void {
             self.*.__check_init.init();
             if (self.*.array == null or self.*.array.?.len == 0) {
                 xfit.print_error("WARN vertice array 0 or null\n", .{});
@@ -242,6 +248,7 @@ pub fn vertices(comptime vertexT: type) type {
                 .len = @intCast(self.*.array.?.len * @sizeOf(vertexT)),
                 .typ = .vertex,
                 .use = _flag,
+                .use_gcpu_mem = use_gcpu_mem,
             }, mem.u8arrC(self.*.array.?));
         }
         ///write_flag가 cpu일때만 호출
@@ -292,21 +299,29 @@ pub fn indices_(comptime _type: index_type) type {
             deinit_callback(self, callback);
             self.allocator.free(self.array.?);
         }
-        pub fn build(self: *Self, _flag: write_flag) void {
+        pub inline fn build_gcpu(self: *Self, _flag: write_flag) void {
+            self.*.__build(_flag, true);
+        }
+        pub inline fn build(self: *Self, _flag: write_flag) void {
+            self.*.__build(_flag, false);
+        }
+        pub fn __build(self: *Self, _flag: write_flag, comptime use_gcpu_mem: bool) void {
             self.*.__check_init.init();
             self.*.node.create_buffer(.{
                 .len = @intCast(self.*.array.?.len * @sizeOf(idxT)),
                 .typ = .index,
                 .use = _flag,
+                .use_gcpu_mem = use_gcpu_mem,
             }, mem.u8arrC(self.*.array.?));
         }
+
         ///write_flag가 cpu일때만 호출
         pub fn copy_update(self: *Self) void {
             self.*.node.copy_update(self.*.array.?.ptr);
         }
     };
 }
-
+//? uniform 속성 개체는 모두 크기가 작아서 use_gcpu_mem true 이다 기본으로
 pub const projection = struct {
     const Self = @This();
     proj: matrix = undefined,
@@ -507,12 +522,19 @@ pub const texture = struct {
             },
         };
     }
-    pub fn build(self: *Self, _width: u32, _height: u32, _pixels: ?[]u8) void {
+    pub inline fn build_gcpu(self: *Self, _width: u32, _height: u32, _pixels: ?[]u8) void {
+        self.*.__build(_width, _height, _pixels, true);
+    }
+    pub inline fn build(self: *Self, _width: u32, _height: u32, _pixels: ?[]u8) void {
+        self.*.__build(_width, _height, _pixels, false);
+    }
+    fn __build(self: *Self, _width: u32, _height: u32, _pixels: ?[]u8, comptime use_gcpu_mem: bool) void {
         self.__check_init.init();
         self.pixels = _pixels;
         self.__image.create_texture(.{
             .width = _width,
             .height = _height,
+            .use_gcpu_mem = use_gcpu_mem,
         }, self.sampler, self.pixels.?);
         var __set_res: [1]res_union = .{.{ .tex = &self.__image }};
         self.__set.__res = __set_res[0..1];
@@ -570,13 +592,20 @@ pub const texture_array = struct {
             },
         };
     }
-    pub fn build(self: *Self, _width: u32, _height: u32, _frames: u32, _pixels: ?[]u8) void {
+    pub inline fn build_gcpu(self: *Self, _width: u32, _height: u32, _frames: u32, _pixels: ?[]u8) void {
+        self.*.__build(_width, _height, _frames, _pixels, true);
+    }
+    pub inline fn build(self: *Self, _width: u32, _height: u32, _frames: u32, _pixels: ?[]u8) void {
+        self.*.__build(_width, _height, _frames, _pixels, false);
+    }
+    fn __build(self: *Self, _width: u32, _height: u32, _frames: u32, _pixels: ?[]u8, comptime use_gcpu_mem: bool) void {
         self.__check_init.init();
         self.pixels = _pixels;
         self.__image.create_texture(.{
             .width = _width,
             .height = _height,
             .len = _frames,
+            .use_gcpu_mem = use_gcpu_mem,
         }, self.sampler, self.pixels.?);
         var __set_res: [1]res_union = .{.{ .tex = &self.__image }};
         self.__set.__res = __set_res[0..1];
@@ -622,7 +651,13 @@ pub const tile_texture_array = struct {
             },
         };
     }
-    pub fn build(self: *Self, tile_width: u32, tile_height: u32, tile_count: u32, _width: u32, pixels: []const u8, inout_alloc_pixels: []u8) void {
+    pub inline fn build_gcpu(self: *Self, tile_width: u32, tile_height: u32, tile_count: u32, _width: u32, pixels: []const u8, inout_alloc_pixels: []u8) void {
+        self.*.__build(tile_width, tile_height, tile_count, _width, pixels, inout_alloc_pixels, true);
+    }
+    pub inline fn build(self: *Self, tile_width: u32, tile_height: u32, tile_count: u32, _width: u32, pixels: []const u8, inout_alloc_pixels: []u8) void {
+        self.*.__build(tile_width, tile_height, tile_count, _width, pixels, inout_alloc_pixels, false);
+    }
+    pub fn __build(self: *Self, tile_width: u32, tile_height: u32, tile_count: u32, _width: u32, pixels: []const u8, inout_alloc_pixels: []u8, comptime use_gcpu_mem: bool) void {
         self.__check_init.init();
         self.alloc_pixels = inout_alloc_pixels;
         //tilemap pixel 형식 데이터를 tile image 들이 연속적으로 배치된 형식 데이터로 변환한다.
@@ -650,6 +685,7 @@ pub const tile_texture_array = struct {
             .width = tile_width,
             .height = tile_height,
             .len = tile_count,
+            .use_gcpu_mem = use_gcpu_mem,
         }, self.sampler, self.alloc_pixels);
         var __set_res: [1]res_union = .{.{ .tex = &self.__image }};
         self.__set.__res = __set_res[0..1];

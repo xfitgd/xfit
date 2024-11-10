@@ -17,7 +17,7 @@ const graphics = @import("graphics.zig");
 
 //16384*16384 = 256MB
 pub var BLOCK_LEN: usize = 16384 * 16384;
-pub var SPECIAL_BLOCK_LEN: usize = 16384 * 16384 / 8;
+pub var SPECIAL_BLOCK_LEN: usize = 16384 * 16384;
 pub var FORMAT: texture_format = undefined;
 pub var nonCoherentAtomSize: usize = 0;
 pub var supported_cache_local: bool = false;
@@ -31,32 +31,51 @@ var single_allocator: std.mem.Allocator = undefined;
 
 pub fn init_block_len() void {
     var i: u32 = 0;
+    var main_heap_idx: u32 = std.math.maxInt(u32);
     var change: bool = false;
     while (i < __vulkan.mem_prop.memory_heap_count) : (i += 1) {
         if (__vulkan.mem_prop.memory_heaps[i].flags.contains(.{ .device_local_bit = true })) {
             if (__vulkan.mem_prop.memory_heaps[i].size < 1024 * 1024 * 1024) {
                 BLOCK_LEN /= 16;
+                SPECIAL_BLOCK_LEN /= 16;
             } else if (__vulkan.mem_prop.memory_heaps[i].size < 2 * 1024 * 1024 * 1024) {
                 BLOCK_LEN /= 8;
+                SPECIAL_BLOCK_LEN /= 8;
             } else if (__vulkan.mem_prop.memory_heaps[i].size < 4 * 1024 * 1024 * 1024) {
                 BLOCK_LEN /= 4;
+                SPECIAL_BLOCK_LEN /= 4;
             } else if (__vulkan.mem_prop.memory_heaps[i].size < 8 * 1024 * 1024 * 1024) {
                 BLOCK_LEN /= 2;
+                SPECIAL_BLOCK_LEN /= 2;
             }
             change = true;
+            xfit.print_log(
+                "XFIT SYSLOG : vulkan Graphic Card Dedicated Memory Block {d}MB, gcpu Block : {d}MB\n",
+                .{ BLOCK_LEN / 1024 / 1024, SPECIAL_BLOCK_LEN / 1024 / 1024 },
+            );
+            main_heap_idx = i;
             break;
         }
     }
     if (!change) { //No Graphic Card Dedicated Memory
         if (__vulkan.mem_prop.memory_heaps[0].size < 2 * 1024 * 1024 * 1024) {
             BLOCK_LEN /= 16;
+            SPECIAL_BLOCK_LEN /= 16;
         } else if (__vulkan.mem_prop.memory_heaps[0].size < 2 * 2 * 1024 * 1024 * 1024) {
             BLOCK_LEN /= 8;
+            SPECIAL_BLOCK_LEN /= 8;
         } else if (__vulkan.mem_prop.memory_heaps[0].size < 2 * 4 * 1024 * 1024 * 1024) {
             BLOCK_LEN /= 4;
+            SPECIAL_BLOCK_LEN /= 4;
         } else if (__vulkan.mem_prop.memory_heaps[0].size < 2 * 8 * 1024 * 1024 * 1024) {
             BLOCK_LEN /= 2;
+            SPECIAL_BLOCK_LEN /= 2;
         }
+        xfit.print_log(
+            "XFIT SYSLOG : vulkan No Graphic Card Dedicated Memory Block {d}MB\n",
+            .{BLOCK_LEN / 1024 / 1024},
+        );
+        main_heap_idx = 0;
     }
     const p: vk.PhysicalDeviceProperties = __vulkan.vki.?.getPhysicalDeviceProperties(__vulkan.vk_physical_device);
     nonCoherentAtomSize = @intCast(p.limits.non_coherent_atom_size);
@@ -68,13 +87,24 @@ pub fn init_block_len() void {
             .host_visible_bit = true,
         })) {
             supported_cache_local = true;
+            xfit.write_log("XFIT SYSLOG : vulkan supported_cache_local\n");
+            if (main_heap_idx != __vulkan.mem_prop.memory_types[i].heap_index) { //SPECIAL_BLOCK 메모리 메인메모리가 아니라면(테스트 필요)
+                SPECIAL_BLOCK_LEN /= @min(16, @max(1, (__vulkan.mem_prop.memory_heaps[main_heap_idx].size / __vulkan.mem_prop.memory_heaps[__vulkan.mem_prop.memory_types[i].heap_index].size)));
+            }
         } else if (__vulkan.mem_prop.memory_types[i].property_flags.contains(.{
             .device_local_bit = true,
             .host_coherent_bit = true,
             .host_visible_bit = true,
         })) {
             supported_noncache_local = true;
+            xfit.write_log("XFIT SYSLOG : vulkan supported_noncache_local\n");
+            if (main_heap_idx != __vulkan.mem_prop.memory_types[i].heap_index) { //SPECIAL_BLOCK 메모리 메인메모리가 아니라면(테스트 필요)
+                SPECIAL_BLOCK_LEN /= @min(16, @max(1, (__vulkan.mem_prop.memory_heaps[main_heap_idx].size / __vulkan.mem_prop.memory_heaps[__vulkan.mem_prop.memory_types[i].heap_index].size)));
+            }
         }
+    }
+    if (!(supported_cache_local or supported_noncache_local)) {
+        xfit.write_log("XFIT SYSLOG : vulkan not supported_(non)cache_local\n");
     }
 }
 
@@ -202,6 +232,7 @@ pub const buffer_create_option = struct {
     typ: buffer_type,
     use: res_usage,
     single: bool = false,
+    use_gcpu_mem: bool = false,
 };
 
 pub const texture_format = enum(c_uint) {
@@ -253,6 +284,7 @@ pub const texture_create_option = struct {
     format: texture_format = .default,
     samples: u8 = 1,
     single: bool = false,
+    use_gcpu_mem: bool = false,
 };
 
 const operation_node = union(enum) {
@@ -400,6 +432,7 @@ fn execute_create_buffer(buf: *vulkan_res_node(.buffer), _data: ?[]const u8) voi
             .use = .cpu,
             .typ = .staging,
             .single = false,
+            .use_gcpu_mem = !buf.*.buffer_option.single,
         }, _data);
     } else if (buf.*.buffer_option.typ == .staging) {
         if (_data == null) xfit.herrm("staging buffer data can't null");
@@ -408,7 +441,7 @@ fn execute_create_buffer(buf: *vulkan_res_node(.buffer), _data: ?[]const u8) voi
         xfit.herr3("execute_create_buffer vkCreateBuffer", e);
 
     var out_idx: *res_range = undefined;
-    const res = if (buf.*.buffer_option.single) create_allocator_and_bind_single(buf.*.res) else create_allocator_and_bind(buf.*.res, prop, &out_idx, 0);
+    const res = if (buf.*.buffer_option.single) create_allocator_and_bind_single(buf.*.res) else create_allocator_and_bind(buf.*.res, prop, &out_idx, 0, buf.*.buffer_option.use_gcpu_mem);
     buf.*.pvulkan_buffer = res;
     buf.*.idx = out_idx;
 
@@ -534,12 +567,13 @@ fn execute_create_texture(buf: *vulkan_res_node(.texture), _data: ?[]const u8) v
             .use = .cpu,
             .typ = .staging,
             .single = false,
+            .use_gcpu_mem = !buf.*.texture_option.single,
         }, _data);
     }
     buf.*.res = __vulkan.vkd.?.createImage(&img_info, null) catch |e| xfit.herr3("execute_create_texture vkCreateImage", e);
 
     var out_idx: *res_range = undefined;
-    const res = if (buf.*.texture_option.single) create_allocator_and_bind_single(buf.*.res) else create_allocator_and_bind(buf.*.res, prop, &out_idx, 0);
+    const res = if (buf.*.texture_option.single) create_allocator_and_bind_single(buf.*.res) else create_allocator_and_bind(buf.*.res, prop, &out_idx, 0, if (buf.*.texture_option.use == .gpu) false else buf.*.texture_option.use_gcpu_mem);
     buf.*.pvulkan_buffer = res;
     buf.*.idx = out_idx;
 
@@ -1395,7 +1429,7 @@ const vulkan_res = struct {
     }
 };
 
-fn create_allocator_and_bind(_res: anytype, _prop: vk.MemoryPropertyFlags, _out_idx: **res_range, _max_size: usize) *vulkan_res {
+fn create_allocator_and_bind(_res: anytype, _prop: vk.MemoryPropertyFlags, _out_idx: **res_range, _max_size: usize, use_gcpu_mem: bool) *vulkan_res {
     var res: ?*vulkan_res = null;
     var mem_require: vk.MemoryRequirements = undefined;
     if (@TypeOf(_res) == vk.Buffer) {
@@ -1410,7 +1444,7 @@ fn create_allocator_and_bind(_res: anytype, _prop: vk.MemoryPropertyFlags, _out_
         max_size = @intCast(mem_require.size);
     }
     var prop = _prop;
-    if (@TypeOf(_res) == vk.Buffer and max_size <= 256 and prop.contains(.{ .host_visible_bit = true })) {
+    if (((@TypeOf(_res) == vk.Buffer and max_size <= 256) or use_gcpu_mem) and prop.contains(.{ .host_visible_bit = true })) {
         if (supported_cache_local) {
             prop = .{ .host_visible_bit = true, .device_local_bit = true, .host_cached_bit = true };
         } else if (supported_noncache_local) {

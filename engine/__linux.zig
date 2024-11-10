@@ -20,7 +20,6 @@ pub const c = @cImport({
 pub var display: ?*c.Display = null;
 pub var def_screen_idx: usize = 0;
 pub var wnd: c.Window = 0;
-pub var screens: ?*c.XRRScreenResources = undefined;
 pub var del_window: c.Atom = undefined;
 
 var input_thread: std.Thread = undefined;
@@ -29,12 +28,18 @@ pub fn system_linux_start() void {
     display = c.XOpenDisplay(null);
     if (display == null) xfit.herrm("system_linux_start XOpenDisplay");
     def_screen_idx = @max(0, c.DefaultScreen(display));
-    screens = c.XRRGetScreenResources(display, c.DefaultRootWindow(display));
 
-    var i: c_uint = 0;
-    while (i < screens.?.*.ncrtc) : (i += 1) {
-        const crtc_info = c.XRRGetCrtcInfo(display, screens, screens.?.*.crtcs[i]);
+    var i: usize = 0;
+
+    const screens_res = c.XRRGetScreenResources(display, c.DefaultRootWindow(display));
+    defer c.XRRFreeScreenResources(screens_res);
+
+    i = 0;
+    while (i < screens_res.*.noutput) : (i += 1) {
+        const crtc_info = c.XRRGetCrtcInfo(display, screens_res, screens_res.*.crtcs[i]);
+        const output = c.XRRGetOutputInfo(display, screens_res, screens_res.*.outputs[i]);
         defer c.XRRFreeCrtcInfo(crtc_info);
+        defer c.XRRFreeOutputInfo(output);
 
         __system.monitors.append(system.monitor_info{
             .is_primary = i == def_screen_idx,
@@ -49,8 +54,44 @@ pub fn system_linux_start() void {
         const last = &__system.monitors.items[__system.monitors.items.len - 1];
         if (last.*.is_primary) __system.primary_monitor = last;
 
+        xfit.print_log("\nXFIT SYSLOG : {s}monitor {d} name: {s}, x:{d}, y:{d}, width:{d}, height:{d} [\n\n", .{
+            if (last.*.is_primary) "primary " else "",
+            i,
+            output.*.name,
+            crtc_info.*.x,
+            crtc_info.*.y,
+            crtc_info.*.width,
+            crtc_info.*.height,
+        });
+
         var j: c_uint = 0;
-        while (j < crtc_info.*.noutput) : (j += 1) {}
+        while (j < output.*.nmode) : (j += 1) {
+            var k: c_uint = 0;
+            var mode_: ?*c.XRRModeInfo = null;
+            while (k < screens_res.*.nmode) : (k += 1) {
+                if (output.*.modes[j] == screens_res.*.modes[k].id) {
+                    mode_ = &screens_res.*.modes[k];
+                    break;
+                }
+            }
+            if (mode_ == null) unreachable;
+            const hz = @as(f64, @floatFromInt(mode_.?.*.dotClock)) / @as(f64, @floatFromInt(mode_.?.*.hTotal * mode_.?.*.vTotal));
+            xfit.print_log("monitor {d} {s}resolution {d} : width {d}, height {d}, refleshrate {d}\n", .{
+                i,
+                if (j == 0) "primary " else "",
+                j,
+                mode_.?.*.width,
+                mode_.?.height,
+                hz,
+            });
+            last.*.resolutions.append(.{
+                .monitor = last,
+                .refleshrate = hz,
+                .size = .{ mode_.?.*.width, mode_.?.height },
+            }) catch |e| xfit.herr3("MonitorEnumProc last.*.resolutions.append", e);
+        }
+        xfit.write("]\n");
+        last.primary_resolution = &last.resolutions.items[0];
         //TODO resolutions add and primary_resolution
     }
 }
@@ -86,7 +127,7 @@ pub fn linux_start() void {
     if (__system.init_set.window_x == xfit.init_setting.DEF_POS) __system.init_set.window_x = 0;
     if (__system.init_set.window_y == xfit.init_setting.DEF_POS) __system.init_set.window_y = 0;
 
-    if (__system.init_set.screen_index > screens.?.*.ncrtc - 1) __system.init_set.screen_index = @intCast(def_screen_idx);
+    if (__system.init_set.screen_index > __system.monitors.items.len - 1) __system.init_set.screen_index = @intCast(def_screen_idx);
 
     wnd = c.XCreateWindow(
         display,
@@ -172,7 +213,6 @@ pub fn linux_loop() void {
                 }
                 //다른 스레드에서 __system.keys[keyv]를 수정하지 않고 읽기만하니 weak로도 충분하다.
                 if (__system.keys[keyv].cmpxchgWeak(false, true, .monotonic, .monotonic) == null) {
-                    //xfit.print_debug("input key_down {d}", .{wParam});
                     system.a_fn_call(__system.key_down_func, .{key}) catch {};
                 }
             },
@@ -189,7 +229,6 @@ pub fn linux_loop() void {
                     keyv = keyv - 0xff00 + 0xff;
                 }
                 __system.keys[keyv].store(false, std.builtin.AtomicOrder.monotonic);
-                //xfit.print_debug("input key_up {d}", .{wParam});
                 system.a_fn_call(__system.key_up_func, .{key}) catch {};
             },
             c.ButtonPress, c.ButtonRelease => |e| {
@@ -252,6 +291,4 @@ pub fn linux_destroy() void {
     input_thread.join();
     _ = c.XDestroyWindow(display, wnd);
     _ = c.XCloseDisplay(display);
-
-    c.XRRFreeScreenResources(screens);
 }

@@ -269,18 +269,44 @@ pub inline fn program_time() f64 {
 pub inline fn set_error_handling_func(_func: *const fn (text: []u8, stack_trace: []u8) void) void {
     @atomicStore(@TypeOf(__system.error_handling_func), &__system.error_handling_func, _func, std.builtin.AtomicOrder.monotonic);
 }
-pub inline fn sleep(ns: u64) void {
-    if (platform == .windows and ns <= 100000000) { //0.1초이하는 임의로 정한 기준. 짧은 시간일수록 정확도를 챙긴다.
+pub inline fn sleep_ex(ns: u64) void {
+    if (platform == .windows) {
         __windows.nanosleep(ns);
     } else {
         std.time.sleep(ns);
     }
 }
-pub inline fn sleep_(ns: u64) void {
+pub fn sleep(ns: u64) void {
     if (platform == .windows) {
-        __windows.nanosleep(ns);
+        std.os.windows.kernel32.Sleep(@intCast(ns / 1000000));
     } else {
-        std.time.sleep(ns);
+        const s = ns / std.time.ns_per_s;
+        const ns_ = ns % std.time.ns_per_s;
+        if (builtin.os.tag == .linux) {
+            const linux = std.os.linux;
+
+            var req: linux.timespec = .{
+                .sec = std.math.cast(linux.time_t, s) orelse std.math.maxInt(linux.time_t),
+                .nsec = std.math.cast(linux.time_t, ns_) orelse std.math.maxInt(linux.time_t),
+            };
+            var rem: linux.timespec = undefined;
+
+            while (true) {
+                switch (linux.E.init(linux.clock_nanosleep(.MONOTONIC, .{ .ABSTIME = false }, &req, &rem))) {
+                    .SUCCESS => return,
+                    .INTR => {
+                        req = rem;
+                        continue;
+                    },
+                    .FAULT,
+                    .INVAL,
+                    .OPNOTSUPP,
+                    => unreachable,
+                    else => return,
+                }
+            }
+        }
+        std.posix.nanosleep(s, ns_);
     }
 }
 
@@ -325,6 +351,8 @@ pub fn exit() void {
 
 pub const screen_mode = enum { WINDOW, BORDERLESSSCREEN, FULLSCREEN };
 
+pub const vSync_mode = enum { none, double, triple };
+
 pub const init_setting = struct {
     pub const DEF_SIZE = @as(u32, @bitCast(__windows.CW_USEDEFAULT));
     pub const DEF_POS = __windows.CW_USEDEFAULT;
@@ -354,27 +382,24 @@ pub const init_setting = struct {
     //*
 
     ///nanosec 단위 1프레임당 1sec = 1000000000 nanosec
-    maxframe: u64 = 0,
+    maxframe: f64 = 0,
     refleshrate: u32 = 0,
-    vSync: bool = true,
+    vSync: vSync_mode = .double,
 };
 
 ///nanosec 1 / 1000000000 sec
-pub inline fn get_maxframe_u64() u64 {
-    if (@sizeOf(usize) == 4) {
-        const native_endian = @import("builtin").target.cpu.arch.endian();
-        const low: u64 = @atomicLoad(u32, @as(*u32, @ptrCast(&__system.init_set.maxframe)), std.builtin.AtomicOrder.monotonic);
-        const high: u64 = @atomicLoad(u32, &@as([*]u32, @ptrCast(&__system.init_set.maxframe))[1], std.builtin.AtomicOrder.monotonic);
-
-        return switch (native_endian) {
-            .big => low << 32 | high,
-            .little => high << 32 | low,
-        };
-    }
-    return @atomicLoad(u64, &__system.init_set.maxframe, std.builtin.AtomicOrder.monotonic);
-}
 pub inline fn get_maxframe() f64 {
-    return @as(f64, @floatFromInt(get_maxframe_u64())) / 1000000000.0;
+    if (@sizeOf(usize) == 4) @compileError("32bit not support");
+    //     const native_endian = @import("builtin").target.cpu.arch.endian();
+    //     const low: u64 = @atomicLoad(u32, @as(*u32, @ptrCast(&__system.init_set.maxframe)), std.builtin.AtomicOrder.monotonic);
+    //     const high: u64 = @atomicLoad(u32, &@as([*]u32, @ptrCast(&__system.init_set.maxframe))[1], std.builtin.AtomicOrder.monotonic);
+
+    //     return switch (native_endian) {
+    //         .big => low << 32 | high,
+    //         .little => high << 32 | low,
+    //     };
+    // ! } Not Use
+    return @atomicLoad(f64, &__system.init_set.maxframe, std.builtin.AtomicOrder.monotonic);
 }
 //nanosec 1 / 1000000000 sec
 pub inline fn set_maxframe_64(_maxframe: u64) void {

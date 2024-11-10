@@ -423,7 +423,7 @@ pub fn nanosleep(ns: u64) void {
         return;
     };
 
-    if (win32.SetWaitableTimer(timer, &win32.LARGE_INTEGER{ .QuadPart = -@as(i64, @intCast(@divTrunc(ns, 100))) }, 0, null, null, FALSE) == FALSE) {
+    if (win32.SetWaitableTimer(timer, &win32.LARGE_INTEGER{ .QuadPart = -@as(i64, @intCast(ns / 100)) }, 0, null, null, FALSE) == FALSE) {
         xfit.print("WARN nanosleep.SetWaitableTimer FAILED Code {d}\n", .{win32.GetLastError()});
         std.time.sleep(ns);
         return;
