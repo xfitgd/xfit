@@ -338,12 +338,6 @@ pub fn run(
 
             if (option.callback != null) option.callback.?(b, result, target);
 
-            result.addAfterIncludePath(get_lazypath(b, std.fmt.allocPrint(arena_allocator.allocator(), "/usr/include/{s}-linux-gnu/", .{get_arch_text(target.result.cpu.arch)}) catch unreachable));
-            xfit.addAfterIncludePath(get_lazypath(b, std.fmt.allocPrint(arena_allocator.allocator(), "/usr/include/{s}-linux-gnu/", .{get_arch_text(target.result.cpu.arch)}) catch unreachable));
-
-            result.addAfterIncludePath(get_lazypath(b, "/usr/include/"));
-            xfit.addAfterIncludePath(get_lazypath(b, "/usr/include/"));
-
             b.installArtifact(result);
         } else unreachable;
 
