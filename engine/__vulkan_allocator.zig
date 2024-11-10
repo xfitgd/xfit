@@ -1444,7 +1444,7 @@ fn create_allocator_and_bind(_res: anytype, _prop: vk.MemoryPropertyFlags, _out_
         max_size = @intCast(mem_require.size);
     }
     var prop = _prop;
-    if (((@TypeOf(_res) == vk.Buffer and max_size <= 256) or use_gcpu_mem) and prop.contains(.{ .host_visible_bit = true })) {
+    if ((BLOCK_LEN == SPECIAL_BLOCK_LEN or (@TypeOf(_res) == vk.Buffer and max_size <= 256) or use_gcpu_mem) and prop.contains(.{ .host_visible_bit = true })) {
         if (supported_cache_local) {
             prop = .{ .host_visible_bit = true, .device_local_bit = true, .host_cached_bit = true };
         } else if (supported_noncache_local) {
