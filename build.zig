@@ -23,7 +23,7 @@ const ANDROID_PATH = "/usr/local/Android";
 const ANDROID_NDK_PATH = std.fmt.comptimePrint("{s}/ndk/27.2.12479018", .{ANDROID_PATH});
 const ANDROID_VER = 35;
 const ANDROID_BUILD_TOOL_VER = "35.0.0";
-///(기본값)상대 경로 또는 절대 경로로 설정하기
+const legacy = false;
 
 //keystore 없으면 생성
 //keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000
@@ -88,6 +88,7 @@ pub fn run(
     build_options.addOption(XfitPlatform, "platform", option.PLATFORM);
     build_options.addOption(std.Target.SubSystem, "subsystem", if (option.is_console) .Console else .Windows);
     build_options.addOption(bool, "enable_log", option.enable_log);
+    build_options.addOption(bool, "legacy", legacy);
 
     const out_arch_text = comptime [_][]const u8{
         "../lib/arm64-v8a",
@@ -95,9 +96,14 @@ pub fn run(
         "../lib/x86_64",
     };
     const targets = [_]std.Target.Query{
-        .{ .os_tag = .linux, .cpu_arch = .aarch64, .abi = .android, .cpu_features_add = std.Target.aarch64.featureSet(&.{ .neon, .v8a }) },
-        .{ .os_tag = .linux, .cpu_arch = .riscv64, .abi = .android },
-        .{ .os_tag = .linux, .cpu_arch = .x86_64, .abi = .android },
+        .{ .os_tag = .linux, .cpu_arch = .aarch64, .abi = .android, .cpu_model = .baseline, .cpu_features_add = std.Target.aarch64.featureSet(&.{ .neon, .v8a, .reserve_x18 }) },
+        .{ .os_tag = .linux, .cpu_arch = .riscv64, .abi = .android, .cpu_model = .baseline, .cpu_features_add = std.Target.riscv.featureSet(&.{.reserve_x18}) },
+        .{ .os_tag = .linux, .cpu_arch = .x86_64, .abi = .android, .cpu_model = .baseline, .cpu_features_add = std.Target.x86.featureSet(&.{
+            .ssse3,
+            .sse4_1,
+            .sse4_2,
+            .popcnt,
+        }) },
     };
 
     const install_step: *std.Build.Step = b.step("shared lib build", "shared lib build");
@@ -223,11 +229,23 @@ pub fn run(
             var target = b.standardTargetOptions(.{ .default_target = .{
                 .os_tag = .windows,
                 .abi = .gnu,
+                .cpu_model = .baseline,
             } });
             if (target.result.cpu.arch == .x86_64) {
-                target.result.cpu.features.addFeatureSet(std.Target.x86.featureSet(&.{.sse4_2}));
+                if (!legacy) {
+                    target.result.cpu.features.addFeatureSet(std.Target.x86.featureSet(&.{
+                        .ssse3,
+                        .sse3,
+                        .sse4_1,
+                        .sse4_2,
+                        .popcnt,
+                        .avx,
+                        .avx2,
+                        .fma,
+                    }));
+                }
             } else if (target.result.cpu.arch == .aarch64) {
-                target.result.cpu.features.addFeatureSet(std.Target.aarch64.featureSet(&.{ .neon, .v8a }));
+                target.result.cpu.features.addFeatureSet(std.Target.aarch64.featureSet(&.{ .neon, .v8_2a }));
             }
             target.query.cpu_features_add = target.result.cpu.features;
             target.query.abi = .gnu; //gnu required
@@ -272,11 +290,25 @@ pub fn run(
             var target = b.standardTargetOptions(.{ .default_target = .{
                 .os_tag = .linux,
                 .abi = .gnu,
+                .cpu_model = .baseline,
             } });
             if (target.result.cpu.arch == .x86_64) {
-                target.result.cpu.features.addFeatureSet(std.Target.x86.featureSet(&.{.sse4_2}));
+                if (!legacy) {
+                    target.result.cpu.features.addFeatureSet(std.Target.x86.featureSet(&.{
+                        .ssse3,
+                        .sse3,
+                        .sse4_1,
+                        .sse4_2,
+                        .popcnt,
+                        .avx,
+                        .avx2,
+                        .fma,
+                    }));
+                }
             } else if (target.result.cpu.arch == .aarch64) {
-                target.result.cpu.features.addFeatureSet(std.Target.aarch64.featureSet(&.{ .neon, .v8a }));
+                if (!legacy) {
+                    target.result.cpu.features.addFeatureSet(std.Target.aarch64.featureSet(&.{.neon}));
+                }
             }
             target.query.cpu_features_add = target.result.cpu.features;
             target.query.abi = .gnu; //gnu required
