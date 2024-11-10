@@ -114,7 +114,7 @@ pub fn get_AssetManager() ?*android.AAssetManager {
 
 pub fn vulkan_android_start(vkSurface: *__vulkan.vk.SurfaceKHR) void {
     __vulkan.load_instance_and_device();
-    if (vkSurface.* != null) {
+    if (vkSurface.* != .null_handle) {
         __vulkan.vki.?.destroySurfaceKHR(vkSurface.*, null);
     }
 
@@ -498,8 +498,9 @@ fn engine_handle_cmd(_cmd: AppEvent) void {
         },
         AppEvent.APP_CMD_WINDOW_RESIZED => {
             var prop: vk.SurfaceCapabilitiesKHR = undefined;
-            _ = vk.vkGetPhysicalDeviceSurfaceCapabilitiesKHR(__vulkan.vk_physical_device, __vulkan.vkSurface, &prop);
-            if (prop.currentExtent.width != __vulkan.vkExtent.width or prop.currentExtent.height != __vulkan.vkExtent.height) {
+            __vulkan.load_instance_and_device();
+            prop = __vulkan.vki.?.getPhysicalDeviceSurfaceCapabilitiesKHR(__vulkan.vk_physical_device, __vulkan.vkSurface) catch unreachable;
+            if (prop.current_extent.width != __vulkan.vkExtent.width or prop.current_extent.height != __vulkan.vkExtent.height) {
                 __system.size_update.store(true, .monotonic);
             }
         },

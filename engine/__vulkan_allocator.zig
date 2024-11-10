@@ -50,8 +50,8 @@ pub fn init_block_len() void {
             }
             change = true;
             xfit.print_log(
-                "XFIT SYSLOG : vulkan Graphic Card Dedicated Memory Block {d}MB, gcpu Block : {d}MB\n",
-                .{ BLOCK_LEN / 1024 / 1024, SPECIAL_BLOCK_LEN / 1024 / 1024 },
+                "XFIT SYSLOG : vulkan Graphic Card Dedicated Memory Block {d}MB\n",
+                .{BLOCK_LEN / 1024 / 1024},
             );
             main_heap_idx = i;
             break;

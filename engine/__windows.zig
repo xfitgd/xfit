@@ -391,7 +391,7 @@ fn change_fullscreen(monitor: *const system.monitor_info, resolution: *const sys
     fullscreen_mode.dmFields = win32.DM_PELSWIDTH | win32.DM_PELSHEIGHT | win32.DM_DISPLAYFREQUENCY;
     fullscreen_mode.dmPelsWidth = resolution.size[0];
     fullscreen_mode.dmPelsHeight = resolution.size[1];
-    fullscreen_mode.dmDisplayFrequency = resolution.refleshrate;
+    fullscreen_mode.dmDisplayFrequency = @intFromFloat(resolution.refleshrate);
 
     @memcpy(fullscreen_name[0..fullscreen_name.len], monitor.name[0..monitor.name.len]);
 
@@ -803,7 +803,7 @@ fn MonitorEnumProc(hMonitor: win32.HMONITOR, hdcMonitor: win32.HDC, lprcMonitor:
     while (win32.EnumDisplaySettingsA(@ptrCast(&monitor_info.szDevice), i, &dm) != FALSE) : (i += 1) {
         last.*.resolutions.append(.{
             .monitor = last,
-            .refleshrate = dm.dmDisplayFrequency,
+            .refleshrate = @floatFromInt(dm.dmDisplayFrequency),
             .size = .{ dm.dmPelsWidth, dm.dmPelsHeight },
         }) catch |e| xfit.herr3("MonitorEnumProc last.*.resolutions.append", e);
     }
@@ -812,7 +812,7 @@ fn MonitorEnumProc(hMonitor: win32.HMONITOR, hdcMonitor: win32.HDC, lprcMonitor:
 
     var j: usize = 0;
     while (j < last.resolutions.items.len) : (j += 1) {
-        if (dm.dmPelsWidth == last.*.resolutions.items[j].size[0] and dm.dmPelsHeight == last.resolutions.items[j].size[1] and dm.dmDisplayFrequency == last.resolutions.items[j].refleshrate) {
+        if (dm.dmPelsWidth == last.*.resolutions.items[j].size[0] and dm.dmPelsHeight == last.resolutions.items[j].size[1] and dm.dmDisplayFrequency == @as(u32, @intFromFloat(last.resolutions.items[j].refleshrate))) {
             last.*.primary_resolution = &last.*.resolutions.items[j];
             break;
         }

@@ -89,11 +89,6 @@ pub fn run(
     build_options.addOption(std.Target.SubSystem, "subsystem", if (option.is_console) .Console else .Windows);
     build_options.addOption(bool, "enable_log", option.enable_log);
 
-    const arch_text = comptime [_][]const u8{
-        "aarch64-linux-android",
-        "riscv64-linux-android",
-        "x86_64-linux-android",
-    };
     const out_arch_text = comptime [_][]const u8{
         "../lib/arm64-v8a",
         "../lib/riscv64",
@@ -179,9 +174,21 @@ pub fn run(
             var contents = std.ArrayList(u8).init(arena_allocator.allocator());
             var writer = contents.writer();
             const plat = if (builtin.os.tag == .windows) "windows" else if (builtin.os.tag == .linux) "linux" else if (builtin.os.tag == .macos) "darwin" else @compileError("not support android host platform.");
-            writer.print("include_dir={s}\n", .{std.fmt.allocPrint(arena_allocator.allocator(), "{s}/toolchains/llvm/prebuilt/{s}-x86_64/sysroot/usr/include", .{ ANDROID_NDK_PATH, plat }) catch unreachable}) catch unreachable;
-            writer.print("sys_include_dir={s}\n", .{std.fmt.allocPrint(arena_allocator.allocator(), "{s}/toolchains/llvm/prebuilt/{s}-x86_64/sysroot/usr/include/{s}", .{ ANDROID_NDK_PATH, plat, arch_text[i] }) catch unreachable}) catch unreachable;
-            writer.print("crt_dir={s}\n", .{std.fmt.allocPrint(arena_allocator.allocator(), "{s}/toolchains/llvm/prebuilt/{s}-x86_64/sysroot/usr/lib/{s}/{d}", .{ ANDROID_NDK_PATH, plat, arch_text[i], ANDROID_VER }) catch unreachable}) catch unreachable;
+            writer.print("include_dir={s}\n", .{std.fmt.allocPrint(
+                arena_allocator.allocator(),
+                "{s}/toolchains/llvm/prebuilt/{s}-x86_64/sysroot/usr/include",
+                .{ ANDROID_NDK_PATH, plat },
+            ) catch unreachable}) catch unreachable;
+            writer.print("sys_include_dir={s}\n", .{std.fmt.allocPrint(
+                arena_allocator.allocator(),
+                "{s}/toolchains/llvm/prebuilt/{s}-x86_64/sysroot/usr/include/{s}-linux-android",
+                .{ ANDROID_NDK_PATH, plat, get_arch_text(targets[i].cpu_arch.?) },
+            ) catch unreachable}) catch unreachable;
+            writer.print("crt_dir={s}\n", .{std.fmt.allocPrint(
+                arena_allocator.allocator(),
+                "{s}/toolchains/llvm/prebuilt/{s}-x86_64/sysroot/usr/lib/{s}-linux-android/{d}",
+                .{ ANDROID_NDK_PATH, plat, get_arch_text(targets[i].cpu_arch.?), ANDROID_VER },
+            ) catch unreachable}) catch unreachable;
             writer.writeAll("msvc_lib_dir=\n") catch unreachable;
             writer.writeAll("kernel32_lib_dir=\n") catch unreachable;
             writer.writeAll("gcc_dir=\n") catch unreachable;
@@ -189,7 +196,11 @@ pub fn run(
             result.setLibCFile(android_libc_step.getDirectory().join(arena_allocator.allocator(), "android-libc.conf") catch unreachable);
             install_step.dependOn(&android_libc_step.step);
 
-            result.addLibraryPath(.{ .cwd_relative = std.fmt.allocPrint(arena_allocator.allocator(), "{s}/toolchains/llvm/prebuilt/{s}-x86_64/sysroot/usr/lib/{s}/{d}", .{ ANDROID_NDK_PATH, plat, arch_text[i], ANDROID_VER }) catch unreachable });
+            result.addLibraryPath(.{ .cwd_relative = std.fmt.allocPrint(
+                arena_allocator.allocator(),
+                "{s}/toolchains/llvm/prebuilt/{s}-x86_64/sysroot/usr/lib/{s}-linux-android/{d}",
+                .{ ANDROID_NDK_PATH, plat, get_arch_text(targets[i].cpu_arch.?), ANDROID_VER },
+            ) catch unreachable });
 
             // result.addLibraryPath(get_lazypath(b, std.fmt.allocPrint(arena_allocator.allocator(), "{s}/lib/android/{s}", .{ engine_path, get_arch_text(targets[i].cpu_arch.?) }) catch unreachable));
 

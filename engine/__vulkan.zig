@@ -244,13 +244,13 @@ fn chooseSwapExtent(capabilities: vk.SurfaceCapabilitiesKHR) vk.Extent2D {
 
 fn chooseSwapSurfaceFormat(availableFormats: []vk.SurfaceFormatKHR) vk.SurfaceFormatKHR {
     for (availableFormats) |value| {
-        if (value.format == .r8g8b8a8_srgb and value.color_space == .srgb_nonlinear_khr) {
+        if (value.format == .r8g8b8a8_unorm) {
             xfit.print_log("XFIT SYSLOG : vulkan swapchain format : {}, colorspace : {}\n", .{ value.format, value.color_space });
             return value;
         }
     }
     for (availableFormats) |value| {
-        if (__vulkan_allocator.texture_format.__has_color(value.format) != null) {
+        if (value.format == .b8g8r8a8_unorm) {
             xfit.print_log("XFIT SYSLOG : vulkan swapchain format : {}, colorspace : {}\n", .{ value.format, value.color_space });
             return value;
         }
@@ -1810,7 +1810,7 @@ pub fn refresh_pre_matrix() void {
             .vertical180 => matrix.rotation2D(std.math.degreesToRadians(180.0)),
             .vertical360 => matrix.identity(),
         };
-        if (__pre_mat_uniform.res == null) {
+        if (__pre_mat_uniform.res == .null_handle) {
             __pre_mat_uniform.create_buffer(
                 .{
                     .len = @sizeOf(matrix),
