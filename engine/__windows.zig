@@ -391,8 +391,9 @@ fn change_fullscreen(monitor: *const system.monitor_info) void {
     fullscreen_mode.dmPelsWidth = monitor.*.resolution.size[0];
     fullscreen_mode.dmPelsHeight = monitor.*.resolution.size[1];
     fullscreen_mode.dmDisplayFrequency = @intFromFloat(monitor.*.resolution.refleshrate);
+    fullscreen_name = std.mem.zeroes([32]u8);
 
-    @memcpy(fullscreen_name[0..fullscreen_name.len], monitor.name[0..monitor.name.len]);
+    @memcpy(fullscreen_name[0..monitor.name.len], monitor.name[0..monitor.name.len]);
 
     __system.current_monitor = monitor;
 
