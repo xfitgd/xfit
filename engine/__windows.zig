@@ -807,7 +807,7 @@ fn MonitorEnumProc(hMonitor: win32.HMONITOR, hdcMonitor: win32.HDC, lprcMonitor:
     last.*.name = std.heap.c_allocator.alloc(u8, len) catch unreachable;
     @memcpy(@constCast(last.*.name), monitor_info.szDevice[0..len]);
 
-    xfit.print_log("\nXFIT SYSLOG : {s}monitor {d} name: {s}, x:{d}, y:{d}, width:{d}, height:{d} [\n\n", .{
+    xfit.print_log("XFIT SYSLOG : {s}monitor {d} name: {s}, x:{d}, y:{d}, width:{d}, height:{d} [\n", .{
         if (last.*.is_primary) "primary " else "",
         __system.monitors.items.len - 1,
         last.*.name,
@@ -825,13 +825,12 @@ fn MonitorEnumProc(hMonitor: win32.HMONITOR, hdcMonitor: win32.HDC, lprcMonitor:
         .refleshrate = @floatFromInt(dm.dmDisplayFrequency),
         .size = .{ dm.dmPelsWidth, dm.dmPelsHeight },
     };
-    xfit.print_log("monitor {d} resolution : width {d}, height {d}, refleshrate {d}\n", .{
+    xfit.print_log("monitor {d} resolution : width {d}, height {d}, refleshrate {d}\n]\n", .{
         __system.monitors.items.len - 1,
         dm.dmPelsWidth,
         dm.dmPelsHeight,
         dm.dmDisplayFrequency,
     });
-    xfit.write("]\n");
 
     return TRUE;
 }

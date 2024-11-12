@@ -68,7 +68,7 @@ pub fn system_linux_start() void {
         last.*.name = std.heap.c_allocator.alloc(u8, std.mem.len(output.*.name)) catch unreachable;
         @memcpy(@constCast(last.*.name), output.*.name[0..last.*.name.len]);
 
-        xfit.print_log("\nXFIT SYSLOG : {s}monitor {d} name: {s}, x:{d}, y:{d}, width:{d}, height:{d} [\n\n", .{
+        xfit.print_log("XFIT SYSLOG : {s}monitor {d} name: {s}, x:{d}, y:{d}, width:{d}, height:{d} [\n", .{
             if (last.*.is_primary) "primary " else "",
             i,
             last.*.name,
@@ -78,7 +78,7 @@ pub fn system_linux_start() void {
             crtc_info.*.height,
         });
         const hz = @as(f64, @floatFromInt(mode_.?.*.dotClock)) / @as(f64, @floatFromInt(mode_.?.*.hTotal * mode_.?.*.vTotal));
-        xfit.print_log("monitor {d} resolution  : width {d}, height {d}, refleshrate {d}\n", .{
+        xfit.print_log("monitor {d} resolution  : width {d}, height {d}, refleshrate {d}\n]\n", .{
             i,
             mode_.?.*.width,
             mode_.?.*.height,
@@ -89,7 +89,6 @@ pub fn system_linux_start() void {
             .refleshrate = hz,
             .size = .{ mode_.?.*.width, mode_.?.*.height },
         };
-        xfit.write("]\n");
     }
 }
 

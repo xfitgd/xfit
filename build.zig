@@ -68,7 +68,6 @@ pub fn run(
     build_options.addOption(XfitPlatform, "platform", option.PLATFORM);
     build_options.addOption(std.Target.SubSystem, "subsystem", if (option.is_console) .Console else .Windows);
     build_options.addOption(bool, "enable_log", option.enable_log);
-    build_options.addOption(bool, "legacy", user_setting.legacy);
 
     const out_arch_text = comptime [_][]const u8{
         "../lib/arm64-v8a",
@@ -99,9 +98,6 @@ pub fn run(
         "libvorbisenc.a",
         "libvorbisfile.a",
         "libminiaudio.a",
-        "libyuv.a",
-        "libavif.a",
-        "libminiaudio.a",
         "liblua.a", //custom
     };
 
@@ -130,8 +126,6 @@ pub fn run(
         "libvorbisfile.a",
         "liblua.a", //custom
         "libminiaudio.a",
-        "libyuv.a",
-        "libavif.a",
         "libz.so",
         "libX11.so",
         "libXrandr.so",
@@ -212,26 +206,13 @@ pub fn run(
                 .cpu_model = .baseline,
             } });
             if (target.result.cpu.arch == .x86_64) {
-                if (!user_setting.legacy) {
-                    target.result.cpu.features.addFeatureSet(std.Target.x86.featureSet(&.{
-                        .ssse3,
-                        .sse3,
-                        .sse4_1,
-                        .sse4_2,
-                        .popcnt,
-                        .avx,
-                        .avx2,
-                        .fma,
-                    }));
-                } else {
-                    target.result.cpu.features.addFeatureSet(std.Target.x86.featureSet(&.{
-                        .ssse3,
-                        .sse3,
-                        .sse4_1,
-                        .sse4_2,
-                        .popcnt,
-                    }));
-                }
+                target.result.cpu.features.addFeatureSet(std.Target.x86.featureSet(&.{
+                    .ssse3,
+                    .sse3,
+                    .sse4_1,
+                    .sse4_2,
+                    .popcnt,
+                }));
             } else if (target.result.cpu.arch == .aarch64) {
                 target.result.cpu.features.addFeatureSet(std.Target.aarch64.featureSet(&.{ .neon, .v8_2a }));
             }
@@ -281,26 +262,13 @@ pub fn run(
                 .cpu_model = .baseline,
             } });
             if (target.result.cpu.arch == .x86_64) {
-                if (!user_setting.legacy) {
-                    target.result.cpu.features.addFeatureSet(std.Target.x86.featureSet(&.{
-                        .ssse3,
-                        .sse3,
-                        .sse4_1,
-                        .sse4_2,
-                        .popcnt,
-                        .avx,
-                        .avx2,
-                        .fma,
-                    }));
-                } else {
-                    target.result.cpu.features.addFeatureSet(std.Target.x86.featureSet(&.{
-                        .ssse3,
-                        .sse3,
-                        .sse4_1,
-                        .sse4_2,
-                        .popcnt,
-                    }));
-                }
+                target.result.cpu.features.addFeatureSet(std.Target.x86.featureSet(&.{
+                    .ssse3,
+                    .sse3,
+                    .sse4_1,
+                    .sse4_2,
+                    .popcnt,
+                }));
             } else if (target.result.cpu.arch == .aarch64) {
                 target.result.cpu.features.addFeatureSet(std.Target.aarch64.featureSet(&.{.neon}));
             }
