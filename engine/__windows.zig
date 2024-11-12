@@ -193,7 +193,7 @@ pub fn windows_start() void {
         window_width = @intCast(__system.monitors.items[__system.init_set.screen_index].rect.width());
         window_height = @intCast(__system.monitors.items[__system.init_set.screen_index].rect.height());
         if (__system.init_set.screen_mode == xfit.screen_mode.FULLSCREEN) {
-            change_fullscreen(&__system.monitors.items[__system.init_set.screen_index], __system.monitors.items[__system.init_set.screen_index].primary_resolution.?);
+            change_fullscreen(&__system.monitors.items[__system.init_set.screen_index]);
         }
         __system.prev_window = .{
             .x = window_x,
@@ -406,7 +406,7 @@ pub fn set_fullscreen_mode(monitor: *const system.monitor_info) void {
     _ = win32.SetWindowLongPtrA(hWnd, win32.GWL_STYLE, win32.WS_POPUP);
     _ = win32.SetWindowLongPtrA(hWnd, win32.GWL_EXSTYLE, win32.WS_EX_APPWINDOW | win32.WS_EX_TOPMOST);
 
-    _ = win32.SetWindowPos(hWnd, win32.HWND_TOPMOST, monitor.*.rect.left, monitor.*.rect.top, monitor.*.resolution[0], monitor.*.resolution.size[1], 0);
+    _ = win32.SetWindowPos(hWnd, win32.HWND_TOPMOST, monitor.*.rect.left, monitor.*.rect.top, @intCast(monitor.*.resolution.size[0]), @intCast(monitor.*.resolution.size[1]), 0);
     _ = win32.ShowWindow(hWnd, win32.SW_MAXIMIZE);
 
     change_fullscreen(monitor);
@@ -797,8 +797,14 @@ fn MonitorEnumProc(hMonitor: win32.HMONITOR, hdcMonitor: win32.HDC, lprcMonitor:
     last.*.is_primary = (monitor_info.monitorInfo.dwFlags & win32.MONITORINFOF_PRIMARY) != 0;
     if (last.*.is_primary) __system.primary_monitor = last;
 
-    last.*.name = std.heap.c_allocator.alloc(u8, std.mem.len(monitor_info.szDevice)) catch unreachable;
-    @memcpy(last.*.name, monitor_info.szDevice[0..last.*.name.len]);
+    var len: usize = 0;
+    for (monitor_info.szDevice) |c| {
+        if (c == 0) break;
+        len += 1;
+    }
+
+    last.*.name = std.heap.c_allocator.alloc(u8, len) catch unreachable;
+    @memcpy(@constCast(last.*.name), monitor_info.szDevice[0..len]);
 
     xfit.print_log("\nXFIT SYSLOG : {s}monitor {d} name: {s}, x:{d}, y:{d}, width:{d}, height:{d} [\n\n", .{
         if (last.*.is_primary) "primary " else "",
