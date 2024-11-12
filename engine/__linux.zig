@@ -178,7 +178,7 @@ pub fn set_borderlessscreen_mode(monitor: *const system.monitor_info) void {
     defer __vulkan.fullscreen_mutex.unlock();
     const wm = window.get_screen_mode();
     if (wm != .BORDERLESSSCREEN) {
-        _ = c.XMoveResizeWindow(display, wnd, monitor.*.rect.left, monitor.*.rect.top, monitor.*.rect.width(), monitor.*.rect.height());
+        _ = c.XMoveResizeWindow(display, wnd, monitor.*.rect.left, monitor.*.rect.top, @intCast(monitor.*.rect.width()), @intCast(monitor.*.rect.height()));
         if (wm == .FULLSCREEN) {
             restore_fullscreen();
         } else {

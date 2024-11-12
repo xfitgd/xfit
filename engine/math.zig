@@ -74,10 +74,10 @@ pub fn rect_(comptime T: type) type {
         top: T,
         bottom: T,
 
-        pub inline fn width(self: *Self) T {
+        pub inline fn width(self: Self) T {
             return @intCast(@abs(self.right - self.left));
         }
-        pub inline fn height(self: *Self) T {
+        pub inline fn height(self: Self) T {
             return @intCast(@abs(self.top - self.bottom));
         }
         pub fn init(_left: T, _right: T, _top: T, _bottom: T) Self {
