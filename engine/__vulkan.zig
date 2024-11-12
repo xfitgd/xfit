@@ -831,7 +831,7 @@ pub fn vulkan_start() void {
         if (vulkanF == null) xfit.herr2("vulkan lib open : {d}", .{std.os.windows.GetLastError()});
         vkGetInstanceProcAddr = @alignCast(@ptrCast(__windows.win32.GetProcAddress(vulkanF, "vkGetInstanceProcAddr") orelse xfit.herrm("vulkan load vkGetInstanceProcAddr")));
     } else {
-        vulkanF = std.c.dlopen("libvulkan.so", .{ .NOW = true });
+        vulkanF = std.c.dlopen("libvulkan.so.1", .{ .NOW = true });
         if (vulkanF == null) xfit.herr2("vulkan lib open : {s}", .{std.c.dlerror().?});
         vkGetInstanceProcAddr = @alignCast(@ptrCast(std.c.dlsym(vulkanF, "vkGetInstanceProcAddr") orelse xfit.herrm("vulkan load vkGetInstanceProcAddr")));
     }

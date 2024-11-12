@@ -43,6 +43,16 @@ pub fn system_linux_start() void {
         defer c.XRRFreeCrtcInfo(crtc_info);
         defer c.XRRFreeOutputInfo(output);
 
+        var k: c_uint = 0;
+        var mode_: ?*c.XRRModeInfo = null;
+        while (k < screens_res.*.nmode) : (k += 1) {
+            if (output.*.modes[0] == screens_res.*.modes[k].id) {
+                mode_ = &screens_res.*.modes[k];
+                break;
+            }
+        }
+        if (mode_ == null) continue;
+
         __system.monitors.append(system.monitor_info{
             .is_primary = i == def_screen_idx,
             .rect = math.recti.init(
@@ -67,16 +77,6 @@ pub fn system_linux_start() void {
             crtc_info.*.width,
             crtc_info.*.height,
         });
-
-        var k: c_uint = 0;
-        var mode_: ?*c.XRRModeInfo = null;
-        while (k < screens_res.*.nmode) : (k += 1) {
-            if (output.*.modes[0] == screens_res.*.modes[k].id) {
-                mode_ = &screens_res.*.modes[k];
-                break;
-            }
-        }
-        if (mode_ == null) unreachable;
         const hz = @as(f64, @floatFromInt(mode_.?.*.dotClock)) / @as(f64, @floatFromInt(mode_.?.*.hTotal * mode_.?.*.vTotal));
         xfit.print_log("monitor {d} resolution  : width {d}, height {d}, refleshrate {d}\n", .{
             i,
