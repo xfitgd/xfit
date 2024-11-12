@@ -38,7 +38,6 @@ pub const BOOL = win32.BOOL;
 
 pub var hWnd: HWND = undefined;
 pub var hInstance: HINSTANCE = undefined;
-pub var screen_mode: xfit.screen_mode = xfit.screen_mode.WINDOW;
 
 const xbox_guid = win32.GUID{
     .Data1 = 0xec87f1e3,
@@ -281,8 +280,8 @@ pub fn set_window_size(w: u32, h: u32) void {
     _ = win32.AdjustWindowRect(&rect, style, FALSE);
 
     _ = win32.SetWindowPos(hWnd, 0, __system.prev_window.x, __system.prev_window.y, rect.right - rect.left, rect.bottom - rect.top, win32.SWP_DRAWFRAME);
-    __system.prev_window.width = @intCast(w);
-    __system.prev_window.height = @intCast(h);
+    __system.prev_window.width = w;
+    __system.prev_window.height = h;
 }
 
 pub fn set_window_pos(x: i32, y: i32) void {
@@ -386,33 +385,31 @@ pub fn __change_fullscreen_mode() void {
     }
 }
 
-fn change_fullscreen(monitor: *const system.monitor_info, resolution: *const system.screen_info) void {
+fn change_fullscreen(monitor: *const system.monitor_info) void {
     fullscreen_mode.dmSize = @sizeOf(win32.DEVMODEA);
     fullscreen_mode.dmFields = win32.DM_PELSWIDTH | win32.DM_PELSHEIGHT | win32.DM_DISPLAYFREQUENCY;
-    fullscreen_mode.dmPelsWidth = resolution.size[0];
-    fullscreen_mode.dmPelsHeight = resolution.size[1];
-    fullscreen_mode.dmDisplayFrequency = @intFromFloat(resolution.refleshrate);
+    fullscreen_mode.dmPelsWidth = monitor.*.resolution.size[0];
+    fullscreen_mode.dmPelsHeight = monitor.*.resolution.size[1];
+    fullscreen_mode.dmDisplayFrequency = @intFromFloat(monitor.*.resolution.refleshrate);
 
     @memcpy(fullscreen_name[0..fullscreen_name.len], monitor.name[0..monitor.name.len]);
 
     __system.current_monitor = monitor;
-    __system.current_resolution = resolution;
 
     if (__vulkan.VK_EXT_full_screen_exclusive_support and !__vulkan.is_fullscreen_ex) {
         __vulkan.is_fullscreen_ex = true;
     }
 }
 
-pub fn set_fullscreen_mode(monitor: *const system.monitor_info, resolution: *const system.screen_info) void {
-    screen_mode = xfit.screen_mode.FULLSCREEN;
+pub fn set_fullscreen_mode(monitor: *const system.monitor_info) void {
     __vulkan.fullscreen_mutex.lock();
     _ = win32.SetWindowLongPtrA(hWnd, win32.GWL_STYLE, win32.WS_POPUP);
     _ = win32.SetWindowLongPtrA(hWnd, win32.GWL_EXSTYLE, win32.WS_EX_APPWINDOW | win32.WS_EX_TOPMOST);
 
-    _ = win32.SetWindowPos(hWnd, win32.HWND_TOPMOST, monitor.*.rect.left, monitor.*.rect.top, @intCast(resolution.*.size[0]), @intCast(resolution.*.size[1]), 0);
+    _ = win32.SetWindowPos(hWnd, win32.HWND_TOPMOST, monitor.*.rect.left, monitor.*.rect.top, monitor.*.resolution[0], monitor.*.resolution.size[1], 0);
     _ = win32.ShowWindow(hWnd, win32.SW_MAXIMIZE);
 
-    change_fullscreen(monitor, resolution);
+    change_fullscreen(monitor);
     __vulkan.fullscreen_mutex.unlock();
 }
 
@@ -788,40 +785,46 @@ fn MonitorEnumProc(hMonitor: win32.HMONITOR, hdcMonitor: win32.HDC, lprcMonitor:
 
     __system.monitors.append(system.monitor_info{
         .is_primary = false,
-        .rect = math.recti.init(0, 0, 0, 0),
-        .resolutions = ArrayList(system.screen_info).init(std.heap.c_allocator),
+        .rect = math.recti.init(
+            monitor_info.monitorInfo.rcMonitor.left,
+            monitor_info.monitorInfo.rcMonitor.right,
+            monitor_info.monitorInfo.rcMonitor.top,
+            monitor_info.monitorInfo.rcMonitor.bottom,
+        ),
         .__hmonitor = hMonitor,
     }) catch |e| xfit.herr3("MonitorEnumProc __system.monitors.append", e);
     var last = &__system.monitors.items[__system.monitors.items.len - 1];
     last.*.is_primary = (monitor_info.monitorInfo.dwFlags & win32.MONITORINFOF_PRIMARY) != 0;
     if (last.*.is_primary) __system.primary_monitor = last;
-    last.*.rect = math.recti.init(monitor_info.monitorInfo.rcMonitor.left, monitor_info.monitorInfo.rcMonitor.right, monitor_info.monitorInfo.rcMonitor.top, monitor_info.monitorInfo.rcMonitor.bottom);
 
-    var i: u32 = 0;
+    last.*.name = std.heap.c_allocator.alloc(u8, std.mem.len(monitor_info.szDevice)) catch unreachable;
+    @memcpy(last.*.name, monitor_info.szDevice[0..last.*.name.len]);
+
+    xfit.print_log("\nXFIT SYSLOG : {s}monitor {d} name: {s}, x:{d}, y:{d}, width:{d}, height:{d} [\n\n", .{
+        if (last.*.is_primary) "primary " else "",
+        __system.monitors.items.len - 1,
+        last.*.name,
+        last.*.rect.left,
+        last.*.rect.top,
+        last.*.rect.width(),
+        last.*.rect.height(),
+    });
+
     var dm: win32.DEVMODEA = std.mem.zeroes(win32.DEVMODEA);
     dm.dmSize = @sizeOf(win32.DEVMODEA);
-    while (win32.EnumDisplaySettingsA(@ptrCast(&monitor_info.szDevice), i, &dm) != FALSE) : (i += 1) {
-        last.*.resolutions.append(.{
-            .monitor = last,
-            .refleshrate = @floatFromInt(dm.dmDisplayFrequency),
-            .size = .{ dm.dmPelsWidth, dm.dmPelsHeight },
-        }) catch |e| xfit.herr3("MonitorEnumProc last.*.resolutions.append", e);
-    }
     _ = win32.EnumDisplaySettingsA(@ptrCast(&monitor_info.szDevice), win32.ENUM_CURRENT_SETTINGS, &dm);
-    last.primary_resolution = null;
-
-    var j: usize = 0;
-    while (j < last.resolutions.items.len) : (j += 1) {
-        if (dm.dmPelsWidth == last.*.resolutions.items[j].size[0] and dm.dmPelsHeight == last.resolutions.items[j].size[1] and dm.dmDisplayFrequency == @as(u32, @intFromFloat(last.resolutions.items[j].refleshrate))) {
-            last.*.primary_resolution = &last.*.resolutions.items[j];
-            break;
-        }
-    }
-    if (last.*.primary_resolution == null) {
-        xfit.print("WARN can't find primary_resolution.\n", .{});
-        last.*.primary_resolution = &last.*.resolutions.items[last.resolutions.items.len - 1];
-    }
-    std.mem.copyForwards(u8, &last.*.name, &monitor_info.szDevice);
+    last.resolution = .{
+        .monitor = last,
+        .refleshrate = @floatFromInt(dm.dmDisplayFrequency),
+        .size = .{ dm.dmPelsWidth, dm.dmPelsHeight },
+    };
+    xfit.print_log("monitor {d} resolution : width {d}, height {d}, refleshrate {d}\n", .{
+        __system.monitors.items.len - 1,
+        dm.dmPelsWidth,
+        dm.dmPelsHeight,
+        dm.dmDisplayFrequency,
+    });
+    xfit.write("]\n");
 
     return TRUE;
 }

@@ -96,6 +96,12 @@ pub fn rect_(comptime T: type) type {
                 .bottom = self.top,
             };
         }
+        pub fn eql(self: Self, target: Self) bool {
+            return self.left == target.left and
+                self.right == target.right and
+                self.top == target.top and
+                self.bottom == target.bottom;
+        }
         pub fn calc_with_canvas(self: Self, _CANVAS_W: f32, _CANVAS_H: f32) Self {
             const _width = @as(f32, @floatFromInt(window.window_width()));
             const _height = @as(f32, @floatFromInt(window.window_height()));
@@ -127,8 +133,14 @@ pub fn rect_(comptime T: type) type {
         pub fn is_point_in(self: Self, pt: pointT) bool {
             return self.left <= pt[0] and self.right >= pt[0] and self.top >= pt[1] and self.bottom <= pt[1];
         }
+        pub fn is_point_in_window_rect(self: Self, pt: pointT) bool {
+            return self.left <= pt[0] and self.right >= pt[0] and self.top <= pt[1] and self.bottom >= pt[1];
+        }
         pub fn is_mouse_in(self: Self) bool {
             return self.is_point_in(input.get_cursor_pos());
+        }
+        pub fn is_mouse_in_window_rect(self: Self) bool {
+            return self.is_point_in_window_rect(input.get_cursor_pos());
         }
     };
 }

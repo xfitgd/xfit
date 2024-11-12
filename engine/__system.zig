@@ -145,7 +145,6 @@ pub var monitors: ArrayList(system.monitor_info) = undefined;
 pub var primary_monitor: *system.monitor_info = undefined;
 
 pub var current_monitor: ?*const system.monitor_info = null;
-pub var current_resolution: ?*const system.screen_info = null;
 
 pub var general_input_callback: ?input.general_input.CallbackFn = null;
 
@@ -219,7 +218,7 @@ pub fn loop() void {
 
 pub fn destroy() void {
     for (monitors.items) |*value| {
-        value.*.resolutions.deinit();
+        std.heap.c_allocator.free(value.*.name);
     }
     monitors.deinit();
     allocator.free(title);

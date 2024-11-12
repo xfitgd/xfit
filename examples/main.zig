@@ -296,7 +296,7 @@ fn key_down(_key: input.key) void {
     if (_key == input.key.F4) {
         if (window.get_screen_mode() == .WINDOW) {
             const monitor = window.get_monitor_from_window();
-            monitor.*.set_fullscreen_mode(monitor.*.primary_resolution.?);
+            monitor.*.set_fullscreen_mode();
             //monitor.*.set_borderlessscreen_mode();
         } else {
             window.set_window_mode();

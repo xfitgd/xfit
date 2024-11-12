@@ -879,6 +879,7 @@ pub fn vulkan_start() void {
                     if (!xfit.dbg and b == &validation_layer_support) continue;
                     layers_names.append(t) catch xfit.herrm("__vulkan_start layer append");
                     b.* = true;
+                    xfit.print_log("XFIT SYSLOG : vulkan {s} instance layer support\n", .{t});
                 }
             }
         }
@@ -896,6 +897,7 @@ pub fn vulkan_start() void {
                 if (!b.* and std.mem.eql(u8, t, value.*.extension_name[0..t.len])) {
                     extension_names.append(t) catch xfit.herrm("__vulkan_start ext append");
                     b.* = true;
+                    xfit.print_log("XFIT SYSLOG : vulkan {s} instance ext support\n", .{t});
                 }
             }
         }
@@ -1050,6 +1052,7 @@ pub fn vulkan_start() void {
                     if (!(xfit.platform == .android and b == &VK_EXT_full_screen_exclusive_support)) {
                         device_extension_names.append(t.ptr) catch xfit.herrm("vulkan_start dev ex append");
                         b.* = true;
+                        xfit.print_log("XFIT SYSLOG : vulkan {s} device ext support\n", .{t});
                     }
                 }
             }

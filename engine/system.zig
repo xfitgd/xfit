@@ -8,6 +8,7 @@ const root = @import("root");
 const xfit = @import("xfit.zig");
 const __android = @import("__android.zig");
 const __windows = @import("__windows.zig");
+const __linux = @import("__linux.zig");
 const window = @import("window.zig");
 const __vulkan = @import("__vulkan.zig");
 const __vulkan_allocator = @import("__vulkan_allocator.zig");
@@ -111,24 +112,29 @@ pub const monitor_info = struct {
     rect: math.recti,
 
     is_primary: bool,
-    primary_resolution: ?*screen_info = null,
-    resolutions: ArrayList(screen_info),
+    resolution: screen_info = undefined,
     __hmonitor: if (xfit.platform == .windows) windows.HMONITOR else void = if (xfit.platform == .windows) undefined else {},
 
-    name: [32]u8 = std.mem.zeroes([32]u8),
+    name: []const u8 = undefined,
 
-    pub fn set_fullscreen_mode(self: Self, resolution: *const screen_info) void {
+    pub fn set_fullscreen_mode(self: Self) void {
         __system.save_prev_window_state();
         if (xfit.platform == .windows) {
-            __windows.set_fullscreen_mode(&self, resolution);
+            __windows.set_fullscreen_mode(&self);
             @atomicStore(xfit.screen_mode, &__system.init_set.screen_mode, xfit.screen_mode.FULLSCREEN, std.builtin.AtomicOrder.monotonic);
-        } else {}
+        } else if (xfit.platform == .linux) {
+            __linux.set_fullscreen_mode(&self);
+            @atomicStore(xfit.screen_mode, &__system.init_set.screen_mode, xfit.screen_mode.FULLSCREEN, std.builtin.AtomicOrder.monotonic);
+        }
     }
     pub fn set_borderlessscreen_mode(self: Self) void {
         __system.save_prev_window_state();
         if (xfit.platform == .windows) {
             __windows.set_borderlessscreen_mode(&self);
             @atomicStore(xfit.screen_mode, &__system.init_set.screen_mode, xfit.screen_mode.BORDERLESSSCREEN, std.builtin.AtomicOrder.monotonic);
+        } else if (xfit.platform == .linux) {
+            __linux.set_borderlessscreen_mode(&self);
+            @atomicStore(xfit.screen_mode, &__system.init_set.screen_mode, xfit.screen_mode.FULLSCREEN, std.builtin.AtomicOrder.monotonic);
         } else {}
     }
 };
@@ -141,9 +147,6 @@ pub inline fn primary_monitor() *const monitor_info {
 }
 pub inline fn current_monitor() ?*const monitor_info {
     return __system.current_monitor;
-}
-pub inline fn current_resolution() ?*const screen_info {
-    return __system.current_resolution;
 }
 
 pub inline fn get_platform_version() *const platform_version {
