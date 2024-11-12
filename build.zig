@@ -5,21 +5,12 @@ pub const XfitPlatform = enum(u32) {
     windows,
     android,
     linux,
-    //mac,
 };
-
-// set(CMAKE_C_COMPILER zig cc -target aarch64-linux-android)
-// set(CMAKE_CXX_COMPILER zig c++ -target aarch64-linux-android)
-// # include_directories(SYSTEM "C:/Android/ndk/27.0.12077973/toolchains/llvm/prebuilt/windows-x86_64/sysroot/usr/include" -isystem "C:/Android/ndk/27.0.12077973/toolchains/llvm/prebuilt/windows-x86_64/sysroot/usr/include/x86_64-linux-android")
-// # add_link_options(-L"C:/Android/ndk/27.0.12077973/toolchains/llvm/prebuilt/windows-x86_64/sysroot/usr/lib/x86_64-linux-android/libc.a")
-
-// include_directories(SYSTEM "C:/Android/ndk/27.0.12077973/toolchains/llvm/prebuilt/windows-x86_64/sysroot/usr/include" -isystem "C:/Android/ndk/27.0.12077973/toolchains/llvm/prebuilt/windows-x86_64/sysroot/usr/include/aarch64-linux-android")
-// add_link_options(-L"C:/Android/ndk/27.0.12077973/toolchains/llvm/prebuilt/windows-x86_64/sysroot/usr/lib/aarch64-linux-android/libc.a")
 
 //* User Setting
 //크로스 플랫폼 빌드시 zig build -Dtarget=aarch64-windows(linux)
 //x86_64-windows(linux)
-const ANDROID_PATH = "/usr/local/Android";
+const ANDROID_PATH = "/usr/local/android";
 const ANDROID_NDK_PATH = std.fmt.comptimePrint("{s}/ndk/27.2.12479018", .{ANDROID_PATH});
 const ANDROID_VER = 35;
 const ANDROID_BUILD_TOOL_VER = "35.0.0";
