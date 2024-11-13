@@ -425,7 +425,7 @@ pub fn linux_loop() void {
             c.ClientMessage => {
                 if (event.xclient.data.l[0] == del_window) {
                     __system.exiting.store(true, std.builtin.AtomicOrder.release);
-                    return;
+                    break;
                 }
             },
             c.KeyPress => {
