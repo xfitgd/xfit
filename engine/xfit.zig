@@ -95,9 +95,8 @@ pub fn xfit_main(_allocator: std.mem.Allocator, _init_setting: *const init_setti
             __linux.linux_start();
 
             __linux.linux_loop();
-
-            __linux.linux_destroy();
         }
+        __linux.linux_destroy();
         __system.destroy();
 
         root.xfit_clean() catch |e| {

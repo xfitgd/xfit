@@ -503,6 +503,9 @@ pub fn linux_loop() void {
             else => {},
         }
     }
+
+    input_thread.join();
+    _ = c.XDestroyWindow(display, wnd);
 }
 
 pub fn linux_close() void {
@@ -517,7 +520,5 @@ pub fn linux_close() void {
 }
 
 pub fn linux_destroy() void {
-    input_thread.join();
-    _ = c.XDestroyWindow(display, wnd);
     _ = c.XCloseDisplay(display);
 }
