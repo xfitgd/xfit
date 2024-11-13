@@ -116,7 +116,7 @@ pub const range = struct {
 };
 pub const render_option2 = struct {
     option: render_option,
-    ranges: []const range,
+    ranges: []range,
 };
 
 ///alloc return []graphics.shape_source and each element vertices.array.? indices.array.?
