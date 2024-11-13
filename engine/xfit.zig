@@ -82,6 +82,7 @@ pub fn xfit_main(_allocator: std.mem.Allocator, _init_setting: *const init_setti
             herr3("xfit_init", e);
         };
     } else if (platform == .linux) {
+        __linux.system_linux_start();
         if (subsystem == SubSystem.Console) {
             root.xfit_init() catch |e| {
                 herr3("xfit_init", e);
@@ -91,20 +92,19 @@ pub fn xfit_main(_allocator: std.mem.Allocator, _init_setting: *const init_setti
                 herr3("xfit_destroy", e);
             };
         } else {
-            __linux.system_linux_start();
             __linux.linux_start();
 
             __linux.linux_loop();
 
             __linux.linux_destroy();
-            __system.destroy();
-
-            root.xfit_clean() catch |e| {
-                herr3("xfit_clean", e);
-            };
-
-            __system.real_destroy();
         }
+        __system.destroy();
+
+        root.xfit_clean() catch |e| {
+            herr3("xfit_clean", e);
+        };
+
+        __system.real_destroy();
     } else {
         @compileError("not support platform");
     }
