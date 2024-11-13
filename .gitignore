@@ -15,4 +15,4 @@
 !zip_x86_64.exe
 !zip_aarch64.exe
 
-user_setting.zig
+/user_setting.zig
