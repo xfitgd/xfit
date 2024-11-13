@@ -223,6 +223,14 @@ pub fn run(
                         .avx2,
                         .fma,
                     }));
+                } else {
+                    target.result.cpu.features.addFeatureSet(std.Target.x86.featureSet(&.{
+                        .ssse3,
+                        .sse3,
+                        .sse4_1,
+                        .sse4_2,
+                        .popcnt,
+                    }));
                 }
             } else if (target.result.cpu.arch == .aarch64) {
                 target.result.cpu.features.addFeatureSet(std.Target.aarch64.featureSet(&.{ .neon, .v8_2a }));
@@ -284,11 +292,17 @@ pub fn run(
                         .avx2,
                         .fma,
                     }));
+                } else {
+                    target.result.cpu.features.addFeatureSet(std.Target.x86.featureSet(&.{
+                        .ssse3,
+                        .sse3,
+                        .sse4_1,
+                        .sse4_2,
+                        .popcnt,
+                    }));
                 }
             } else if (target.result.cpu.arch == .aarch64) {
-                if (!user_setting.legacy) {
-                    target.result.cpu.features.addFeatureSet(std.Target.aarch64.featureSet(&.{.neon}));
-                }
+                target.result.cpu.features.addFeatureSet(std.Target.aarch64.featureSet(&.{.neon}));
             }
             target.query.cpu_features_add = target.result.cpu.features;
             target.query.abi = .gnu; //gnu required
