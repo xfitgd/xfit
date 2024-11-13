@@ -116,13 +116,18 @@ pub const range = struct {
 };
 pub const render_option2 = struct {
     option: render_option,
-    ranges: []range,
+    ranges: []const range,
 };
 
 ///alloc return []graphics.shape_source and each element vertices.array.? indices.array.?
 pub fn render_string2(_str: []const u8, _render_option: render_option2, allocator: std.mem.Allocator) ![]graphics.shape_source {
     var srclist = std.ArrayListAligned(graphics.shape_source, null).init(allocator);
-    errdefer srclist.deinit();
+    errdefer {
+        for (srclist.items) |*s| {
+            s.*.deinit_for_alloc();
+        }
+        srclist.deinit();
+    }
     var i: usize = 0;
     var option = _render_option.option;
     for (_render_option.ranges) |v| {
@@ -143,20 +148,10 @@ pub fn render_string2(_str: []const u8, _render_option: render_option2, allocato
             src = &srclist.items[srclist.items.len - 1];
         }
         if (v.len == 0 or i + v.len >= _str.len) {
-            _ = v.font.*.render_string(_str[i..], option, src, allocator) catch |e| {
-                for (srclist.items) |*s| {
-                    s.*.deinit_for_alloc();
-                }
-                return e;
-            };
+            _ = try v.font.*.render_string(_str[i..], option, src, allocator);
             break;
         } else {
-            option._offset = v.font.*.render_string(_str[i..(i + v.len)], option, src, allocator) catch |e| {
-                for (srclist.items) |*s| {
-                    s.*.deinit_for_alloc();
-                }
-                return e;
-            };
+            option._offset = try v.font.*.render_string(_str[i..(i + v.len)], option, src, allocator);
             i += v.len;
         }
     }
