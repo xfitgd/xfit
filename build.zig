@@ -7,18 +7,7 @@ pub const XfitPlatform = enum(u32) {
     linux,
 };
 
-//* User Setting
-//크로스 플랫폼 빌드시 zig build -Dtarget=aarch64-windows(linux)
-//x86_64-windows(linux)
-const ANDROID_PATH = "/usr/local/android";
-const ANDROID_NDK_PATH = std.fmt.comptimePrint("{s}/ndk/27.2.12479018", .{ANDROID_PATH});
-const ANDROID_VER = 35;
-const ANDROID_BUILD_TOOL_VER = "35.0.0";
-const legacy = false;
-
-//keystore 없으면 생성
-//keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000
-//*
+const user_setting = @import("user_setting.zig");
 
 inline fn get_lazypath(b: *std.Build, path: []const u8) std.Build.LazyPath {
     return if (std.fs.path.isAbsolute(path)) .{ .cwd_relative = path } else b.path(path);
@@ -79,7 +68,7 @@ pub fn run(
     build_options.addOption(XfitPlatform, "platform", option.PLATFORM);
     build_options.addOption(std.Target.SubSystem, "subsystem", if (option.is_console) .Console else .Windows);
     build_options.addOption(bool, "enable_log", option.enable_log);
-    build_options.addOption(bool, "legacy", legacy);
+    build_options.addOption(bool, "legacy", user_setting.legacy);
 
     const out_arch_text = comptime [_][]const u8{
         "../lib/arm64-v8a",
@@ -174,17 +163,17 @@ pub fn run(
             writer.print("include_dir={s}\n", .{std.fmt.allocPrint(
                 arena_allocator.allocator(),
                 "{s}/toolchains/llvm/prebuilt/{s}-x86_64/sysroot/usr/include",
-                .{ ANDROID_NDK_PATH, plat },
+                .{ user_setting.ANDROID_NDK_PATH, plat },
             ) catch unreachable}) catch unreachable;
             writer.print("sys_include_dir={s}\n", .{std.fmt.allocPrint(
                 arena_allocator.allocator(),
                 "{s}/toolchains/llvm/prebuilt/{s}-x86_64/sysroot/usr/include/{s}-linux-android",
-                .{ ANDROID_NDK_PATH, plat, get_arch_text(targets[i].cpu_arch.?) },
+                .{ user_setting.ANDROID_NDK_PATH, plat, get_arch_text(targets[i].cpu_arch.?) },
             ) catch unreachable}) catch unreachable;
             writer.print("crt_dir={s}\n", .{std.fmt.allocPrint(
                 arena_allocator.allocator(),
                 "{s}/toolchains/llvm/prebuilt/{s}-x86_64/sysroot/usr/lib/{s}-linux-android/{d}",
-                .{ ANDROID_NDK_PATH, plat, get_arch_text(targets[i].cpu_arch.?), ANDROID_VER },
+                .{ user_setting.ANDROID_NDK_PATH, plat, get_arch_text(targets[i].cpu_arch.?), user_setting.ANDROID_VER },
             ) catch unreachable}) catch unreachable;
             writer.writeAll("msvc_lib_dir=\n") catch unreachable;
             writer.writeAll("kernel32_lib_dir=\n") catch unreachable;
@@ -196,7 +185,7 @@ pub fn run(
             result.addLibraryPath(.{ .cwd_relative = std.fmt.allocPrint(
                 arena_allocator.allocator(),
                 "{s}/toolchains/llvm/prebuilt/{s}-x86_64/sysroot/usr/lib/{s}-linux-android/{d}",
-                .{ ANDROID_NDK_PATH, plat, get_arch_text(targets[i].cpu_arch.?), ANDROID_VER },
+                .{ user_setting.ANDROID_NDK_PATH, plat, get_arch_text(targets[i].cpu_arch.?), user_setting.ANDROID_VER },
             ) catch unreachable });
 
             // result.addLibraryPath(get_lazypath(b, std.fmt.allocPrint(arena_allocator.allocator(), "{s}/lib/android/{s}", .{ engine_path, get_arch_text(targets[i].cpu_arch.?) }) catch unreachable));
@@ -223,7 +212,7 @@ pub fn run(
                 .cpu_model = .baseline,
             } });
             if (target.result.cpu.arch == .x86_64) {
-                if (!legacy) {
+                if (!user_setting.legacy) {
                     target.result.cpu.features.addFeatureSet(std.Target.x86.featureSet(&.{
                         .ssse3,
                         .sse3,
@@ -284,7 +273,7 @@ pub fn run(
                 .cpu_model = .baseline,
             } });
             if (target.result.cpu.arch == .x86_64) {
-                if (!legacy) {
+                if (!user_setting.legacy) {
                     target.result.cpu.features.addFeatureSet(std.Target.x86.featureSet(&.{
                         .ssse3,
                         .sse3,
@@ -297,7 +286,7 @@ pub fn run(
                     }));
                 }
             } else if (target.result.cpu.arch == .aarch64) {
-                if (!legacy) {
+                if (!user_setting.legacy) {
                     target.result.cpu.features.addFeatureSet(std.Target.aarch64.featureSet(&.{.neon}));
                 }
             }
@@ -350,13 +339,13 @@ pub fn run(
     var cmd: *std.Build.Step.Run = undefined;
     if (builtin.os.tag == .windows) {
         if (option.PLATFORM == XfitPlatform.android) {
-            cmd = b.addSystemCommand(&.{ std.fmt.allocPrint(arena_allocator.allocator(), "{s}/compile.bat", .{engine_path}) catch unreachable, engine_path, b.install_path, "android", ANDROID_PATH, std.fmt.comptimePrint("{d}", .{ANDROID_VER}), ANDROID_BUILD_TOOL_VER, option.ANDROID_KEYSTORE.?, b.build_root.path.?, get_arch_text(builtin.cpu.arch) });
+            cmd = b.addSystemCommand(&.{ std.fmt.allocPrint(arena_allocator.allocator(), "{s}/compile.bat", .{engine_path}) catch unreachable, engine_path, b.install_path, "android", user_setting.ANDROID_PATH, std.fmt.comptimePrint("{d}", .{user_setting.ANDROID_VER}), user_setting.ANDROID_BUILD_TOOL_VER, option.ANDROID_KEYSTORE.?, b.build_root.path.?, get_arch_text(builtin.cpu.arch) });
         } else {
             cmd = b.addSystemCommand(&.{std.fmt.allocPrint(arena_allocator.allocator(), "{s}/compile.bat", .{engine_path}) catch unreachable});
         }
     } else {
         if (option.PLATFORM == XfitPlatform.android) {
-            cmd = b.addSystemCommand(&.{ std.fmt.allocPrint(arena_allocator.allocator(), "{s}/compile.sh", .{engine_path}) catch unreachable, engine_path, b.install_path, "android", ANDROID_PATH, std.fmt.comptimePrint("{d}", .{ANDROID_VER}), ANDROID_BUILD_TOOL_VER, option.ANDROID_KEYSTORE.?, b.build_root.path.?, get_arch_text(builtin.cpu.arch) });
+            cmd = b.addSystemCommand(&.{ std.fmt.allocPrint(arena_allocator.allocator(), "{s}/compile.sh", .{engine_path}) catch unreachable, engine_path, b.install_path, "android", user_setting.ANDROID_PATH, std.fmt.comptimePrint("{d}", .{user_setting.ANDROID_VER}), user_setting.ANDROID_BUILD_TOOL_VER, option.ANDROID_KEYSTORE.?, b.build_root.path.?, get_arch_text(builtin.cpu.arch) });
         } else {
             cmd = b.addSystemCommand(&.{std.fmt.allocPrint(arena_allocator.allocator(), "{s}/compile.sh", .{engine_path}) catch unreachable});
         }
