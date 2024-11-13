@@ -120,6 +120,7 @@ pub const monitor_info = struct {
     pub fn set_fullscreen_mode(self: Self) void {
         __vulkan.fullscreen_mutex.lock();
         defer __vulkan.fullscreen_mutex.unlock();
+        if (window.get_screen_mode() == .FULLSCREEN) return;
         __system.save_prev_window_state();
         if (xfit.platform == .windows) {
             __windows.set_fullscreen_mode(&self);
@@ -132,13 +133,14 @@ pub const monitor_info = struct {
     pub fn set_borderlessscreen_mode(self: Self) void {
         __vulkan.fullscreen_mutex.lock();
         defer __vulkan.fullscreen_mutex.unlock();
+        if (window.get_screen_mode() == .BORDERLESSSCREEN) return;
         __system.save_prev_window_state();
         if (xfit.platform == .windows) {
             __windows.set_borderlessscreen_mode(&self);
             @atomicStore(xfit.screen_mode, &__system.init_set.screen_mode, xfit.screen_mode.BORDERLESSSCREEN, std.builtin.AtomicOrder.monotonic);
         } else if (xfit.platform == .linux) {
             __linux.set_borderlessscreen_mode(&self);
-            @atomicStore(xfit.screen_mode, &__system.init_set.screen_mode, xfit.screen_mode.FULLSCREEN, std.builtin.AtomicOrder.monotonic);
+            @atomicStore(xfit.screen_mode, &__system.init_set.screen_mode, xfit.screen_mode.BORDERLESSSCREEN, std.builtin.AtomicOrder.monotonic);
         } else {}
     }
 };

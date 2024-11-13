@@ -329,6 +329,10 @@ pub fn set_window_mode2(pos: math.point(i32), size: math.point(u32), state: wind
 
     _ = win32.SendMessageA(hWnd, win32.WM_SETICON, win32.ICON_SMALL, @bitCast(@intFromPtr(icon)));
     _ = win32.SendMessageA(hWnd, win32.WM_SETICON, win32.ICON_BIG, @bitCast(@intFromPtr(icon)));
+
+    if (__vulkan.is_fullscreen_ex) {
+        __vulkan.is_fullscreen_ex = false;
+    }
 }
 
 pub fn set_window_title() void {

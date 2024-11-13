@@ -202,9 +202,11 @@ pub fn set_window_pos(x: i32, y: i32) void {
 }
 
 pub fn set_window_size(w: u32, h: u32) void {
+    reset_size_hint();
     _ = c.XResizeWindow(display, wnd, w + window_extent[0] + window_extent[1], h + window_extent[2] + window_extent[3]);
     __system.prev_window.width = w;
     __system.prev_window.height = h;
+    set_size_hint(true);
 }
 
 pub fn set_window_mode2(pos: math.point(i32), size: math.point(u32), state: window.window_state, can_maximize: bool, can_minimize: bool, can_resizewindow: bool) void {
@@ -220,6 +222,7 @@ pub fn set_window_mode2(pos: math.point(i32), size: math.point(u32), state: wind
             __vulkan.is_fullscreen_ex = false;
         }
     }
+    reset_size_hint();
     _ = c.XMoveResizeWindow(
         display,
         wnd,
@@ -228,6 +231,14 @@ pub fn set_window_mode2(pos: math.point(i32), size: math.point(u32), state: wind
         @intCast(size[0] + window_extent[0] + window_extent[1]),
         @intCast(size[1] + window_extent[2] + window_extent[3]),
     );
+    __system.prev_window = .{
+        .x = pos[0],
+        .y = pos[1],
+        .width = size[0],
+        .height = size[1],
+        .state = window.window_state.Restore,
+    };
+    set_size_hint(true);
 }
 
 pub fn set_fullscreen_mode(monitor: *const system.monitor_info) void {

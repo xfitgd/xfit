@@ -119,6 +119,7 @@ pub fn set_window_pos(x: i32, y: i32) void {
 pub fn set_window_mode() void {
     __vulkan.fullscreen_mutex.lock();
     defer __vulkan.fullscreen_mutex.unlock();
+    if (get_screen_mode() == .WINDOW) return;
     if (xfit.platform == .windows) {
         __windows.set_window_mode();
     } else if (xfit.platform == .linux) {
@@ -148,7 +149,7 @@ pub fn set_window_mode2(pos: math.point(i32), size: math.point(u32), state: syst
     if (xfit.platform == .windows) {
         __windows.set_window_mode2(pos, size, state, state, _can_maximize, _can_minimize, _can_resizewindow);
     } else if (xfit.platform == .linux) {
-        //TODO _can_maximize, _can_minimize, _can_resizewindow은 나중에 지원?
+        //TODO _can_maximize, _can_minimize 나중에 지원?
         __linux.set_window_mode2(pos, size, state, state, _can_maximize, _can_minimize, _can_resizewindow);
     } else {
         return;
