@@ -6,6 +6,7 @@ const system = @import("system.zig");
 const __system = @import("__system.zig");
 const __windows = @import("__windows.zig");
 const __linux = @import("__linux.zig");
+const __vulkan = @import("__vulkan.zig");
 const __android = @import("__android.zig");
 const math = @import("math.zig");
 const xfit = @import("xfit.zig");
@@ -116,6 +117,8 @@ pub fn set_window_pos(x: i32, y: i32) void {
 }
 
 pub fn set_window_mode() void {
+    __vulkan.fullscreen_mutex.lock();
+    defer __vulkan.fullscreen_mutex.unlock();
     if (xfit.platform == .windows) {
         __windows.set_window_mode();
     } else if (xfit.platform == .linux) {
@@ -140,6 +143,8 @@ pub fn set_window_mode() void {
     }
 }
 pub fn set_window_mode2(pos: math.point(i32), size: math.point(u32), state: system.window_state, _can_maximize: bool, _can_minimize: bool, _can_resizewindow: bool) void {
+    __vulkan.fullscreen_mutex.lock();
+    defer __vulkan.fullscreen_mutex.unlock();
     if (xfit.platform == .windows) {
         __windows.set_window_mode2(pos, size, state, state, _can_maximize, _can_minimize, _can_resizewindow);
     } else if (xfit.platform == .linux) {

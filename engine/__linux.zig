@@ -151,8 +151,6 @@ fn change_fullscreen(monitor: *const system.monitor_info, _switch_from_window: b
 fn restore_fullscreen() void {}
 
 pub fn set_window_mode() void {
-    __vulkan.fullscreen_mutex.lock();
-    defer __vulkan.fullscreen_mutex.unlock();
     const wm = window.get_screen_mode();
     if (wm != .WINDOW) {
         toggle_borderless(false);
@@ -173,8 +171,6 @@ pub fn set_window_mode() void {
 }
 
 pub fn set_borderlessscreen_mode(monitor: *const system.monitor_info) void {
-    __vulkan.fullscreen_mutex.lock();
-    defer __vulkan.fullscreen_mutex.unlock();
     const wm = window.get_screen_mode();
     if (wm != .BORDERLESSSCREEN) {
         _ = c.XMoveResizeWindow(display, wnd, monitor.*.rect.left, monitor.*.rect.top, @intCast(monitor.*.rect.width()), @intCast(monitor.*.rect.height()));
@@ -216,8 +212,6 @@ pub fn set_window_mode2(pos: math.point(i32), size: math.point(u32), state: wind
     _ = can_minimize;
     _ = can_resizewindow;
     _ = state;
-    __vulkan.fullscreen_mutex.lock();
-    defer __vulkan.fullscreen_mutex.unlock();
     const wm = window.get_screen_mode();
     if (wm != .WINDOW) {
         toggle_borderless(false);
@@ -237,8 +231,6 @@ pub fn set_window_mode2(pos: math.point(i32), size: math.point(u32), state: wind
 }
 
 pub fn set_fullscreen_mode(monitor: *const system.monitor_info) void {
-    __vulkan.fullscreen_mutex.lock();
-    defer __vulkan.fullscreen_mutex.unlock();
     const wm = window.get_screen_mode();
     change_fullscreen(monitor, wm == .WINDOW);
     _ = c.XMoveResizeWindow(display, wnd, monitor.*.rect.left, monitor.*.rect.top, monitor.*.resolution.size[0], monitor.*.resolution.size[1]);

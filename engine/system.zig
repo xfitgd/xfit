@@ -118,6 +118,8 @@ pub const monitor_info = struct {
     name: []const u8 = undefined,
 
     pub fn set_fullscreen_mode(self: Self) void {
+        __vulkan.fullscreen_mutex.lock();
+        defer __vulkan.fullscreen_mutex.unlock();
         __system.save_prev_window_state();
         if (xfit.platform == .windows) {
             __windows.set_fullscreen_mode(&self);
@@ -128,6 +130,8 @@ pub const monitor_info = struct {
         }
     }
     pub fn set_borderlessscreen_mode(self: Self) void {
+        __vulkan.fullscreen_mutex.lock();
+        defer __vulkan.fullscreen_mutex.unlock();
         __system.save_prev_window_state();
         if (xfit.platform == .windows) {
             __windows.set_borderlessscreen_mode(&self);

@@ -247,8 +247,6 @@ pub fn set_window_mode() void {
     var rect: RECT = .{ .left = 0, .top = 0, .right = @intCast(__system.prev_window.width), .bottom = @intCast(__system.prev_window.height) };
     _ = win32.AdjustWindowRect(&rect, style, FALSE);
 
-    __vulkan.fullscreen_mutex.lock();
-
     _ = win32.SetWindowLongPtrA(hWnd, win32.GWL_STYLE, @intCast(style));
     _ = win32.SetWindowLongPtrA(hWnd, win32.GWL_EXSTYLE, 0);
     _ = win32.SetWindowPos(hWnd, null, __system.prev_window.x, __system.prev_window.y, rect.right - rect.left, rect.bottom - rect.top, win32.SWP_DRAWFRAME);
@@ -265,8 +263,6 @@ pub fn set_window_mode() void {
 
     _ = win32.SendMessageA(hWnd, win32.WM_SETICON, win32.ICON_SMALL, @bitCast(@intFromPtr(icon)));
     _ = win32.SendMessageA(hWnd, win32.WM_SETICON, win32.ICON_BIG, @bitCast(@intFromPtr(icon)));
-
-    __vulkan.fullscreen_mutex.unlock();
 }
 
 pub fn set_window_size(w: u32, h: u32) void {
@@ -321,8 +317,6 @@ pub fn set_window_mode2(pos: math.point(i32), size: math.point(u32), state: wind
     var rect: RECT = .{ .left = 0, .top = 0, .right = @intCast(size.x), .bottom = @intCast(size.y) };
     _ = win32.AdjustWindowRect(&rect, style, FALSE);
 
-    __vulkan.fullscreen_mutex.lock();
-
     _ = win32.SetWindowLongPtrA(hWnd, win32.GWL_STYLE, style);
     _ = win32.SetWindowLongPtrA(hWnd, win32.GWL_EXSTYLE, 0);
     _ = win32.SetWindowPos(hWnd, 0, pos.x, pos.y, rect.right - rect.left, rect.bottom - rect.top, win32.SWP_DRAWFRAME);
@@ -335,8 +329,6 @@ pub fn set_window_mode2(pos: math.point(i32), size: math.point(u32), state: wind
 
     _ = win32.SendMessageA(hWnd, win32.WM_SETICON, win32.ICON_SMALL, @bitCast(@intFromPtr(icon)));
     _ = win32.SendMessageA(hWnd, win32.WM_SETICON, win32.ICON_BIG, @bitCast(@intFromPtr(icon)));
-
-    __vulkan.fullscreen_mutex.unlock();
 }
 
 pub fn set_window_title() void {
@@ -347,7 +339,6 @@ pub fn set_window_title() void {
 }
 
 pub fn set_borderlessscreen_mode(monitor: *const system.monitor_info) void {
-    __vulkan.fullscreen_mutex.lock();
     _ = win32.SetWindowLongPtrA(hWnd, win32.GWL_STYLE, win32.WS_POPUP);
     _ = win32.SetWindowLongPtrA(hWnd, win32.GWL_EXSTYLE, win32.WS_EX_APPWINDOW);
 
@@ -358,7 +349,6 @@ pub fn set_borderlessscreen_mode(monitor: *const system.monitor_info) void {
     if (__vulkan.is_fullscreen_ex) {
         __vulkan.is_fullscreen_ex = false;
     }
-    __vulkan.fullscreen_mutex.unlock();
 }
 
 pub fn get_window_state() window.window_state {
@@ -403,7 +393,6 @@ fn change_fullscreen(monitor: *const system.monitor_info) void {
 }
 
 pub fn set_fullscreen_mode(monitor: *const system.monitor_info) void {
-    __vulkan.fullscreen_mutex.lock();
     _ = win32.SetWindowLongPtrA(hWnd, win32.GWL_STYLE, win32.WS_POPUP);
     _ = win32.SetWindowLongPtrA(hWnd, win32.GWL_EXSTYLE, win32.WS_EX_APPWINDOW | win32.WS_EX_TOPMOST);
 
@@ -411,7 +400,6 @@ pub fn set_fullscreen_mode(monitor: *const system.monitor_info) void {
     _ = win32.ShowWindow(hWnd, win32.SW_MAXIMIZE);
 
     change_fullscreen(monitor);
-    __vulkan.fullscreen_mutex.unlock();
 }
 
 pub fn nanosleep(ns: u64) void {

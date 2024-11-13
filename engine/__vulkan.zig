@@ -2006,7 +2006,7 @@ fn create_swapchain_and_imageviews(comptime program_start: bool) void {
         .clipped = 1,
         .old_swapchain = .null_handle,
         .image_sharing_mode = .exclusive,
-        .p_next = if (is_fullscreen_ex) @ptrCast(&fullS) else null,
+        .p_next = if (VK_EXT_full_screen_exclusive_support and is_fullscreen_ex) @ptrCast(&fullS) else null,
     };
 
     const queueFamiliesIndices = [_]u32{ graphicsFamilyIndex, presentFamilyIndex };
