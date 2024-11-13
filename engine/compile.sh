@@ -12,7 +12,8 @@ ARCH=$9
 
 if [ "$PLATFORM" = "android" ]
 then
-    if [ ! - "$OUT_DIR" ]; then
+    if [ ! -d $OUT_DIR ]
+    then
         mkdir $OUT_DIR
     fi
     "${ANDROID_PATH}/build-tools/${ANDROID_BUILD_TOOL_VER}/aapt2" compile --dir res -o "${OUT_DIR}/res.zip"
