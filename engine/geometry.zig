@@ -101,7 +101,7 @@ pub inline fn point_line_side(p: point, l0: point, l1: point) f32 {
     return (l1[0] - l0[0]) * (p[1] - l0[1]) - (p[0] - l0[0]) * (l1[1] - l0[1]);
 }
 ///https://bowbowbow.tistory.com/24
-pub fn point_in_polygon(p: point, pts: []point) bool {
+pub fn point_in_polygon(p: point, pts: []const point) bool {
     var i: usize = 0;
     //crosses는 점p와 오른쪽 반직선과 다각형과의 교점의 개수
     var crosses: usize = 0;
@@ -117,7 +117,7 @@ pub fn point_in_polygon(p: point, pts: []point) bool {
     }
     return (crosses % 2) > 0;
 }
-pub fn center_point_in_polygon(pts: []point) point {
+pub fn center_point_in_polygon(pts: []const point) point {
     var i: usize = 0;
     var area: f32 = 0;
     var p: point = .{ 0, 0 };
@@ -131,7 +131,7 @@ pub fn center_point_in_polygon(pts: []point) point {
     p *= @splat(1.0 / area);
     return p;
 }
-pub fn line_in_polygon(a: point, b: point, pts: []point, check_inside_line: bool) bool {
+pub fn line_in_polygon(a: point, b: point, pts: []const point, check_inside_line: bool) bool {
     if (check_inside_line and point_in_polygon(a, pts)) return true; //반드시 점 ab가 다각형 내에 모두 있어야 선 ab와 다각형 선분이 교차하지 않는다. 따라서 b는 확인할 필요 없다.
     var i: usize = 0;
     var result: point = undefined;

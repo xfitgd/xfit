@@ -10,6 +10,7 @@ const geometry = @import("geometry.zig");
 const rect = math.rect;
 const mem = @import("mem.zig");
 const point = math.point;
+const input = @import("input.zig");
 const vector = math.vector;
 const matrix = math.matrix;
 const matrix_error = math.matrix_error;
@@ -28,13 +29,13 @@ pub const iarea = union(iarea_type) {
     pub inline fn is_point_in(self: iarea, pt: point) bool {
         switch (self) {
             .rect => |*e| return e.*.is_point_in(pt),
-            else => return false,
+            .polygon => |e| geometry.point_in_polygon(pt, e),
         }
     }
     pub inline fn is_mouse_in(self: iarea) bool {
         switch (self) {
             .rect => |*e| return e.*.is_mouse_in(),
-            else => return false,
+            .polygon => |e| geometry.point_in_polygon(input.get_cursor_pos(), e),
         }
     }
 };
