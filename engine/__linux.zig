@@ -348,6 +348,10 @@ pub fn linux_start() void {
     var res_remain: c_ulong = undefined;
     var res_data: [*c]u8 = undefined;
 
+    const wm_Name = c.XInternAtom(display, "_NET_WM_NAME", 0);
+    const utf8Str = c.XInternAtom(display, "UTF8_STRING", 0);
+    _ = c.XChangeProperty(display, wnd, wm_Name, utf8Str, 8, c.PropModeReplace, __system.title.ptr, @intCast(__system.title.len));
+
     del_window = c.XInternAtom(display, "WM_DELETE_WINDOW", 0);
     state_window = c.XInternAtom(display, "WM_STATE", 0);
     _ = c.XSetWMProtocols(display, wnd, &del_window, 1);
