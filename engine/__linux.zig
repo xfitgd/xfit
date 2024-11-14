@@ -322,8 +322,8 @@ pub fn linux_start() void {
 
     if (__system.init_set.window_width == xfit.init_setting.DEF_SIZE or __system.init_set.window_width == 0) __system.init_set.window_width = @as(u32, @intCast(__system.monitors.items[__system.init_set.screen_index].rect.width())) / 2;
     if (__system.init_set.window_height == xfit.init_setting.DEF_SIZE or __system.init_set.window_height == 0) __system.init_set.window_height = @as(u32, @intCast(__system.monitors.items[__system.init_set.screen_index].rect.height())) / 2;
-    if (__system.init_set.window_x == xfit.init_setting.DEF_POS) __system.init_set.window_x = 0;
-    if (__system.init_set.window_y == xfit.init_setting.DEF_POS) __system.init_set.window_y = 0;
+    if (__system.init_set.window_x == xfit.init_setting.DEF_POS) __system.init_set.window_x = __system.monitors.items[__system.init_set.screen_index].rect.left + @divFloor(__system.monitors.items[__system.init_set.screen_index].rect.width(), 4);
+    if (__system.init_set.window_y == xfit.init_setting.DEF_POS) __system.init_set.window_y = __system.monitors.items[__system.init_set.screen_index].rect.top + @divFloor(__system.monitors.items[__system.init_set.screen_index].rect.height(), 4);
 
     wnd = c.XCreateWindow(
         display,
