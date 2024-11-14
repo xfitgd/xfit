@@ -957,7 +957,7 @@ pub fn vulkan_start() void {
             .enabled_extension_count = @intCast(extension_names.items.len),
             .pp_enabled_extension_names = extension_names.items.ptr,
             .p_next = if (features == null) null else @ptrCast(&features),
-            .flags = .{ .enumerate_portability_bit_khr = true },
+            .flags = .{ .enumerate_portability_bit_khr = VK_KHR_portability_enumeration_support },
         };
 
         vkInstance = vkb.createInstance(&createInfo, null) catch |e|
