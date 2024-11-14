@@ -57,6 +57,7 @@ pub fn init(_font_data: []const u8, _face_index: u32) !Self {
     if (err != freetype.FT_Err_Ok) {
         return font_error.load_error;
     }
+    _ = freetype.FT_Set_Char_Size(font.__face, 0, 16 * 64, 0, 0);
     return font;
 }
 
@@ -119,6 +120,10 @@ pub const render_option2 = struct {
     ranges: []const range,
 };
 
+pub fn set_font_size(self: *Self, pt: u32) void {
+    _ = freetype.FT_Set_Char_Size(self.*.__face, 0, pt, 0, 0);
+}
+
 ///alloc return []graphics.shape_source and each element vertices.array.? indices.array.?
 pub fn render_string2(_str: []const u8, _render_option: render_option2, allocator: std.mem.Allocator) ![]graphics.shape_source {
     var srclist = std.ArrayListAligned(graphics.shape_source, null).init(allocator);
@@ -171,13 +176,13 @@ pub fn render_string(self: *Self, _str: []const u8, _render_option: render_optio
     while (utf8.nextCodepoint()) |codepoint| {
         if (_render_option.area != null and offset[1] <= -_render_option.area.?[1]) break;
         if (codepoint == '\n') {
-            offset[1] -= @as(f32, @floatFromInt(self.*.__face.*.height)) / 64.0;
+            offset[1] -= @as(f32, @floatFromInt(self.*.__face.*.size.*.metrics.height)) / 64.0;
             offset[0] = 0;
             continue;
         }
         minP = @min(minP, offset);
         try _render_char(self, codepoint, out_shape_src, &offset, _render_option.area, _render_option.scale, allocator);
-        maxP = @max(maxP, point{ offset[0], offset[1] + @as(f32, @floatFromInt(self.*.__face.*.height)) / 64.0 });
+        maxP = @max(maxP, point{ offset[0], offset[1] + @as(f32, @floatFromInt(self.*.__face.*.size.*.metrics.height)) / 64.0 });
     }
     var i: usize = start_;
     const size: point = (if (_render_option.area != null) _render_option.area.? else (maxP - minP)) * point{ 1, 1 };
