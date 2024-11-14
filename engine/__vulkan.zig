@@ -320,7 +320,16 @@ pub var vkRenderPassCopy: vk.RenderPass = undefined;
 pub var vkSwapchain: vk.SwapchainKHR = .null_handle;
 
 pub var vkCommandPool: vk.CommandPool = undefined;
-pub var vkCommandBuffer: vk.CommandBuffer = undefined;
+pub var vkCommandBuffer: [render_command.MAX_FRAME]vk.CommandBuffer = undefined;
+
+pub var depth_optimal = false;
+pub var depth_transfer_src_optimal = false;
+pub var depth_transfer_dst_optimal = false;
+pub var depth_sample_optimal = false;
+pub var color_attach_optimal = false;
+pub var color_sample_optimal = false;
+pub var color_transfer_src_optimal = false;
+pub var color_transfer_dst_optimal = false;
 
 var vkImageAvailableSemaphore: [render_command.MAX_FRAME]vk.Semaphore = .{.null_handle} ** render_command.MAX_FRAME;
 var vkRenderFinishedSemaphore: [render_command.MAX_FRAME]vk.Semaphore = .{.null_handle} ** render_command.MAX_FRAME;
@@ -363,6 +372,7 @@ pub var surfaceCap: vk.SurfaceCapabilitiesKHR = undefined;
 
 var formats: []vk.SurfaceFormatKHR = undefined;
 pub var format: vk.SurfaceFormatKHR = undefined;
+pub var depth_format: __vulkan_allocator.texture_format = .d24_unorm_s8_uint;
 pub var presentMode: vk.PresentModeKHR = undefined;
 
 pub var linear_sampler: vk.Sampler = undefined;
@@ -408,6 +418,7 @@ pub var VK_KHR_portability_enumeration_support = false;
 pub var validation_layer_support = false;
 //device
 pub var VK_EXT_full_screen_exclusive_support = false;
+pub var VK_KHR_portability_subset_support = false;
 
 fn createShaderModule(code: []align(@alignOf(u32)) const u8) vk.ShaderModule {
     const createInfo: vk.ShaderModuleCreateInfo = .{ .code_size = code.len, .p_code = @ptrCast(code.ptr) };
@@ -841,19 +852,24 @@ pub fn vulkan_start() void {
 
     vkb = BaseDispatch.load(vkGetInstanceProcAddr) catch unreachable;
 
-    const appInfo: vk.ApplicationInfo = .{
+    var appInfo: vk.ApplicationInfo = .{
         .p_application_name = __system.title.ptr,
         .application_version = vk.makeApiVersion(1, 0, 0, 0),
         .p_engine_name = "Xfit",
         .engine_version = vk.makeApiVersion(1, 0, 0, 0),
         .api_version = vk.API_VERSION_1_1,
     };
+    _ = vkGetInstanceProcAddr(.null_handle, "vkEnumerateInstanceVersion") orelse {
+        xfit.write_log("XFIT SYSLOG : vulkan 1.0 device, set api version 1.0\n");
+        appInfo.api_version = vk.API_VERSION_1_0;
+    };
 
     {
         const ext = [_][:0]const u8{
             "VK_KHR_get_surface_capabilities2",
+            "VK_KHR_portability_enumeration",
         };
-        const checked: [ext.len]*bool = .{&VK_KHR_get_surface_capabilities2_support};
+        const checked: [ext.len]*bool = .{ &VK_KHR_get_surface_capabilities2_support, &VK_KHR_portability_enumeration_support };
 
         const layers = [_][:0]const u8{
             "VK_LAYER_KHRONOS_validation",
@@ -937,6 +953,7 @@ pub fn vulkan_start() void {
             .enabled_extension_count = @intCast(extension_names.items.len),
             .pp_enabled_extension_names = extension_names.items.ptr,
             .p_next = if (features == null) null else @ptrCast(&features),
+            .flags = .{ .enumerate_portability_bit_khr = true },
         };
 
         vkInstance = vkb.createInstance(&createInfo, null) catch |e|
@@ -1042,11 +1059,13 @@ pub fn vulkan_start() void {
             "VK_EXT_full_screen_exclusive",
             //"VK_KHR_depth_stencil_resolve",
             //"VK_KHR_create_renderpass2",
+            "VK_KHR_portability_subset",
         };
         const checked: [ext.len]*bool = .{
             &VK_EXT_full_screen_exclusive_support,
             //&VK_KHR_depth_stencil_resolve_support,
             // &VK_KHR_create_renderpass2_support,
+            &VK_KHR_portability_subset_support,
         };
 
         while (i < deviceExtensionCount) : (i += 1) {
@@ -1116,7 +1135,7 @@ pub fn vulkan_start() void {
     nearest_sampler = vkd.?.createSampler(&sampler_info, null) catch |e| xfit.herr3("__vulkan.vulkan_start createSampler nearest_sampler", e);
 
     const depthAttachmentSample: vk.AttachmentDescription = .{
-        .format = .d24_unorm_s8_uint,
+        .format = depth_format.__get(),
         .samples = .{ .@"4_bit" = true },
         .load_op = .load,
         .store_op = .store,
@@ -1127,7 +1146,7 @@ pub fn vulkan_start() void {
     };
 
     const depthAttachmentSampleClear: vk.AttachmentDescription = .{
-        .format = .d24_unorm_s8_uint,
+        .format = depth_format.__get(),
         .samples = .{ .@"4_bit" = true },
         .load_op = .clear,
         .store_op = .store,
@@ -1193,7 +1212,7 @@ pub fn vulkan_start() void {
     };
 
     const depthAttachmentClear: vk.AttachmentDescription = .{
-        .format = .d24_unorm_s8_uint,
+        .format = depth_format.__get(),
         .samples = .{ .@"1_bit" = true },
         .load_op = .clear,
         .store_op = .store,
@@ -1215,7 +1234,7 @@ pub fn vulkan_start() void {
     };
 
     const depthAttachment: vk.AttachmentDescription = .{
-        .format = .d24_unorm_s8_uint,
+        .format = depth_format.__get(),
         .samples = .{ .@"1_bit" = true },
         .load_op = .load,
         .store_op = .store,
@@ -1575,7 +1594,7 @@ pub fn vulkan_start() void {
     const allocInfo: vk.CommandBufferAllocateInfo = .{
         .command_pool = vkCommandPool,
         .level = .primary,
-        .command_buffer_count = 1,
+        .command_buffer_count = render_command.MAX_FRAME,
     };
 
     vkd.?.allocateCommandBuffers(&allocInfo, @ptrCast(&vkCommandBuffer)) catch |e| xfit.herr3("__vulkan.vulkan_start allocateCommandBuffers vkCommandBuffer", e);
@@ -1713,7 +1732,7 @@ fn create_framebuffer() void {
     depth_stencil_image_sample.create_texture(.{
         .width = vkExtent_rotation.width,
         .height = vkExtent_rotation.height,
-        .format = .d24_unorm_s8_uint,
+        .format = depth_format,
         .samples = 4,
         .tex_use = .{
             .image_resource = false,
@@ -1736,7 +1755,7 @@ fn create_framebuffer() void {
     depth_stencil_image.create_texture(.{
         .width = vkExtent_rotation.width,
         .height = vkExtent_rotation.height,
-        .format = .d24_unorm_s8_uint,
+        .format = depth_format,
         .tex_use = .{
             .image_resource = false,
             .frame_buffer = true,
@@ -1896,10 +1915,50 @@ fn create_swapchain_and_imageviews(comptime program_start: bool) void {
         @atomicStore(u32, &__system.init_set.window_width, @intCast(vkExtent.width), std.builtin.AtomicOrder.monotonic);
         @atomicStore(u32, &__system.init_set.window_height, @intCast(vkExtent.height), std.builtin.AtomicOrder.monotonic);
     }
-
+    // pub var depth_optimal = false;
+    // pub var depth_transfer_src_optimal = false;
+    // pub var depth_transfer_dst_optimal = false;
+    // pub var depth_sample_optimal = false;
+    // pub var color_attach_optimal = false;
+    // pub var color_sample_optimal = false;
+    // pub var color_transfer_src_optimal = false;
+    // pub var color_transfer_dst_optimal = false;
     if (program_start) {
         format = chooseSwapSurfaceFormat(formats);
         presentMode = chooseSwapPresentMode(presentModes, __system.init_set.vSync);
+
+        var depth_prop = vki.?.getPhysicalDeviceFormatProperties(vk_physical_device, .d24_unorm_s8_uint);
+        depth_optimal = depth_prop.optimal_tiling_features.contains(.{ .depth_stencil_attachment_bit = true });
+        if (!depth_optimal and !depth_prop.linear_tiling_features.contains(.{ .depth_stencil_attachment_bit = true })) {
+            depth_prop = vki.?.getPhysicalDeviceFormatProperties(vk_physical_device, .d32_sfloat_s8_uint);
+            depth_optimal = depth_prop.optimal_tiling_features.contains(.{ .depth_stencil_attachment_bit = true });
+            depth_transfer_src_optimal = depth_prop.optimal_tiling_features.contains(.{ .transfer_src_bit = true });
+            depth_transfer_dst_optimal = depth_prop.optimal_tiling_features.contains(.{ .transfer_dst_bit = true });
+            depth_sample_optimal = depth_prop.optimal_tiling_features.contains(.{ .sampled_image_bit = true });
+            depth_format = .d32_sfloat_s8_uint;
+        } else {
+            depth_transfer_src_optimal = depth_prop.optimal_tiling_features.contains(.{ .transfer_src_bit = true });
+            depth_transfer_dst_optimal = depth_prop.optimal_tiling_features.contains(.{ .transfer_dst_bit = true });
+            depth_sample_optimal = depth_prop.optimal_tiling_features.contains(.{ .sampled_image_bit = true });
+        }
+
+        const color_prop = vki.?.getPhysicalDeviceFormatProperties(vk_physical_device, format.format);
+        color_attach_optimal = color_prop.optimal_tiling_features.contains(.{ .color_attachment_bit = true });
+        color_sample_optimal = color_prop.optimal_tiling_features.contains(.{ .sampled_image_bit = true });
+        color_transfer_src_optimal = color_prop.optimal_tiling_features.contains(.{ .transfer_src_bit = true });
+        color_transfer_dst_optimal = color_prop.optimal_tiling_features.contains(.{ .transfer_dst_bit = true });
+
+        xfit.print_log("XFIT SYSLOG : depth format : {}\n", .{depth_format});
+        xfit.print_log("XFIT SYSLOG : optimal format supports : \n depth_optimal:{}, depth_transfer_src_optimal:{}, depth_transfer_dst_optimal:{}, depth_sample_optimal:{}\ncolor_attach_optimal:{}, color_sample_optimal:{}, color_transfer_src_optimal:{}, color_transfer_dst_optimal:{}\n", .{
+            depth_optimal,
+            depth_transfer_src_optimal,
+            depth_transfer_dst_optimal,
+            depth_sample_optimal,
+            color_attach_optimal,
+            color_sample_optimal,
+            color_transfer_src_optimal,
+            color_transfer_dst_optimal,
+        });
     }
 
     var imageCount = surfaceCap.min_image_count + 1;
@@ -1997,7 +2056,9 @@ pub fn set_fullscreen_ex() void {
         if (xfit.platform == .windows) {
             __windows.__change_fullscreen_mode();
         }
-        vkd.?.acquireFullScreenExclusiveModeEXT(vkSwapchain) catch |e| xfit.herr3("__vulkan.set_fullscreen_ex.acquireFullScreenExclusiveModeEXT", e);
+        vkd.?.acquireFullScreenExclusiveModeEXT(vkSwapchain) catch {
+            VK_EXT_full_screen_exclusive_support = false;
+        };
     }
 }
 
@@ -2036,7 +2097,9 @@ pub fn recreate_swapchain() void {
     fullscreen_mutex.lock();
 
     if (!windowed and VK_EXT_full_screen_exclusive_support and !is_fullscreen_ex) {
-        vkd.?.releaseFullScreenExclusiveModeEXT(vkSwapchain) catch |e| xfit.herr3("__vulkan.recreate_swapchain.releaseFullScreenExclusiveModeEXT", e);
+        vkd.?.releaseFullScreenExclusiveModeEXT(vkSwapchain) catch {
+            VK_EXT_full_screen_exclusive_support = false;
+        };
         windowed = true;
     }
 
@@ -2049,6 +2112,7 @@ pub fn recreate_swapchain() void {
         //__windows.vulkan_windows_start(&vkSurface);
     }
 
+    cleanup_sync_object();
     cleanup_swapchain();
     create_swapchain_and_imageviews(false);
     if (vkExtent.width <= 0 or vkExtent.height <= 0) {
@@ -2058,6 +2122,7 @@ pub fn recreate_swapchain() void {
         return;
     }
     create_framebuffer();
+    create_sync_object();
 
     set_fullscreen_ex();
 
@@ -2088,6 +2153,11 @@ pub fn drawFrame() void {
     }
 
     if (graphics.render_cmd != null) {
+        const waitForFences_result = vkd.?.waitForFences(1, @ptrCast(&vkInFlightFence[state.frame]), vk.TRUE, std.math.maxInt(u64)) catch |e| {
+            xfit.herr3("__vulkan.wait_for_fences.vkWaitForFences", e);
+        };
+        xfit.herr(waitForFences_result == .success, "__vulkan.wait_for_fences.vkWaitForFences : {}", .{waitForFences_result});
+
         const acquireNextImageKHR_result = vkd.?.acquireNextImageKHR(vkSwapchain, std.math.maxInt(u64), vkImageAvailableSemaphore[state.frame], .null_handle) catch |e| {
             if (e == error.OutOfDateKHR) {
                 recreate_swapchain();
@@ -2112,10 +2182,12 @@ pub fn drawFrame() void {
         }
         imageIndex = acquireNextImageKHR_result.image_index;
 
+        vkd.?.resetFences(1, @ptrCast(&vkInFlightFence[state.frame])) catch |e| xfit.herr3("__vulkan.drawFrame.resetFences", e);
+
         const cmds = std.heap.c_allocator.alloc(vk.CommandBuffer, graphics.render_cmd.?.len + 1) catch xfit.herrm("drawframe cmds alloc");
         defer std.heap.c_allocator.free(cmds);
 
-        cmds[0] = vkCommandBuffer;
+        cmds[0] = vkCommandBuffer[state.frame];
         var cmdidx: usize = 1;
 
         for (graphics.render_cmd.?) |*cmd| {
@@ -2158,20 +2230,14 @@ pub fn drawFrame() void {
             .flags = .{ .one_time_submit_bit = true },
             .p_inheritance_info = null,
         };
-        vkd.?.beginCommandBuffer(vkCommandBuffer, &beginInfo) catch |e| xfit.herr3("__vulkan.drawFrame.beginCommandBuffer", e);
-        vkd.?.cmdBeginRenderPass(vkCommandBuffer, &renderPassInfo, .@"inline");
-        vkd.?.cmdEndRenderPass(vkCommandBuffer);
-        vkd.?.endCommandBuffer(vkCommandBuffer) catch |e| xfit.herr3("__vulkan.drawFrame.endCommandBuffer", e);
-
-        vkd.?.resetFences(1, @ptrCast(&vkInFlightFence[state.frame])) catch |e| xfit.herr3("__vulkan.drawFrame.resetFences", e);
+        vkd.?.beginCommandBuffer(vkCommandBuffer[state.frame], &beginInfo) catch |e| xfit.herr3("__vulkan.drawFrame.beginCommandBuffer", e);
+        vkd.?.cmdBeginRenderPass(vkCommandBuffer[state.frame], &renderPassInfo, .@"inline");
+        vkd.?.cmdEndRenderPass(vkCommandBuffer[state.frame]);
+        vkd.?.endCommandBuffer(vkCommandBuffer[state.frame]) catch |e| xfit.herr3("__vulkan.drawFrame.endCommandBuffer", e);
 
         __vulkan_allocator.submit_mutex.lock();
         vkd.?.queueSubmit(vkGraphicsQueue, 1, @ptrCast(&submitInfo), vkInFlightFence[state.frame]) catch |e| xfit.herr3("__vulkan.drawFrame.queueSubmit", e);
         __vulkan_allocator.submit_mutex.unlock();
-        const waitForFences_result = vkd.?.waitForFences(1, @ptrCast(&vkInFlightFence[state.frame]), vk.TRUE, std.math.maxInt(u64)) catch |e| {
-            xfit.herr3("__vulkan.wait_for_fences.vkWaitForFences", e);
-        };
-        xfit.herr(waitForFences_result == .success, "__vulkan.wait_for_fences.vkWaitForFences : {}", .{waitForFences_result});
 
         const swapChains = [_]vk.SwapchainKHR{vkSwapchain};
 

@@ -242,21 +242,23 @@ pub const texture_format = enum(c_uint) {
     b8g8r8a8_srgb = @intFromEnum(vk.Format.b8g8r8a8_srgb),
     r8g8b8a8_srgb = @intFromEnum(vk.Format.r8g8b8a8_srgb),
     d24_unorm_s8_uint = @intFromEnum(vk.Format.d24_unorm_s8_uint),
+    d32_sfloat_s8_uint = @intFromEnum(vk.Format.d32_sfloat_s8_uint),
     pub inline fn is_depth_format(fmt: texture_format) bool {
         return switch (fmt) {
             .d24_unorm_s8_uint => true,
+            .d32_sfloat_s8_uint => true,
             else => false,
         };
     }
     pub inline fn __has(raw: vk.Format) ?texture_format {
         return switch (raw) {
-            .r8g8b8a8_unorm, .b8g8r8a8_unorm, .b8g8r8a8_srgb, .r8g8b8a8_srgb, .d24_unorm_s8_uint => |e| @enumFromInt(@as(c_uint, @intCast(@intFromEnum(e)))),
+            .r8g8b8a8_unorm, .b8g8r8a8_unorm, .b8g8r8a8_srgb, .r8g8b8a8_srgb, .d24_unorm_s8_uint, .d32_sfloat_s8_uint => |e| @enumFromInt(@as(c_uint, @intCast(@intFromEnum(e)))),
             else => null,
         };
     }
     pub inline fn __has_depth(raw: vk.Format) ?texture_format {
         return switch (raw) {
-            .d24_unorm_s8_uint => |e| @enumFromInt(@as(c_uint, @intCast(@intFromEnum(e)))),
+            .d24_unorm_s8_uint, .d32_sfloat_s8_uint => |e| @enumFromInt(@as(c_uint, @intCast(@intFromEnum(e)))),
             else => null,
         };
     }
@@ -485,6 +487,7 @@ pub fn bit_size(fmt: texture_format) c_uint {
         .b8g8r8a8_srgb => 4,
         .r8g8b8a8_srgb => 4,
         .d24_unorm_s8_uint => 4,
+        .d32_sfloat_s8_uint => 4,
     };
 }
 
@@ -540,6 +543,43 @@ fn execute_create_texture(buf: *vulkan_res_node(.texture), _data: ?[]const u8) v
     if (buf.*.texture_option.tex_use.__input_attachment) usage_ = usage_.merge(.{ .input_attachment_bit = true });
     if (buf.*.texture_option.tex_use.__transient_attachment) usage_ = usage_.merge(.{ .transient_attachment_bit = true });
 
+    var tiling: vk.ImageTiling = .optimal;
+    if (is_depth) out: {
+        if (usage_.contains(.{ .depth_stencil_attachment_bit = true }) and !__vulkan.depth_optimal) {
+            tiling = .linear;
+            break :out;
+        }
+        if (usage_.contains(.{ .sampled_bit = true }) and !__vulkan.depth_sample_optimal) {
+            tiling = .linear;
+            break :out;
+        }
+        if (usage_.contains(.{ .transfer_src_bit = true }) and !__vulkan.depth_transfer_src_optimal) {
+            tiling = .linear;
+            break :out;
+        }
+        if (usage_.contains(.{ .transfer_dst_bit = true }) and !__vulkan.depth_transfer_dst_optimal) {
+            tiling = .linear;
+            break :out;
+        }
+    } else out: {
+        if (usage_.contains(.{ .color_attachment_bit = true }) and !__vulkan.color_attach_optimal) {
+            tiling = .linear;
+            break :out;
+        }
+        if (usage_.contains(.{ .sampled_bit = true }) and !__vulkan.color_sample_optimal) {
+            tiling = .linear;
+            break :out;
+        }
+        if (usage_.contains(.{ .transfer_src_bit = true }) and !__vulkan.color_transfer_src_optimal) {
+            tiling = .linear;
+            break :out;
+        }
+        if (usage_.contains(.{ .transfer_dst_bit = true }) and !__vulkan.color_transfer_dst_optimal) {
+            tiling = .linear;
+            break :out;
+        }
+    }
+
     const bit = bit_size(buf.*.texture_option.format);
     var img_info: vk.ImageCreateInfo = .{
         .array_layers = buf.*.texture_option.len,
@@ -547,7 +587,7 @@ fn execute_create_texture(buf: *vulkan_res_node(.texture), _data: ?[]const u8) v
         .sharing_mode = .exclusive,
         .extent = .{ .width = buf.*.texture_option.width, .height = buf.*.texture_option.height, .depth = 1 },
         .samples = get_samples(buf.*.texture_option.samples),
-        .tiling = .optimal,
+        .tiling = tiling,
         .mip_levels = 1,
         .format = buf.*.texture_option.format.__get(),
         .image_type = .@"2d",
