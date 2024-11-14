@@ -2161,9 +2161,10 @@ pub fn drawFrame() void {
     if (vkExtent.width <= 0 or vkExtent.height <= 0) {
         recreate_swapchain();
         return;
-    } else if (__system.size_update.load(.monotonic)) {
+    } else if (__system.size_update.load(.monotonic) or __system.change_screen_mode.load(.acquire)) {
         recreate_swapchain();
         __system.size_update.store(false, .monotonic);
+        __system.change_screen_mode.store(false, .release);
     }
 
     if (graphics.render_cmd != null) {

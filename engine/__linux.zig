@@ -203,7 +203,7 @@ pub fn set_window_pos(x: i32, y: i32) void {
 
 pub fn set_window_size(w: u32, h: u32) void {
     reset_size_hint();
-    _ = c.XResizeWindow(display, wnd, w + window_extent[0] + window_extent[1], h + window_extent[2] + window_extent[3]);
+    _ = c.XResizeWindow(display, wnd, @intCast(w + window_extent[0] + window_extent[1]), @intCast(h + window_extent[2] + window_extent[3]));
     __system.prev_window.width = w;
     __system.prev_window.height = h;
     set_size_hint(true);
@@ -212,7 +212,7 @@ pub fn set_window_size(w: u32, h: u32) void {
 pub fn set_window_mode2(pos: math.point(i32), size: math.point(u32), state: window.window_state, can_maximize: bool, can_minimize: bool, can_resizewindow: bool) void {
     _ = can_maximize;
     _ = can_minimize;
-    _ = can_resizewindow;
+    @atomicStore(bool, &__system.init_set.can_resizewindow, can_resizewindow, .monotonic);
     _ = state;
     const wm = window.get_screen_mode();
     if (wm != .WINDOW) {
