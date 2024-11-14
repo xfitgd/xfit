@@ -12,7 +12,6 @@ void main() {
 
     // float sd = (pow(fragUv.x, 3) - fragUv.y * fragUv.z) / sqrt(fx * fx + fy * fy);
     // float alpha = 0.5 - sd;
-    // TODO antialising
 
     if ((pow(fragUv.x, 3) - fragUv.y * fragUv.z) <= 0) discard;
 }

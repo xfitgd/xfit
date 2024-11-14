@@ -317,8 +317,8 @@ fn reset_size_hint() void {
 }
 
 pub fn linux_start() void {
-    if (__system.init_set.window_width == xfit.init_setting.DEF_SIZE or __system.init_set.window_width == 0) __system.init_set.window_width = 960;
-    if (__system.init_set.window_height == xfit.init_setting.DEF_SIZE or __system.init_set.window_height == 0) __system.init_set.window_height = 540;
+    if (__system.init_set.window_width == xfit.init_setting.DEF_SIZE or __system.init_set.window_width == 0) __system.init_set.window_width = @as(u32, @intCast(__system.primary_monitor.*.rect.width())) / 2;
+    if (__system.init_set.window_height == xfit.init_setting.DEF_SIZE or __system.init_set.window_height == 0) __system.init_set.window_height = @as(u32, @intCast(__system.primary_monitor.*.rect.height())) / 2;
     if (__system.init_set.window_x == xfit.init_setting.DEF_POS) __system.init_set.window_x = 0;
     if (__system.init_set.window_y == xfit.init_setting.DEF_POS) __system.init_set.window_y = 0;
 
