@@ -242,48 +242,52 @@ fn chooseSwapExtent(capabilities: vk.SurfaceCapabilitiesKHR) vk.Extent2D {
     }
 }
 
-fn chooseSwapSurfaceFormat(availableFormats: []vk.SurfaceFormatKHR) vk.SurfaceFormatKHR {
+fn chooseSwapSurfaceFormat(availableFormats: []vk.SurfaceFormatKHR, comptime program_start: bool) vk.SurfaceFormatKHR {
     for (availableFormats) |value| {
         if (value.format == .r8g8b8a8_unorm) {
-            xfit.print_log("XFIT SYSLOG : vulkan swapchain format : {}, colorspace : {}\n", .{ value.format, value.color_space });
+            if (program_start) {
+                xfit.print_log("XFIT SYSLOG : vulkan swapchain format : {}, colorspace : {}\n", .{ value.format, value.color_space });
+            }
             return value;
         }
     }
     for (availableFormats) |value| {
         if (value.format == .b8g8r8a8_unorm) {
-            xfit.print_log("XFIT SYSLOG : vulkan swapchain format : {}, colorspace : {}\n", .{ value.format, value.color_space });
+            if (program_start) {
+                xfit.print_log("XFIT SYSLOG : vulkan swapchain format : {}, colorspace : {}\n", .{ value.format, value.color_space });
+            }
             return value;
         }
     }
     xfit.herrm("chooseSwapSurfaceFormat unsupported");
 }
 
-fn chooseSwapPresentMode(availablePresentModes: []vk.PresentModeKHR, _vSync: xfit.vSync_mode) vk.PresentModeKHR {
+fn chooseSwapPresentMode(availablePresentModes: []vk.PresentModeKHR, _vSync: xfit.vSync_mode, comptime program_start: bool) vk.PresentModeKHR {
     if (_vSync == .double) {
-        xfit.write_log("XFIT SYSLOG : vulkan present mode fifo_khr vsync default\n");
+        if (program_start) xfit.write_log("XFIT SYSLOG : vulkan present mode fifo_khr vsync default\n");
         return vk.PresentModeKHR.fifo_khr;
     } else if (_vSync == .triple) {
         for (availablePresentModes) |value| {
             if (value == vk.PresentModeKHR.mailbox_khr) {
-                xfit.write_log("XFIT SYSLOG : vulkan present mode mailbox_khr\n");
+                if (program_start) xfit.write_log("XFIT SYSLOG : vulkan present mode mailbox_khr\n");
                 return value;
             }
         }
         for (availablePresentModes) |value| {
             if (value == vk.PresentModeKHR.immediate_khr) {
-                xfit.write_log("XFIT SYSLOG : vulkan present mode immediate_khr mailbox_khr instead\n");
+                if (program_start) xfit.write_log("XFIT SYSLOG : vulkan present mode immediate_khr mailbox_khr instead\n");
                 return value;
             }
         }
     } else {
         for (availablePresentModes) |value| {
             if (value == vk.PresentModeKHR.immediate_khr) {
-                xfit.write_log("XFIT SYSLOG : vulkan present mode immediate_khr\n");
+                if (program_start) xfit.write_log("XFIT SYSLOG : vulkan present mode immediate_khr\n");
                 return value;
             }
         }
     }
-    xfit.write_log("XFIT SYSLOG : vulkan present mode fifo_khr other not supported so default\n");
+    if (program_start) xfit.write_log("XFIT SYSLOG : vulkan present mode fifo_khr other not supported so default\n");
     return vk.PresentModeKHR.fifo_khr;
 }
 inline fn create_frag_shader_state(frag_module: vk.ShaderModule) vk.PipelineShaderStageCreateInfo {
@@ -857,7 +861,7 @@ pub fn vulkan_start() void {
         .application_version = vk.makeApiVersion(1, 0, 0, 0),
         .p_engine_name = "Xfit",
         .engine_version = vk.makeApiVersion(1, 0, 0, 0),
-        .api_version = vk.API_VERSION_1_1,
+        .api_version = vk.API_VERSION_1_3,
     };
     _ = vkGetInstanceProcAddr(.null_handle, "vkEnumerateInstanceVersion") orelse {
         xfit.write_log("XFIT SYSLOG : vulkan 1.0 device, set api version 1.0\n");
@@ -1923,31 +1927,41 @@ fn create_swapchain_and_imageviews(comptime program_start: bool) void {
     // pub var color_sample_optimal = false;
     // pub var color_transfer_src_optimal = false;
     // pub var color_transfer_dst_optimal = false;
-    if (program_start) {
-        format = chooseSwapSurfaceFormat(formats);
-        presentMode = chooseSwapPresentMode(presentModes, __system.init_set.vSync);
 
-        var depth_prop = vki.?.getPhysicalDeviceFormatProperties(vk_physical_device, .d24_unorm_s8_uint);
+    format = chooseSwapSurfaceFormat(formats, program_start);
+    presentMode = chooseSwapPresentMode(presentModes, __system.init_set.vSync, program_start);
+
+    var depth_prop = vki.?.getPhysicalDeviceFormatProperties(vk_physical_device, .d24_unorm_s8_uint);
+    depth_optimal = depth_prop.optimal_tiling_features.contains(.{ .depth_stencil_attachment_bit = true });
+    if (!depth_optimal and !depth_prop.linear_tiling_features.contains(.{ .depth_stencil_attachment_bit = true })) {
+        depth_prop = vki.?.getPhysicalDeviceFormatProperties(vk_physical_device, .d32_sfloat_s8_uint);
         depth_optimal = depth_prop.optimal_tiling_features.contains(.{ .depth_stencil_attachment_bit = true });
         if (!depth_optimal and !depth_prop.linear_tiling_features.contains(.{ .depth_stencil_attachment_bit = true })) {
-            depth_prop = vki.?.getPhysicalDeviceFormatProperties(vk_physical_device, .d32_sfloat_s8_uint);
+            depth_prop = vki.?.getPhysicalDeviceFormatProperties(vk_physical_device, .d16_unorm_s8_uint);
             depth_optimal = depth_prop.optimal_tiling_features.contains(.{ .depth_stencil_attachment_bit = true });
             depth_transfer_src_optimal = depth_prop.optimal_tiling_features.contains(.{ .transfer_src_bit = true });
             depth_transfer_dst_optimal = depth_prop.optimal_tiling_features.contains(.{ .transfer_dst_bit = true });
             depth_sample_optimal = depth_prop.optimal_tiling_features.contains(.{ .sampled_image_bit = true });
-            depth_format = .d32_sfloat_s8_uint;
+            depth_format = .d16_unorm_s8_uint;
         } else {
             depth_transfer_src_optimal = depth_prop.optimal_tiling_features.contains(.{ .transfer_src_bit = true });
             depth_transfer_dst_optimal = depth_prop.optimal_tiling_features.contains(.{ .transfer_dst_bit = true });
             depth_sample_optimal = depth_prop.optimal_tiling_features.contains(.{ .sampled_image_bit = true });
+            depth_format = .d32_sfloat_s8_uint;
         }
+    } else {
+        depth_transfer_src_optimal = depth_prop.optimal_tiling_features.contains(.{ .transfer_src_bit = true });
+        depth_transfer_dst_optimal = depth_prop.optimal_tiling_features.contains(.{ .transfer_dst_bit = true });
+        depth_sample_optimal = depth_prop.optimal_tiling_features.contains(.{ .sampled_image_bit = true });
+    }
 
-        const color_prop = vki.?.getPhysicalDeviceFormatProperties(vk_physical_device, format.format);
-        color_attach_optimal = color_prop.optimal_tiling_features.contains(.{ .color_attachment_bit = true });
-        color_sample_optimal = color_prop.optimal_tiling_features.contains(.{ .sampled_image_bit = true });
-        color_transfer_src_optimal = color_prop.optimal_tiling_features.contains(.{ .transfer_src_bit = true });
-        color_transfer_dst_optimal = color_prop.optimal_tiling_features.contains(.{ .transfer_dst_bit = true });
+    const color_prop = vki.?.getPhysicalDeviceFormatProperties(vk_physical_device, format.format);
+    color_attach_optimal = color_prop.optimal_tiling_features.contains(.{ .color_attachment_bit = true });
+    color_sample_optimal = color_prop.optimal_tiling_features.contains(.{ .sampled_image_bit = true });
+    color_transfer_src_optimal = color_prop.optimal_tiling_features.contains(.{ .transfer_src_bit = true });
+    color_transfer_dst_optimal = color_prop.optimal_tiling_features.contains(.{ .transfer_dst_bit = true });
 
+    if (program_start) {
         xfit.print_log("XFIT SYSLOG : depth format : {}\n", .{depth_format});
         xfit.print_log("XFIT SYSLOG : optimal format supports : \n depth_optimal:{}, depth_transfer_src_optimal:{}, depth_transfer_dst_optimal:{}, depth_sample_optimal:{}\ncolor_attach_optimal:{}, color_sample_optimal:{}, color_transfer_src_optimal:{}, color_transfer_dst_optimal:{}\n", .{
             depth_optimal,

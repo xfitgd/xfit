@@ -243,22 +243,24 @@ pub const texture_format = enum(c_uint) {
     r8g8b8a8_srgb = @intFromEnum(vk.Format.r8g8b8a8_srgb),
     d24_unorm_s8_uint = @intFromEnum(vk.Format.d24_unorm_s8_uint),
     d32_sfloat_s8_uint = @intFromEnum(vk.Format.d32_sfloat_s8_uint),
+    d16_unorm_s8_uint = @intFromEnum(vk.Format.d16_unorm_s8_uint),
     pub inline fn is_depth_format(fmt: texture_format) bool {
         return switch (fmt) {
             .d24_unorm_s8_uint => true,
             .d32_sfloat_s8_uint => true,
+            .d16_unorm_s8_uint => true,
             else => false,
         };
     }
     pub inline fn __has(raw: vk.Format) ?texture_format {
         return switch (raw) {
-            .r8g8b8a8_unorm, .b8g8r8a8_unorm, .b8g8r8a8_srgb, .r8g8b8a8_srgb, .d24_unorm_s8_uint, .d32_sfloat_s8_uint => |e| @enumFromInt(@as(c_uint, @intCast(@intFromEnum(e)))),
+            .r8g8b8a8_unorm, .b8g8r8a8_unorm, .b8g8r8a8_srgb, .r8g8b8a8_srgb, .d24_unorm_s8_uint, .d32_sfloat_s8_uint, .d16_unorm_s8_uint => |e| @enumFromInt(@as(c_uint, @intCast(@intFromEnum(e)))),
             else => null,
         };
     }
     pub inline fn __has_depth(raw: vk.Format) ?texture_format {
         return switch (raw) {
-            .d24_unorm_s8_uint, .d32_sfloat_s8_uint => |e| @enumFromInt(@as(c_uint, @intCast(@intFromEnum(e)))),
+            .d24_unorm_s8_uint, .d32_sfloat_s8_uint, .d16_unorm_s8_uint => |e| @enumFromInt(@as(c_uint, @intCast(@intFromEnum(e)))),
             else => null,
         };
     }
@@ -487,7 +489,8 @@ pub fn bit_size(fmt: texture_format) c_uint {
         .b8g8r8a8_srgb => 4,
         .r8g8b8a8_srgb => 4,
         .d24_unorm_s8_uint => 4,
-        .d32_sfloat_s8_uint => 4,
+        .d32_sfloat_s8_uint => 5,
+        .d16_unorm_s8_uint => 3,
     };
 }
 
