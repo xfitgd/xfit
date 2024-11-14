@@ -269,7 +269,7 @@ fn _render_char(self: *Self, char: u21, out_shape_src: *graphics.shape_source, o
         char_d = &char_d2;
     }
     if (area != null and offset.*[0] + char_d.?.*.advance[0] >= area.?[0]) {
-        offset.*[1] -= @as(f32, @floatFromInt(self.*.__face.*.height)) / 64.0;
+        offset.*[1] -= @as(f32, @floatFromInt(self.*.__face.*.size.*.metrics.height)) / 64.0;
         offset.*[0] = 0;
         if (offset.*[1] <= -area.?[1]) return;
     }
