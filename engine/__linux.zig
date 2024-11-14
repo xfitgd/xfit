@@ -439,7 +439,7 @@ pub fn linux_loop() void {
                 ) == c.Success) {
                     if (res_data[0] == '\x03') { //IconicState
                         __system.pause.store(true, std.builtin.AtomicOrder.monotonic);
-                        xfit.write_log("pause\n");
+                        //xfit.write_log("pause\n");
                     }
                     _ = c.XFree(@ptrCast(res_data));
                 }
