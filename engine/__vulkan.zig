@@ -2072,7 +2072,9 @@ pub fn set_fullscreen_ex() void {
         }
         vkd.?.acquireFullScreenExclusiveModeEXT(vkSwapchain) catch {
             VK_EXT_full_screen_exclusive_support = false;
+            return;
         };
+        released_fullscreen_ex = false;
     }
 }
 
@@ -2103,18 +2105,18 @@ pub fn get_swapchain_image_length() usize {
     return vk_swapchain_images.len;
 }
 
-pub var windowed: bool = true;
+pub var released_fullscreen_ex: bool = true;
 pub var fullscreen_mutex: std.Thread.Mutex = .{};
 
 pub fn recreate_swapchain() void {
     if (vkDevice == .null_handle) return;
     fullscreen_mutex.lock();
 
-    if (!windowed and VK_EXT_full_screen_exclusive_support and !is_fullscreen_ex) {
+    if (!released_fullscreen_ex and VK_EXT_full_screen_exclusive_support) {
         vkd.?.releaseFullScreenExclusiveModeEXT(vkSwapchain) catch {
             VK_EXT_full_screen_exclusive_support = false;
         };
-        windowed = true;
+        released_fullscreen_ex = true;
     }
 
     __vulkan_allocator.execute_and_wait_all_op();
@@ -2140,6 +2142,9 @@ pub fn recreate_swapchain() void {
 
     set_fullscreen_ex();
 
+    __system.size_update.store(false, .monotonic);
+    __system.change_screen_mode.store(false, .release);
+
     fullscreen_mutex.unlock();
 
     __render_command.refresh_all();
@@ -2163,8 +2168,6 @@ pub fn drawFrame() void {
         return;
     } else if (__system.size_update.load(.monotonic) or __system.change_screen_mode.load(.acquire)) {
         recreate_swapchain();
-        __system.size_update.store(false, .monotonic);
-        __system.change_screen_mode.store(false, .release);
     }
 
     if (graphics.render_cmd != null) {
