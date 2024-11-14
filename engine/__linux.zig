@@ -21,6 +21,7 @@ pub var display: ?*c.Display = null;
 pub var def_screen_idx: usize = 0;
 pub var wnd: c.Window = 0;
 pub var del_window: c.Atom = undefined;
+pub var state_window: c.Atom = undefined;
 pub var window_extent: [4]c_long = undefined;
 
 var input_thread: std.Thread = undefined;
@@ -338,7 +339,7 @@ pub fn linux_start() void {
         0,
         null,
     );
-    _ = c.XSelectInput(display, wnd, c.KeyPressMask | c.KeyReleaseMask | c.ButtonReleaseMask | c.ButtonPressMask | c.PointerMotionMask | c.StructureNotifyMask);
+    _ = c.XSelectInput(display, wnd, c.KeyPressMask | c.KeyReleaseMask | c.ButtonReleaseMask | c.ButtonPressMask | c.PointerMotionMask | c.StructureNotifyMask | c.FocusChangeMask);
     _ = c.XMapWindow(display, wnd);
 
     var res_atom: c.Atom = undefined;
@@ -348,6 +349,7 @@ pub fn linux_start() void {
     var res_data: [*c]u8 = undefined;
 
     del_window = c.XInternAtom(display, "WM_DELETE_WINDOW", 0);
+    state_window = c.XInternAtom(display, "WM_STATE", 0);
     _ = c.XSetWMProtocols(display, wnd, &del_window, 1);
 
     while (c.XGetWindowProperty(
@@ -369,8 +371,11 @@ pub fn linux_start() void {
         _ = c.XNextEvent(display, &event);
     }
     @memcpy(window_extent[0..window_extent.len], @as([*c]align(1) c_long, @ptrCast(res_data))[0..window_extent.len]);
+    _ = c.XFree(@ptrCast(res_data));
 
     set_size_hint(false);
+    _ = c.XMoveWindow(display, wnd, __system.init_set.window_x, __system.init_set.window_y);
+    _ = c.XFlush(display);
 
     //left %ld right %ld top %ld bottom %ld
     //xfit.print_log("{d},{d},{d},{d}\n", .{ window_extent[0], window_extent[1], window_extent[2], window_extent[3] });
@@ -396,6 +401,54 @@ pub fn linux_loop() void {
     while (!xfit.exiting()) {
         _ = c.XNextEvent(display, &event);
         switch (event.type) {
+            c.FocusIn => {
+                __system.pause.store(false, std.builtin.AtomicOrder.monotonic);
+                __system.activated.store(true, std.builtin.AtomicOrder.monotonic);
+
+                //xfit.write_log("activate\n");
+                root.xfit_activate(true, false) catch |e| {
+                    xfit.herr3("xfit_activate", e);
+                };
+            },
+            c.FocusOut => {
+                for (&__system.keys) |*value| {
+                    value.*.store(false, std.builtin.AtomicOrder.monotonic);
+                }
+                //
+                __system.activated.store(false, std.builtin.AtomicOrder.monotonic);
+
+                var res_atom: c.Atom = undefined;
+                var res_fmt: c_int = undefined;
+                var res_num: c_ulong = undefined;
+                var res_remain: c_ulong = undefined;
+                var res_data: [*c]u8 = undefined;
+
+                if (c.XGetWindowProperty(
+                    display,
+                    wnd,
+                    state_window,
+                    0,
+                    1024,
+                    c.False,
+                    state_window,
+                    &res_atom,
+                    &res_fmt,
+                    &res_num,
+                    &res_remain,
+                    &res_data,
+                ) == c.Success) {
+                    if (res_data[0] == '\x03') { //IconicState
+                        __system.pause.store(true, std.builtin.AtomicOrder.monotonic);
+                        //xfit.write_log("pause\n");
+                    }
+                    _ = c.XFree(@ptrCast(res_data));
+                }
+
+                //xfit.write_log("deactivate\n");
+                root.xfit_activate(false, __system.pause.load(.monotonic)) catch |e| {
+                    xfit.herr3("xfit_activate", e);
+                };
+            },
             c.ConfigureNotify => {
                 const w = window.window_width();
                 const h = window.window_height();
