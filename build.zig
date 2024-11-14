@@ -188,6 +188,7 @@ pub fn run(
             //result.linkSystemLibrary("vulkan");
             //result.linkSystemLibrary("VkLayer_khronos_validation");
             result.linkSystemLibrary("c");
+            result.linkSystemLibrary("z");
             result.linkSystemLibrary("log");
 
             for (lib_names) |n| {
@@ -238,7 +239,6 @@ pub fn run(
             // result.linkSystemLibrary("hid");
             // result.linkSystemLibrary("Gdi32");
 
-            //result.addObjectFile(get_lazypath(b, std.fmt.allocPrint(arena_allocator.allocator(), "{s}/lib/windows/vulkan.lib", .{engine_path}) catch unreachable));
             for (lib_names) |n| {
                 result.addObjectFile(get_lazypath(b, std.fmt.allocPrint(arena_allocator.allocator(), "{s}/lib/windows/{s}/{s}", .{ engine_path, get_arch_text(target.result.cpu.arch), n }) catch unreachable));
             }
