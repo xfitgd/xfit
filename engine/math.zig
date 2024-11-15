@@ -63,8 +63,11 @@ pub inline fn pow(v0: anytype, p: comptime_float) @TypeOf(v0) {
 pub fn rect_(comptime T: type) type {
     const pointT = switch (T) {
         u32 => pointu,
+        u64 => pointu8,
         f32 => point,
+        f64 => point8,
         i32 => pointi,
+        i64 => pointi8,
         else => @compileError("not a rect compatible type"),
     };
     return struct {
@@ -102,7 +105,9 @@ pub fn rect_(comptime T: type) type {
                 self.top == target.top and
                 self.bottom == target.bottom;
         }
-        pub fn calc_with_canvas(self: Self, _CANVAS_W: f32, _CANVAS_H: f32) Self {
+        pub fn calc_with_canvas(self: Self, _CANVAS_W: T, _CANVAS_H: T) Self {
+            if (@typeInfo(T) != .float) @compileError("rect T type must be float");
+
             const _width = @as(f32, @floatFromInt(window.window_width()));
             const _height = @as(f32, @floatFromInt(window.window_height()));
             const ratio = if (_width / _height > _CANVAS_W / _CANVAS_H) _height / _CANVAS_H else _width / _CANVAS_W;
@@ -114,7 +119,22 @@ pub fn rect_(comptime T: type) type {
                 .bottom = self.bottom * ratio,
             };
         }
-        pub fn mul_matrix(self: Self, mat: matrix) Self {
+        pub fn get(_pos: pointT, _size: pointT) Self {
+            if (@typeInfo(T) != .float) @compileError("rect T type must be float");
+            return .{
+                .left = _pos[0] - _size[0] / 2,
+                .right = _pos[0] + _size[0] / 2,
+                .top = _pos[1] + _size[1] / 2,
+                .bottom = _pos[1] - _size[1] / 2,
+            };
+        }
+        fn rect_matrix(_type: type) type {
+            const info = @typeInfo(_type);
+            if (info != .float) @compileError("rect T type must be float");
+            if (info.float.bits == 32) return matrix;
+            return matrix_(_type, 4, 4);
+        }
+        pub fn mul_matrix(self: Self, mat: rect_matrix(T)) Self {
             return .{
                 .left = mat.mul_point(self.left),
                 .right = mat.mul_point(self.right),
@@ -122,7 +142,7 @@ pub fn rect_(comptime T: type) type {
                 .bottom = mat.mul_point(self.bottom),
             };
         }
-        pub fn div_matrix(self: Self, mat: matrix) !Self {
+        pub fn div_matrix(self: Self, mat: rect_matrix(T)) !Self {
             return .{
                 .left = try mat.div_point(self.left),
                 .right = try mat.div_point(self.right),
@@ -155,9 +175,13 @@ comptime {
 }
 
 pub const point = @Vector(2, f32);
+pub const point8 = @Vector(2, f64);
 pub const pointu = @Vector(2, u32);
+pub const pointu8 = @Vector(2, u64);
 pub const pointi = @Vector(2, i32);
+pub const pointi8 = @Vector(2, i64);
 pub const vector = @Vector(4, f32);
+pub const vector8 = @Vector(4, f64);
 
 pub fn length_pow(p1: anytype, p2: anytype) @TypeOf(p1[0], p2[0]) {
     if (@typeInfo(@TypeOf(p1, p2)) == .vector) {
