@@ -327,7 +327,21 @@ pub const projection = struct {
     proj: matrix = undefined,
     __uniform: vulkan_res_node(.buffer) = .{},
     __check_alloc: mem.check_alloc = .{},
+    __canvas_width: std.atomic.Value(f32) = undefined,
+    __canvas_height: std.atomic.Value(f32) = undefined,
 
+    pub inline fn refresh_canvas_width(self: *Self) void {
+        self.*.__canvas_width.store(2.0 / self.*.proj.e[0][0], .monotonic);
+    }
+    pub inline fn refresh_canvas_height(self: *Self) void {
+        self.*.__canvas_height.store(2.0 / self.*.proj.e[1][1], .monotonic);
+    }
+    pub inline fn canvas_width(self: Self) f32 {
+        return self.__canvas_width.load(.monotonic);
+    }
+    pub inline fn canvas_height(self: Self) f32 {
+        return self.__canvas_height.load(.monotonic);
+    }
     pub inline fn init_matrix_orthographic(self: *Self, _width: f32, _height: f32) matrix_error!void {
         return init_matrix_orthographic2(self, _width, _height, 0.1, 100);
     }
@@ -341,11 +355,14 @@ pub const projection = struct {
             near,
             far,
         );
+        self.*.__canvas_width.store(width * ratio, .monotonic);
+        self.*.__canvas_height.store(height * ratio, .monotonic);
     }
     pub fn init_matrix_perspective(self: *Self, fov: f32) matrix_error!void {
+        const ratio = @as(f32, @floatFromInt(window.window_width())) / @as(f32, @floatFromInt(window.window_height()));
         self.*.proj = try matrix.perspectiveFovLhVulkan(
             fov,
-            @as(f32, @floatFromInt(window.window_width())) / @as(f32, @floatFromInt(window.window_height())),
+            ratio,
             0.1,
             100,
         );
