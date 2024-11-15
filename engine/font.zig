@@ -45,6 +45,8 @@ pub fn __destroy() void {
     _ = freetype.FT_Done_FreeType(library);
     library = null;
 }
+/// ! 크게 설정하지 마시오.
+const RESOLUTION: comptime_float = 256;
 
 pub fn init(_font_data: []const u8, _face_index: u32) !Self {
     if (library == null) {
@@ -121,7 +123,7 @@ pub const render_option2 = struct {
 };
 
 pub fn set_font_size(self: *Self, pt: u32) void {
-    _ = freetype.FT_Set_Char_Size(self.*.__face, 0, pt, 0, 0);
+    _ = freetype.FT_Set_Char_Size(self.*.__face, 0, pt * @as(u32, @intFromFloat(RESOLUTION)), 0, 0);
 }
 
 ///alloc return []graphics.shape_source and each element vertices.array.? indices.array.?
@@ -176,13 +178,13 @@ pub fn render_string(self: *Self, _str: []const u8, _render_option: render_optio
     while (utf8.nextCodepoint()) |codepoint| {
         if (_render_option.area != null and offset[1] <= -_render_option.area.?[1]) break;
         if (codepoint == '\n') {
-            offset[1] -= @as(f32, @floatFromInt(self.*.__face.*.size.*.metrics.height)) / 64.0;
+            offset[1] -= @as(f32, @floatFromInt(self.*.__face.*.size.*.metrics.height)) / (64.0 * RESOLUTION);
             offset[0] = 0;
             continue;
         }
         minP = @min(minP, offset);
         try _render_char(self, codepoint, out_shape_src, &offset, _render_option.area, _render_option.scale, allocator);
-        maxP = @max(maxP, point{ offset[0], offset[1] + @as(f32, @floatFromInt(self.*.__face.*.size.*.metrics.height)) / 64.0 });
+        maxP = @max(maxP, point{ offset[0], offset[1] + @as(f32, @floatFromInt(self.*.__face.*.size.*.metrics.height)) / (64.0 * RESOLUTION) });
     }
     var i: usize = start_;
     const size: point = (if (_render_option.area != null) _render_option.area.? else (maxP - minP)) * point{ 1, 1 };
@@ -216,8 +218,8 @@ fn _render_char(self: *Self, char: u21, out_shape_src: *graphics.shape_source, o
         //     while (d < self.__face.*.glyph.*.outline.n_points) : (d += 1) {
         //         xfit.print_debug("[{d}] {d},{d} tag {d}", .{
         //             d,
-        //             @as(f32, @floatFromInt(self.*.__face.*.glyph.*.outline.points[d].x)) / 64.0,
-        //             @as(f32, @floatFromInt(self.*.__face.*.glyph.*.outline.points[d].y)) / 64.0,
+        //             @as(f32, @floatFromInt(self.*.__face.*.glyph.*.outline.points[d].x)) / (64.0 * RESOLUTION),
+        //             @as(f32, @floatFromInt(self.*.__face.*.glyph.*.outline.points[d].y)) / (64.0 * RESOLUTION),
         //             self.*.__face.*.glyph.*.outline.tags[d],
         //         });
         //     }
@@ -257,8 +259,8 @@ fn _render_char(self: *Self, char: u21, out_shape_src: *graphics.shape_source, o
             };
             try poly.compute_polygon(allocator, &char_d2.raw_p.?);
         }
-        char_d2.advance[0] = @as(f32, @floatFromInt(self.*.__face.*.glyph.*.advance.x)) / 64.0;
-        char_d2.advance[1] = @as(f32, @floatFromInt(self.*.__face.*.glyph.*.advance.y)) / 64.0;
+        char_d2.advance[0] = @as(f32, @floatFromInt(self.*.__face.*.glyph.*.advance.x)) / (64.0 * RESOLUTION);
+        char_d2.advance[1] = @as(f32, @floatFromInt(self.*.__face.*.glyph.*.advance.y)) / (64.0 * RESOLUTION);
 
         char_d2.allocator = allocator;
         self.*.__char_array.put(res, char_d2) catch |e| {
@@ -269,7 +271,7 @@ fn _render_char(self: *Self, char: u21, out_shape_src: *graphics.shape_source, o
         char_d = &char_d2;
     }
     if (area != null and offset.*[0] + char_d.?.*.advance[0] >= area.?[0]) {
-        offset.*[1] -= @as(f32, @floatFromInt(self.*.__face.*.size.*.metrics.height)) / 64.0;
+        offset.*[1] -= @as(f32, @floatFromInt(self.*.__face.*.size.*.metrics.height)) / (64.0 * RESOLUTION);
         offset.*[0] = 0;
         if (offset.*[1] <= -area.?[1]) return;
     }
@@ -306,8 +308,8 @@ const font_user_data = struct {
 fn line_to(vec: [*c]const freetype.FT_Vector, user: ?*anyopaque) callconv(.C) c_int {
     const data: *font_user_data = @alignCast(@ptrCast(user.?));
     const end = point{
-        @as(f32, @floatFromInt(vec.*.x)) / 64.0,
-        @as(f32, @floatFromInt(vec.*.y)) / 64.0,
+        @as(f32, @floatFromInt(vec.*.x)) / (64.0 * RESOLUTION),
+        @as(f32, @floatFromInt(vec.*.y)) / (64.0 * RESOLUTION),
     };
 
     data.*.polygon.*.lines[data.*.idx - 1][data.*.idx2] = geometry.line.line_init(
@@ -322,12 +324,12 @@ fn line_to(vec: [*c]const freetype.FT_Vector, user: ?*anyopaque) callconv(.C) c_
 fn conic_to(vec: [*c]const freetype.FT_Vector, vec2: [*c]const freetype.FT_Vector, user: ?*anyopaque) callconv(.C) c_int {
     const data: *font_user_data = @alignCast(@ptrCast(user.?));
     const control0 = point{
-        @as(f32, @floatFromInt(vec.*.x)) / 64.0,
-        @as(f32, @floatFromInt(vec.*.y)) / 64.0,
+        @as(f32, @floatFromInt(vec.*.x)) / (64.0 * RESOLUTION),
+        @as(f32, @floatFromInt(vec.*.y)) / (64.0 * RESOLUTION),
     };
     const end = point{
-        @as(f32, @floatFromInt(vec2.*.x)) / 64.0,
-        @as(f32, @floatFromInt(vec2.*.y)) / 64.0,
+        @as(f32, @floatFromInt(vec2.*.x)) / (64.0 * RESOLUTION),
+        @as(f32, @floatFromInt(vec2.*.y)) / (64.0 * RESOLUTION),
     };
 
     data.*.polygon.*.lines[data.*.idx - 1][data.*.idx2] = geometry.line.quadratic_init(
@@ -343,16 +345,16 @@ fn conic_to(vec: [*c]const freetype.FT_Vector, vec2: [*c]const freetype.FT_Vecto
 fn cubic_to(vec: [*c]const freetype.FT_Vector, vec2: [*c]const freetype.FT_Vector, vec3: [*c]const freetype.FT_Vector, user: ?*anyopaque) callconv(.C) c_int {
     const data: *font_user_data = @alignCast(@ptrCast(user.?));
     const control0 = point{
-        @as(f32, @floatFromInt(vec.*.x)) / 64.0,
-        @as(f32, @floatFromInt(vec.*.y)) / 64.0,
+        @as(f32, @floatFromInt(vec.*.x)) / (64.0 * RESOLUTION),
+        @as(f32, @floatFromInt(vec.*.y)) / (64.0 * RESOLUTION),
     };
     const control1 = point{
-        @as(f32, @floatFromInt(vec2.*.x)) / 64.0,
-        @as(f32, @floatFromInt(vec2.*.y)) / 64.0,
+        @as(f32, @floatFromInt(vec2.*.x)) / (64.0 * RESOLUTION),
+        @as(f32, @floatFromInt(vec2.*.y)) / (64.0 * RESOLUTION),
     };
     const end = point{
-        @as(f32, @floatFromInt(vec3.*.x)) / 64.0,
-        @as(f32, @floatFromInt(vec3.*.y)) / 64.0,
+        @as(f32, @floatFromInt(vec3.*.x)) / (64.0 * RESOLUTION),
+        @as(f32, @floatFromInt(vec3.*.y)) / (64.0 * RESOLUTION),
     };
 
     data.*.polygon.*.lines[data.*.idx - 1][data.*.idx2] = .{
@@ -370,8 +372,8 @@ fn move_to(vec: [*c]const freetype.FT_Vector, user: ?*anyopaque) callconv(.C) c_
     const data: *font_user_data = @alignCast(@ptrCast(user.?));
 
     data.*.pen = point{
-        @as(f32, @floatFromInt(vec.*.x)) / 64.0,
-        @as(f32, @floatFromInt(vec.*.y)) / 64.0,
+        @as(f32, @floatFromInt(vec.*.x)) / (64.0 * RESOLUTION),
+        @as(f32, @floatFromInt(vec.*.y)) / (64.0 * RESOLUTION),
     };
     data.*.idx += 1;
     data.*.polygon.*.lines[data.*.idx - 1] = data.*.allocator.alloc(geometry.line, data.*.len) catch return -1;
