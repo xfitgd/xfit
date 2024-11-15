@@ -190,10 +190,10 @@ pub fn button_(_msaa: bool) type {
             _out[1].*.up_color = _out[1].*.src.color;
 
             var rect_line: [4]geometry.line = .{
-                geometry.line.line_init(.{ -scale[0], scale[1] }, .{ scale[0], scale[1] }),
-                geometry.line.line_init(.{ scale[0], scale[1] }, .{ scale[0], -scale[1] }),
-                geometry.line.line_init(.{ scale[0], -scale[1] }, .{ -scale[0], -scale[1] }),
-                geometry.line.line_init(.{ -scale[0], -scale[1] }, .{ -scale[0], scale[1] }),
+                geometry.line.line_init(.{ -scale[0] / 2, scale[1] / 2 }, .{ scale[0] / 2, scale[1] / 2 }),
+                geometry.line.line_init(.{ scale[0] / 2, scale[1] / 2 }, .{ scale[0] / 2, -scale[1] / 2 }),
+                geometry.line.line_init(.{ scale[0] / 2, -scale[1] / 2 }, .{ -scale[0] / 2, -scale[1] / 2 }),
+                geometry.line.line_init(.{ -scale[0] / 2, -scale[1] / 2 }, .{ -scale[0] / 2, scale[1] / 2 }),
             };
 
             var rl = [1][]geometry.line{rect_line[0..rect_line.len]};
