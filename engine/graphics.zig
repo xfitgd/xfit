@@ -328,16 +328,8 @@ pub const projection = struct {
     __uniform: vulkan_res_node(.buffer) = .{},
     __check_alloc: mem.check_alloc = .{},
 
-    pub fn init_matrix_orthographic(self: *Self, _width: f32, _height: f32) matrix_error!void {
-        const width = @as(f32, @floatFromInt(window.window_width()));
-        const height = @as(f32, @floatFromInt(window.window_height()));
-        const ratio = if (width / height > _width / _height) _height / height else _width / width;
-        self.*.proj = try matrix.orthographicLhVulkan(
-            width * ratio,
-            height * ratio,
-            0.1,
-            100,
-        );
+    pub inline fn init_matrix_orthographic(self: *Self, _width: f32, _height: f32) matrix_error!void {
+        return init_matrix_orthographic2(self, _width, _height, 0.1, 100);
     }
     pub fn init_matrix_orthographic2(self: *Self, _width: f32, _height: f32, near: f32, far: f32) matrix_error!void {
         const width = @as(f32, @floatFromInt(window.window_width()));

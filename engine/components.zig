@@ -177,7 +177,7 @@ pub fn button_(_msaa: bool) type {
             }
         }
 
-        pub fn make_square_button(_out: []*button_source, scale: point, _allocator: std.mem.Allocator) !void {
+        pub fn make_square_button(_out: []*button_source, scale: point, thickness: f32, _allocator: std.mem.Allocator) !void {
             _out[0].* = button_source.init_for_alloc(_allocator);
             _out[1].* = button_source.init_for_alloc(_allocator);
             _out[0].*.down_color = .{ 0.5, 0.5, 0.5, 0.8 };
@@ -198,7 +198,7 @@ pub fn button_(_msaa: bool) type {
 
             var rl = [1][]geometry.line{rect_line[0..rect_line.len]};
             var rect_poly: geometry.polygon = .{
-                .tickness = 2,
+                .tickness = thickness,
                 .lines = rl[0..1],
             };
             var raw_polygon_outline = geometry.raw_polygon{

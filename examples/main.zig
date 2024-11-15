@@ -133,7 +133,7 @@ pub fn xfit_init() !void {
 
     rect_button_text_src = components.button_source.init_for_alloc(allocator);
 
-    try components.button.make_square_button(rect_button_srcs[0..2], .{ 100, 50 }, allocator);
+    try components.button.make_square_button(rect_button_srcs[0..2], .{ 100, 50 }, 2, allocator);
 
     const data = file_.read_file("test.webp", allocator) catch |e| xfit.herr3("test.webp read_file", e);
     defer allocator.free(data);
