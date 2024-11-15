@@ -352,6 +352,11 @@ pub fn linux_start() void {
     const utf8Str = c.XInternAtom(display, "UTF8_STRING", 0);
     _ = c.XChangeProperty(display, wnd, wm_Name, utf8Str, 8, c.PropModeReplace, __system.title.ptr, @intCast(__system.title.len));
 
+    _ = c.XSetClassHint(display, wnd, @constCast(&c.XClassHint{
+        .res_class = __system.title.ptr,
+        .res_name = __system.title.ptr,
+    }));
+
     del_window = c.XInternAtom(display, "WM_DELETE_WINDOW", 0);
     state_window = c.XInternAtom(display, "WM_STATE", 0);
     _ = c.XSetWMProtocols(display, wnd, &del_window, 1);
