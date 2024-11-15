@@ -46,16 +46,6 @@ pub const animate_object = struct {
         }
         return 0;
     }
-    pub inline fn deinit(self: *animate_object) void {
-        switch (self.obj.*) {
-            inline else => |*case| case.*.deinit(),
-        }
-    }
-    pub inline fn build(self: *animate_object) void {
-        switch (self.obj.*) {
-            inline else => |*case| case.*.build(),
-        }
-    }
     pub inline fn update(self: *animate_object) void {
         switch (self.obj.*) {
             inline else => |*case| case.*.update(),

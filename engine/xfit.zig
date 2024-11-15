@@ -28,6 +28,7 @@ pub const input = @import("input.zig");
 pub const mem = @import("mem.zig");
 pub const ini = @import("ini.zig");
 pub const s2s = @import("s2s.zig");
+pub const gui = @import("gui.zig");
 
 //system engine only headers
 const __system = @import("__system.zig");

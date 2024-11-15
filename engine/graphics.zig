@@ -190,6 +190,11 @@ pub const iobject = union(iobject_type) {
             inline else => |*case| case.*.__draw(cmd),
         }
     }
+    pub inline fn ptransform(self: *Self) *transform {
+        return switch (self.*) {
+            inline else => |*case| &case.*.transform,
+        };
+    }
     pub inline fn is_shape_type(self: *Self) bool {
         return switch (self.*) {
             ._shape, ._button => true,
@@ -327,20 +332,20 @@ pub const projection = struct {
     proj: matrix = undefined,
     __uniform: vulkan_res_node(.buffer) = .{},
     __check_alloc: mem.check_alloc = .{},
-    __canvas_width: std.atomic.Value(f32) = undefined,
-    __canvas_height: std.atomic.Value(f32) = undefined,
+    __window_width: std.atomic.Value(f32) = undefined,
+    __window_height: std.atomic.Value(f32) = undefined,
 
-    pub inline fn refresh_canvas_width(self: *Self) void {
-        self.*.__canvas_width.store(2.0 / self.*.proj.e[0][0], .monotonic);
+    pub inline fn refresh_window_width(self: *Self) void {
+        self.*.__window_width.store(2.0 / self.*.proj.e[0][0], .monotonic);
     }
-    pub inline fn refresh_canvas_height(self: *Self) void {
-        self.*.__canvas_height.store(2.0 / self.*.proj.e[1][1], .monotonic);
+    pub inline fn refresh_window_height(self: *Self) void {
+        self.*.__window_height.store(2.0 / self.*.proj.e[1][1], .monotonic);
     }
-    pub inline fn canvas_width(self: Self) f32 {
-        return self.__canvas_width.load(.monotonic);
+    pub inline fn window_width(self: Self) f32 {
+        return self.__window_width.load(.monotonic);
     }
-    pub inline fn canvas_height(self: Self) f32 {
-        return self.__canvas_height.load(.monotonic);
+    pub inline fn window_height(self: Self) f32 {
+        return self.__window_height.load(.monotonic);
     }
     pub inline fn init_matrix_orthographic(self: *Self, _width: f32, _height: f32) matrix_error!void {
         return init_matrix_orthographic2(self, _width, _height, 0.1, 100);
@@ -355,8 +360,8 @@ pub const projection = struct {
             near,
             far,
         );
-        self.*.__canvas_width.store(width * ratio, .monotonic);
-        self.*.__canvas_height.store(height * ratio, .monotonic);
+        self.*.__window_width.store(width * ratio, .monotonic);
+        self.*.__window_height.store(height * ratio, .monotonic);
     }
     pub fn init_matrix_perspective(self: *Self, fov: f32) matrix_error!void {
         const ratio = @as(f32, @floatFromInt(window.window_width())) / @as(f32, @floatFromInt(window.window_height()));
@@ -381,7 +386,7 @@ pub const projection = struct {
     }
     pub fn build(self: *Self, _flag: write_flag) void {
         self.*.__check_alloc.init(__system.allocator);
-        self.*.__uniform.create_buffer(.{
+        self.*.__uniform.create_buffer_copy(.{
             .len = @sizeOf(matrix),
             .typ = .uniform,
             .use = _flag,
@@ -409,7 +414,7 @@ pub const camera = struct {
         self.*.__uniform.clean(null, {});
     }
     pub fn build(self: *Self) void {
-        self.*.__uniform.create_buffer(.{
+        self.*.__uniform.create_buffer_copy(.{
             .len = @sizeOf(matrix),
             .typ = .uniform,
             .use = .cpu,
@@ -441,7 +446,7 @@ pub const color_transform = struct {
     }
     pub fn build(self: *Self, _flag: write_flag) void {
         self.*.__check_alloc.init(__system.allocator);
-        self.*.__uniform.create_buffer(.{
+        self.*.__uniform.create_buffer_copy(.{
             .len = @sizeOf(matrix),
             .typ = .uniform,
             .use = _flag,
@@ -461,11 +466,10 @@ pub const transform = struct {
     parent_type: iobject_type,
 
     model: matrix = matrix.identity(),
-    __model: matrix = undefined,
     ///이 값 자체가 변경되면 iobject.update 필요
-    camera: ?*camera = null,
+    camera: *camera = undefined,
     ///이 값 자체가 변경되면 iobject.update 필요
-    projection: ?*projection = null,
+    projection: *projection = undefined,
     __model_uniform: vulkan_res_node(.buffer) = .{},
 
     __check_init: mem.check_init = .{},
@@ -481,28 +485,18 @@ pub const transform = struct {
     //     mat.e[1][1] *= @floatFromInt(e.*.src.*.height);
     //     return mat;
     // }
-    inline fn get_mat(self: *Self) matrix {
-        switch (self.*.parent_type) {
-            // inline ._image, ._anim_image => |e| {
-            //     return get_mat_set_wh(self, std.meta.TagPayload(iobject, e));
-            // }, not use this anymore
-            else => return self.*.model,
-        }
-    }
     pub inline fn __build(self: *Self) void {
         self.*.__check_init.init();
-        self.*.__model = get_mat(self);
-        self.*.__model_uniform.create_buffer(.{
+        self.*.__model_uniform.create_buffer_copy(.{
             .len = @sizeOf(matrix),
             .typ = .uniform,
             .use = .cpu,
-        }, mem.obj_to_u8arrC(&self.*.__model));
+        }, mem.obj_to_u8arrC(&self.*.model));
     }
     ///write_flag가 readwrite_cpu일때만 호출
     pub fn copy_update(self: *Self) void {
         self.*.__check_init.check_inited();
-        self.*.__model = get_mat(self);
-        self.*.__model_uniform.copy_update(&self.*.__model);
+        self.*.__model_uniform.copy_update(&self.*.model);
     }
 };
 
@@ -808,8 +802,8 @@ pub fn shape_(_msaa: bool) type {
         pub fn update(self: *Self) void {
             var __set_res: [4]res_union = .{
                 .{ .buf = &self.*.transform.__model_uniform },
-                .{ .buf = &self.*.transform.camera.?.*.__uniform },
-                .{ .buf = &self.*.transform.projection.?.*.__uniform },
+                .{ .buf = &self.*.transform.camera.*.__uniform },
+                .{ .buf = &self.*.transform.projection.*.__uniform },
                 .{ .buf = &__vulkan.__pre_mat_uniform },
             };
             self.*.__set.__res = __set_res[0..4];
@@ -912,8 +906,8 @@ pub const image = struct {
     pub fn update(self: *Self) void {
         var __set_res: [5]res_union = .{
             .{ .buf = &self.*.transform.__model_uniform },
-            .{ .buf = &self.*.transform.camera.?.*.__uniform },
-            .{ .buf = &self.*.transform.projection.?.*.__uniform },
+            .{ .buf = &self.*.transform.camera.*.__uniform },
+            .{ .buf = &self.*.transform.projection.*.__uniform },
             .{ .buf = &__vulkan.__pre_mat_uniform },
             .{ .buf = &self.*.color_tran.*.__uniform },
         };
@@ -1039,8 +1033,8 @@ pub const animate_image = struct {
     pub fn update(self: *Self) void {
         var __set_res: [6]res_union = .{
             .{ .buf = &self.*.transform.__model_uniform },
-            .{ .buf = &self.*.transform.camera.?.*.__uniform },
-            .{ .buf = &self.*.transform.projection.?.*.__uniform },
+            .{ .buf = &self.*.transform.camera.*.__uniform },
+            .{ .buf = &self.*.transform.projection.*.__uniform },
             .{ .buf = &__vulkan.__pre_mat_uniform },
             .{ .buf = &self.*.color_tran.*.__uniform },
             .{ .buf = &self.*.__frame_uniform },
@@ -1127,8 +1121,8 @@ pub const tile_image = struct {
     pub fn update(self: *Self) void {
         var __set_res: [6]res_union = .{
             .{ .buf = &self.*.transform.__model_uniform },
-            .{ .buf = &self.*.transform.camera.?.*.__uniform },
-            .{ .buf = &self.*.transform.projection.?.*.__uniform },
+            .{ .buf = &self.*.transform.camera.*.__uniform },
+            .{ .buf = &self.*.transform.projection.*.__uniform },
             .{ .buf = &__vulkan.__pre_mat_uniform },
             .{ .buf = &self.*.color_tran.*.__uniform },
             .{ .buf = &self.*.__tile_uniform },
