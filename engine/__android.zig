@@ -78,7 +78,6 @@ const android_app = struct {
     window: ?*android.ANativeWindow = null,
     contentRect: android.ARect = std.mem.zeroes(android.ARect),
     activityState: AppEvent = AppEvent.APP_CMD_INPUT_CHANGED,
-    destroryRequested: bool = false,
     msgread: i32 = 0,
     msgwrite: i32 = 0,
 
@@ -124,15 +123,6 @@ pub fn vulkan_android_start(vkSurface: *__vulkan.vk.SurfaceKHR) void {
 }
 
 fn destroy_android() void {
-    __vulkan_allocator.execute_and_wait_all_op();
-
-    __vulkan.wait_device_idle();
-
-    root.xfit_destroy() catch |e| {
-        xfit.herr3("xfit_destroy", e);
-    };
-    __vulkan.vulkan_destroy();
-
     __system.destroy();
 }
 
@@ -390,7 +380,7 @@ fn android_app_pre_exec_cmd(_cmd: u8) void {
         },
         AppEvent.APP_CMD_DESTROY => {
             if (xfit.dbg) _ = LOGV("APP_CMD_DESTROY", .{});
-            @atomicStore(bool, &app.destroryRequested, true, .monotonic);
+            __system.exiting.store(true, .release);
         },
         else => {},
     }
@@ -450,6 +440,30 @@ fn process_input(_source: ?*android_poll_source) void {
     }
 }
 
+fn render_func() void {
+    __vulkan.vulkan_start();
+
+    root.xfit_init() catch |e| {
+        xfit.herr3("xfit_init", e);
+    };
+    start_sem.post();
+
+    __vulkan_allocator.execute_and_wait_all_op();
+
+    while (!xfit.exiting()) {
+        __system.loop();
+    }
+    __vulkan_allocator.execute_and_wait_all_op();
+    __vulkan.wait_device_idle();
+    root.xfit_destroy() catch |e| {
+        xfit.herr3("xfit_destroy", e);
+    };
+    __vulkan.vulkan_destroy();
+}
+
+var render_thread: std.Thread = undefined;
+var start_sem: std.Thread.Semaphore = .{};
+
 fn engine_handle_cmd(_cmd: AppEvent) void {
     switch (_cmd) {
         AppEvent.APP_CMD_SAVE_STATE => {
@@ -465,7 +479,9 @@ fn engine_handle_cmd(_cmd: AppEvent) void {
                         xfit.herr3("root.main", e);
                     };
 
-                    __vulkan_allocator.execute_and_wait_all_op();
+                    render_thread = std.Thread.spawn(.{}, render_func, .{}) catch unreachable;
+
+                    start_sem.wait();
                     app.inited = true;
                 } else {
                     __system.size_update.store(true, .monotonic);
@@ -842,11 +858,8 @@ fn anrdoid_app_entry() void {
         if (source != null) {
             source.?.*.process.?(source);
         }
-
-        if (app.inited) {
-            __system.loop();
-        }
-        if (system.a_load(app.destroryRequested)) {
+        if (xfit.exiting()) {
+            render_thread.join();
             destroy_android();
             break;
         }

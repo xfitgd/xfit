@@ -24,7 +24,7 @@ pub var del_window: c.Atom = undefined;
 pub var state_window: c.Atom = undefined;
 pub var window_extent: [4]c_long = undefined;
 
-var input_thread: std.Thread = undefined;
+var render_thread: std.Thread = undefined;
 var cur_fullscreen_monitor: system.monitor_info = undefined;
 
 pub fn system_linux_start() void {
@@ -389,7 +389,7 @@ pub fn linux_start() void {
     //left %ld right %ld top %ld bottom %ld
     //xfit.print_log("{d},{d},{d},{d}\n", .{ window_extent[0], window_extent[1], window_extent[2], window_extent[3] });
 
-    input_thread = std.Thread.spawn(.{}, render_func, .{}) catch unreachable;
+    render_thread = std.Thread.spawn(.{}, render_func, .{}) catch unreachable;
 }
 
 pub fn vulkan_linux_start(vkSurface: *__vulkan.vk.SurfaceKHR) void {
@@ -569,7 +569,7 @@ pub fn linux_loop() void {
         }
     }
 
-    input_thread.join();
+    render_thread.join();
     _ = c.XDestroyWindow(display, wnd);
 }
 

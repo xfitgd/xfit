@@ -77,13 +77,7 @@ pub fn xfit_main(_allocator: std.mem.Allocator, _init_setting: *const init_setti
         };
 
         __system.real_destroy();
-    } else if (platform == .android) {
-        __vulkan.vulkan_start();
-
-        root.xfit_init() catch |e| {
-            herr3("xfit_init", e);
-        };
-    } else if (platform == .linux) {
+    } else if (platform == .android) {} else if (platform == .linux) {
         __linux.system_linux_start();
         if (subsystem == SubSystem.Console) {
             root.xfit_init() catch |e| {
@@ -343,11 +337,17 @@ pub fn exit() void {
         __system.exiting.store(true, std.builtin.AtomicOrder.release);
     } else if (platform == .android) {
         __system.exiting.store(true, .release);
-        @atomicStore(bool, &__android.app.destroryRequested, true, .monotonic);
     } else if (platform == .linux) {
         __system.exiting.store(true, .release);
         __linux.linux_close();
     }
+}
+
+pub fn set_vsync(_vSync: vSync_mode) void {
+    __vulkan.fullscreen_mutex.lock();
+    defer __vulkan.fullscreen_mutex.unlock();
+    __system.init_set.vSync = _vSync;
+    __system.size_update.store(true, .monotonic);
 }
 
 pub const screen_mode = enum { WINDOW, BORDERLESSSCREEN, FULLSCREEN };
