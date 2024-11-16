@@ -44,6 +44,7 @@ pub const button_source = struct {
     up_color: ?vector = null,
     over_color: ?vector = null,
     down_color: ?vector = null,
+    __updated: std.atomic.Value(bool) = std.atomic.Value(bool).init(false),
 
     pub fn init() button_source {
         return .{
@@ -87,22 +88,19 @@ pub fn button_(_msaa: bool) type {
         fn update_color(self: *Self) void {
             for (self.*.srcs) |v| {
                 if (v.*.up_color == null or v.*.src.vertices.node.res == .null_handle or v.*.src.indices.node.res == .null_handle) continue;
-                if (self.*.state == .UP) {
+                if (self.*.state == .UP and !v.*.__updated.load(.acquire)) {
                     v.*.src.color = v.*.up_color.?;
-                    v.*.src.copy_color_update();
-                } else if (self.*.state == .OVER) {
+                    v.*.__updated.store(true, .release);
+                } else if (self.*.state == .OVER and !v.*.__updated.load(.acquire)) {
                     if (v.*.over_color == null) {
                         v.*.src.color = v.*.up_color.?;
-                        v.*.src.copy_color_update();
                     } else {
                         v.*.src.color = v.*.over_color.?;
-                        v.*.src.copy_color_update();
                     }
-                } else if (self.*.state == .DOWN) {
-                    if (v.*.down_color != null) {
-                        v.*.src.color = v.*.down_color.?;
-                        v.*.src.copy_color_update();
-                    }
+                    v.*.__updated.store(true, .release);
+                } else if (self.*.state == .DOWN and v.*.down_color != null and !v.*.__updated.load(.acquire)) {
+                    v.*.src.color = v.*.down_color.?;
+                    v.*.__updated.store(true, .release);
                 }
             }
         }
@@ -220,8 +218,15 @@ pub fn button_(_msaa: bool) type {
             _out[1].*.src.indices.array = raw_polygon_outline.indices;
             _out[1].*.src.build(.gpu, .cpu);
         }
-
         pub fn update(self: *Self) void {
+            for (self.*.srcs) |v| {
+                if (v.*.__updated.load(.acquire)) {
+                    v.*.src.copy_color_update();
+                    v.*.__updated.store(false, .release);
+                }
+            }
+        }
+        pub fn update_uniforms(self: *Self) void {
             var __set_res: [4]res_union = .{
                 .{ .buf = &self.*.transform.__model_uniform },
                 .{ .buf = &self.*.transform.camera.*.__uniform },
@@ -233,7 +238,7 @@ pub fn button_(_msaa: bool) type {
         }
         pub fn build(self: *Self) void {
             self.*.transform.__build();
-            self.*.update();
+            self.*.update_uniforms();
         }
         pub fn deinit(self: *Self) void {
             self.*.transform.__deinit(null);

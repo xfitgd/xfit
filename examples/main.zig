@@ -343,9 +343,9 @@ fn move_callback() !bool {
     dx += 1;
     if (dx >= 200) {
         dx = 0;
-        xfit.print("{d}\n", .{xfit.dt()});
-    }
-    update_mutex.unlock();
+        update_mutex.unlock();
+        xfit.print_log("{d}\n", .{xfit.dt()});
+    } else update_mutex.unlock();
 
     return true;
 }
@@ -358,6 +358,7 @@ pub fn xfit_update() !void {
 
     text_shape.*._shape.transform.copy_update();
     shape_src[0].copy_color_update();
+    rect_button.*.update();
 
     anim.update(xfit.dt());
 }

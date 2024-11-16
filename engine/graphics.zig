@@ -180,9 +180,15 @@ pub const iobject = union(iobject_type) {
             inline else => |*case| case.*.build(),
         }
     }
+    pub inline fn update_uniforms(self: *Self) void {
+        switch (self.*) {
+            inline else => |*case| case.*.update_uniforms(),
+        }
+    }
     pub inline fn update(self: *Self) void {
         switch (self.*) {
-            inline else => |*case| case.*.update(),
+            inline ._button, ._pixel_button => |*case| case.*.update(),
+            else => {},
         }
     }
     pub inline fn __draw(self: *Self, cmd: vk.CommandBuffer) void {
@@ -466,9 +472,9 @@ pub const transform = struct {
     parent_type: iobject_type,
 
     model: matrix = matrix.identity(),
-    ///이 값 자체가 변경되면 iobject.update 필요
+    ///이 값 자체가 변경되면 iobject.update_uniforms 필요
     camera: *camera = undefined,
-    ///이 값 자체가 변경되면 iobject.update 필요
+    ///이 값 자체가 변경되면 iobject.update_uniforms 필요
     projection: *projection = undefined,
     __model_uniform: vulkan_res_node(.buffer) = .{},
 
@@ -799,7 +805,7 @@ pub fn shape_(_msaa: bool) type {
                 .src = _src,
             };
         }
-        pub fn update(self: *Self) void {
+        pub fn update_uniforms(self: *Self) void {
             var __set_res: [4]res_union = .{
                 .{ .buf = &self.*.transform.__model_uniform },
                 .{ .buf = &self.*.transform.camera.*.__uniform },
@@ -811,7 +817,7 @@ pub fn shape_(_msaa: bool) type {
         }
         pub fn build(self: *Self) void {
             self.*.transform.__build();
-            self.*.update();
+            self.*.update_uniforms();
         }
         pub fn deinit(self: *Self) void {
             self.*.transform.__deinit(null);
@@ -903,7 +909,7 @@ pub const image = struct {
     pub fn deinit_callback(self: *Self, callback: ?*const fn (caller: *anyopaque) void) void {
         self.*.transform.__deinit(callback);
     }
-    pub fn update(self: *Self) void {
+    pub fn update_uniforms(self: *Self) void {
         var __set_res: [5]res_union = .{
             .{ .buf = &self.*.transform.__model_uniform },
             .{ .buf = &self.*.transform.camera.*.__uniform },
@@ -917,7 +923,7 @@ pub const image = struct {
     pub fn build(self: *Self) void {
         self.*.transform.__build();
 
-        self.*.update();
+        self.*.update_uniforms();
     }
     pub fn __draw(self: *Self, cmd: vk.CommandBuffer) void {
         self.*.transform.__check_init.check_inited();
@@ -1030,7 +1036,7 @@ pub const animate_image = struct {
         const __frame_cpy: f32 = @floatFromInt(self.*.frame);
         self.*.__frame_uniform.copy_update(&__frame_cpy);
     }
-    pub fn update(self: *Self) void {
+    pub fn update_uniforms(self: *Self) void {
         var __set_res: [6]res_union = .{
             .{ .buf = &self.*.transform.__model_uniform },
             .{ .buf = &self.*.transform.camera.*.__uniform },
@@ -1052,7 +1058,7 @@ pub const animate_image = struct {
             .use = .cpu,
         }, mem.obj_to_u8arrC(&__frame_cpy));
 
-        self.*.update();
+        self.*.update_uniforms();
     }
     pub fn __draw(self: *Self, cmd: vk.CommandBuffer) void {
         self.*.transform.__check_init.check_inited();
@@ -1118,7 +1124,7 @@ pub const tile_image = struct {
         const __idx_cpy: f32 = @floatFromInt(self.*.tile_idx);
         self.*.__tile_uniform.copy_update(&__idx_cpy);
     }
-    pub fn update(self: *Self) void {
+    pub fn update_uniforms(self: *Self) void {
         var __set_res: [6]res_union = .{
             .{ .buf = &self.*.transform.__model_uniform },
             .{ .buf = &self.*.transform.camera.*.__uniform },
@@ -1140,7 +1146,7 @@ pub const tile_image = struct {
             .use = .cpu,
         }, mem.obj_to_u8arrC(&__idx_cpy));
 
-        self.*.update();
+        self.*.update_uniforms();
     }
     pub fn __draw(self: *Self, cmd: vk.CommandBuffer) void {
         self.*.transform.__check_init.check_inited();
