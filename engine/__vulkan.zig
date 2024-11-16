@@ -2148,11 +2148,11 @@ pub fn recreate_swapchain() void {
     fullscreen_mutex.unlock();
 
     __render_command.refresh_all();
-    if (xfit.platform == .android) { //if mobile
-        root.xfit_size() catch |e| {
-            xfit.herr3("xfit_size", e);
-        };
-    }
+    //if (xfit.platform == .android) { //if mobile
+    root.xfit_size() catch |e| {
+        xfit.herr3("xfit_size", e);
+    };
+    //}
 
     __vulkan_allocator.execute_and_wait_all_op();
 }

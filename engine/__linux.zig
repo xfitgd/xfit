@@ -466,9 +466,9 @@ pub fn linux_loop() void {
                     @atomicStore(u32, &__system.init_set.window_height, @abs(event.xconfigure.height), .monotonic);
 
                     if (__system.loop_start.load(.monotonic)) {
-                        root.xfit_size() catch |e| {
-                            xfit.herr3("xfit_size", e);
-                        };
+                        // root.xfit_size() catch |e| {
+                        //     xfit.herr3("xfit_size", e);
+                        // };
                         __system.size_update.store(true, .monotonic);
                     }
                     //xfit.print_log("w{d}, h{d}\n", .{ event.xconfigure.width, event.xconfigure.height });

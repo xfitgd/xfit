@@ -696,9 +696,9 @@ fn WindowProc(hwnd: HWND, uMsg: u32, wParam: win32.WPARAM, lParam: win32.LPARAM)
             @atomicStore(u32, &__system.init_set.window_height, win32.HIWORD(lParam), std.builtin.AtomicOrder.monotonic);
 
             if (__system.loop_start.load(.monotonic)) {
-                root.xfit_size() catch |e| {
-                    xfit.herr3("xfit_size", e);
-                };
+                // root.xfit_size() catch |e| {
+                //     xfit.herr3("xfit_size", e);
+                // };
                 __system.size_update.store(true, .monotonic);
             }
         },
