@@ -101,7 +101,7 @@ pub const icomponent = struct {
             },
         }
     }
-    pub fn get_rect(self: icomponent, _size: point) math.rect {
+    pub fn get_rect(self: icomponent, _size: point, _CANVAS_W: f32, _CANVAS_H: f32) math.rect {
         const transform: *graphics.transform = self.obj.ptransform();
         const proj: *graphics.projection = transform.*.projection;
         switch (self.com.x_align) {
@@ -109,15 +109,15 @@ pub const icomponent = struct {
                 switch (self.com.y_align) {
                     .top => {
                         const base = self.com.scale_padding * point{ 1, -1 } * self.com.scale;
-                        return math.rect.get(base + point{ -proj.*.window_width() / 2 + self.com.pos[0], proj.*.window_height() / 2 - self.com.pos[1] }, _size * self.com.scale);
+                        return math.rect.get(base + point{ -proj.*.window_width() / 2 + self.com.pos[0], proj.*.window_height() / 2 - self.com.pos[1] }, _size * self.com.scale).calc_with_canvas(_CANVAS_W, _CANVAS_H);
                     },
                     .middle => {
                         const base = self.com.scale_padding * self.com.scale;
-                        return math.rect.get(base + point{ -proj.*.window_width() / 2 + self.com.pos[0], self.com.pos[1] }, _size * self.com.scale);
+                        return math.rect.get(base + point{ -proj.*.window_width() / 2 + self.com.pos[0], self.com.pos[1] }, _size * self.com.scale).calc_with_canvas(_CANVAS_W, _CANVAS_H);
                     },
                     .bottom => {
                         const base = self.com.scale_padding * self.com.scale;
-                        return math.rect.get(base + point{ -proj.*.window_width() / 2 + self.com.pos[0], -proj.*.window_height() / 2 + self.com.pos[1] }, _size * self.com.scale);
+                        return math.rect.get(base + point{ -proj.*.window_width() / 2 + self.com.pos[0], -proj.*.window_height() / 2 + self.com.pos[1] }, _size * self.com.scale).calc_with_canvas(_CANVAS_W, _CANVAS_H);
                     },
                 }
             },
@@ -125,15 +125,15 @@ pub const icomponent = struct {
                 switch (self.com.y_align) {
                     .top => {
                         const base = self.com.scale_padding * point{ 1, -1 } * self.com.scale;
-                        return math.rect.get(base + point{ self.com.pos[0], -proj.*.window_height() / 2 + self.com.pos[1] }, _size * self.com.scale);
+                        return math.rect.get(base + point{ self.com.pos[0], -proj.*.window_height() / 2 + self.com.pos[1] }, _size * self.com.scale).calc_with_canvas(_CANVAS_W, _CANVAS_H);
                     },
                     .middle => {
                         const base = self.com.scale_padding * self.com.scale;
-                        return math.rect.get(base + point{ self.com.pos[0], self.com.pos[1] }, _size * self.com.scale);
+                        return math.rect.get(base + point{ self.com.pos[0], self.com.pos[1] }, _size * self.com.scale).calc_with_canvas(_CANVAS_W, _CANVAS_H);
                     },
                     .bottom => {
                         const base = self.com.scale_padding * self.com.scale;
-                        return math.rect.get(base + point{ self.com.pos[0], -proj.*.window_height() / 2 + self.com.pos[1] }, _size * self.com.scale);
+                        return math.rect.get(base + point{ self.com.pos[0], -proj.*.window_height() / 2 + self.com.pos[1] }, _size * self.com.scale).calc_with_canvas(_CANVAS_W, _CANVAS_H);
                     },
                 }
             },
@@ -141,15 +141,15 @@ pub const icomponent = struct {
                 switch (self.com.y_align) {
                     .top => {
                         const base = self.com.scale_padding * point{ -1, -1 } * self.com.scale;
-                        return math.rect.get(base + point{ proj.*.window_width() / 2 - self.com.pos[0], -proj.*.window_height() / 2 + self.com.pos[1] }, _size * self.com.scale);
+                        return math.rect.get(base + point{ proj.*.window_width() / 2 - self.com.pos[0], -proj.*.window_height() / 2 + self.com.pos[1] }, _size * self.com.scale).calc_with_canvas(_CANVAS_W, _CANVAS_H);
                     },
                     .middle => {
                         const base = self.com.scale_padding * point{ -1, 1 } * self.com.scale;
-                        return math.rect.get(base + point{ proj.*.window_width() / 2 - self.com.pos[0], self.com.pos[1] }, _size * self.com.scale);
+                        return math.rect.get(base + point{ proj.*.window_width() / 2 - self.com.pos[0], self.com.pos[1] }, _size * self.com.scale).calc_with_canvas(_CANVAS_W, _CANVAS_H);
                     },
                     .bottom => {
                         const base = self.com.scale_padding * point{ -1, 1 } * self.com.scale;
-                        return math.rect.get(base + point{ proj.*.window_width() / 2 - self.com.pos[0], -proj.*.window_height() / 2 + self.com.pos[1] }, _size * self.com.scale);
+                        return math.rect.get(base + point{ proj.*.window_width() / 2 - self.com.pos[0], -proj.*.window_height() / 2 + self.com.pos[1] }, _size * self.com.scale).calc_with_canvas(_CANVAS_W, _CANVAS_H);
                     },
                 }
             },
