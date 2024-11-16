@@ -9,9 +9,6 @@ layout(set = 0, binding = 1) uniform UniformBufferObject1 {
 layout(set = 0, binding = 2) uniform UniformBufferObject2 {
     mat4 proj;
 } proj;
-layout(set = 0, binding = 3) uniform UniformBufferObject3 {
-    mat4 pre;
-} pre;
 
 //#extension GL_EXT_debug_printf : enable
 layout(location = 0) out vec2 fragTexCoord;
@@ -28,6 +25,6 @@ vec2 quad[6] = {
 };
 
 void main() {
-    gl_Position = pre.pre * proj.proj * view.view * model.model * vec4(quad[gl_VertexIndex] * vec2(textureSize(texSampler, 0)), 0.0, 1.0);
+    gl_Position = proj.proj * view.view * model.model * vec4(quad[gl_VertexIndex] * vec2(textureSize(texSampler, 0)), 0.0, 1.0);
     fragTexCoord = (quad[gl_VertexIndex] + vec2(0.5,0.5)) * vec2(1,-1);
 }

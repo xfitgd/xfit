@@ -104,13 +104,13 @@ pub const single_uniform_pool_sizes: [1]descriptor_pool_size = .{
 pub const transform_uniform_pool_sizes: [1]descriptor_pool_size = .{
     .{
         .typ = .uniform,
-        .cnt = 4,
+        .cnt = 3,
     },
 };
 pub const image_uniform_pool_sizes: [2]descriptor_pool_size = .{
     .{
         .typ = .uniform,
-        .cnt = 4,
+        .cnt = 3,
     },
     .{
         .typ = .uniform,
@@ -121,7 +121,7 @@ pub const image_uniform_pool_binding: [2]c_uint = .{ 0, 4 };
 pub const animate_image_uniform_pool_sizes: [2]descriptor_pool_size = .{
     .{
         .typ = .uniform,
-        .cnt = 4,
+        .cnt = 3,
     },
     .{
         .typ = .uniform,
@@ -132,7 +132,7 @@ pub const animate_image_uniform_pool_binding: [2]c_uint = .{ 0, 4 };
 pub const tile_image_uniform_pool_sizes: [3]descriptor_pool_size = .{
     .{
         .typ = .uniform,
-        .cnt = 4,
+        .cnt = 3,
     },
     .{
         .typ = .uniform,
@@ -392,15 +392,17 @@ pub const projection = struct {
     }
     pub fn build(self: *Self, _flag: write_flag) void {
         self.*.__check_alloc.init(__system.allocator);
+        const mat = self.*.proj.multiply(&__vulkan.rotate_mat);
         self.*.__uniform.create_buffer_copy(.{
             .len = @sizeOf(matrix),
             .typ = .uniform,
             .use = _flag,
-        }, mem.obj_to_u8arrC(&self.*.proj));
+        }, mem.obj_to_u8arrC(&mat));
     }
     ///write_flag가 cpu일때만 호출
     pub fn copy_update(self: *Self) void {
-        self.*.__uniform.copy_update(&self.*.proj);
+        const mat = self.*.proj.multiply(&__vulkan.rotate_mat);
+        self.*.__uniform.copy_update(&mat);
     }
 };
 pub const camera = struct {
@@ -806,13 +808,12 @@ pub fn shape_(_msaa: bool) type {
             };
         }
         pub fn update_uniforms(self: *Self) void {
-            var __set_res: [4]res_union = .{
+            var __set_res: [3]res_union = .{
                 .{ .buf = &self.*.transform.__model_uniform },
                 .{ .buf = &self.*.transform.camera.*.__uniform },
                 .{ .buf = &self.*.transform.projection.*.__uniform },
-                .{ .buf = &__vulkan.__pre_mat_uniform },
             };
-            self.*.__set.__res = __set_res[0..4];
+            self.*.__set.__res = __set_res[0..3];
             __vulkan_allocator.update_descriptor_sets((&self.*.__set)[0..1]);
         }
         pub fn build(self: *Self) void {
@@ -910,14 +911,13 @@ pub const image = struct {
         self.*.transform.__deinit(callback);
     }
     pub fn update_uniforms(self: *Self) void {
-        var __set_res: [5]res_union = .{
+        var __set_res: [4]res_union = .{
             .{ .buf = &self.*.transform.__model_uniform },
             .{ .buf = &self.*.transform.camera.*.__uniform },
             .{ .buf = &self.*.transform.projection.*.__uniform },
-            .{ .buf = &__vulkan.__pre_mat_uniform },
             .{ .buf = &self.*.color_tran.*.__uniform },
         };
-        self.*.__set.__res = __set_res[0..5];
+        self.*.__set.__res = __set_res[0..4];
         __vulkan_allocator.update_descriptor_sets((&self.*.__set)[0..1]);
     }
     pub fn build(self: *Self) void {
@@ -1037,15 +1037,14 @@ pub const animate_image = struct {
         self.*.__frame_uniform.copy_update(&__frame_cpy);
     }
     pub fn update_uniforms(self: *Self) void {
-        var __set_res: [6]res_union = .{
+        var __set_res: [5]res_union = .{
             .{ .buf = &self.*.transform.__model_uniform },
             .{ .buf = &self.*.transform.camera.*.__uniform },
             .{ .buf = &self.*.transform.projection.*.__uniform },
-            .{ .buf = &__vulkan.__pre_mat_uniform },
             .{ .buf = &self.*.color_tran.*.__uniform },
             .{ .buf = &self.*.__frame_uniform },
         };
-        self.*.__set.__res = __set_res[0..6];
+        self.*.__set.__res = __set_res[0..5];
         __vulkan_allocator.update_descriptor_sets((&self.*.__set)[0..1]);
     }
     pub fn build(self: *Self) void {
@@ -1125,15 +1124,14 @@ pub const tile_image = struct {
         self.*.__tile_uniform.copy_update(&__idx_cpy);
     }
     pub fn update_uniforms(self: *Self) void {
-        var __set_res: [6]res_union = .{
+        var __set_res: [5]res_union = .{
             .{ .buf = &self.*.transform.__model_uniform },
             .{ .buf = &self.*.transform.camera.*.__uniform },
             .{ .buf = &self.*.transform.projection.*.__uniform },
-            .{ .buf = &__vulkan.__pre_mat_uniform },
             .{ .buf = &self.*.color_tran.*.__uniform },
             .{ .buf = &self.*.__tile_uniform },
         };
-        self.*.__set.__res = __set_res[0..6];
+        self.*.__set.__res = __set_res[0..5];
         __vulkan_allocator.update_descriptor_sets((&self.*.__set)[0..1]);
     }
     pub fn build(self: *Self) void {

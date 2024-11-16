@@ -1397,12 +1397,6 @@ pub fn vulkan_start() void {
                 .descriptor_type = .uniform_buffer,
                 .stage_flags = .{ .vertex_bit = true, .fragment_bit = true },
             },
-            vk.DescriptorSetLayoutBinding{
-                .binding = 3,
-                .descriptor_count = 1,
-                .descriptor_type = .uniform_buffer,
-                .stage_flags = .{ .vertex_bit = true, .fragment_bit = true },
-            },
         };
         const set_layout_info: vk.DescriptorSetLayoutCreateInfo = .{
             .binding_count = uboLayoutBinding.len,
@@ -1442,12 +1436,6 @@ pub fn vulkan_start() void {
             },
             vk.DescriptorSetLayoutBinding{
                 .binding = 3,
-                .descriptor_count = 1,
-                .descriptor_type = .uniform_buffer,
-                .stage_flags = .{ .vertex_bit = true, .fragment_bit = true },
-            },
-            vk.DescriptorSetLayoutBinding{
-                .binding = 4,
                 .descriptor_count = 1,
                 .descriptor_type = .uniform_buffer,
                 .stage_flags = .{ .fragment_bit = true },
@@ -1508,16 +1496,10 @@ pub fn vulkan_start() void {
                 .binding = 3,
                 .descriptor_count = 1,
                 .descriptor_type = .uniform_buffer,
-                .stage_flags = .{ .vertex_bit = true, .fragment_bit = true },
-            },
-            vk.DescriptorSetLayoutBinding{
-                .binding = 4,
-                .descriptor_count = 1,
-                .descriptor_type = .uniform_buffer,
                 .stage_flags = .{ .fragment_bit = true },
             },
             vk.DescriptorSetLayoutBinding{
-                .binding = 5,
+                .binding = 4,
                 .descriptor_count = 1,
                 .descriptor_type = .uniform_buffer,
                 .stage_flags = .{ .fragment_bit = true },
@@ -1618,7 +1600,6 @@ pub fn vulkan_start() void {
 pub fn vulkan_destroy() void {
     //graphics destroy
     no_color_tran.deinit();
-    __pre_mat_uniform.clean(null, {});
 
     cleanup_swapchain();
 
@@ -1827,7 +1808,7 @@ fn create_framebuffer() void {
     vkd.?.updateDescriptorSets(descriptorWrite.len, &descriptorWrite, 0, null);
 }
 
-var rotate_mat: matrix = undefined;
+pub var rotate_mat: matrix = matrix.identity();
 
 pub fn refresh_pre_matrix() void {
     if (xfit.platform == .android) {
@@ -1839,30 +1820,6 @@ pub fn refresh_pre_matrix() void {
             .vertical180 => matrix.rotation2D(std.math.degreesToRadians(180.0)),
             .vertical360 => matrix.identity(),
         };
-        if (__pre_mat_uniform.res == .null_handle) {
-            __pre_mat_uniform.create_buffer(
-                .{
-                    .len = @sizeOf(matrix),
-                    .typ = .uniform,
-                    .use = .cpu,
-                },
-                std.mem.sliceAsBytes(@as([*]const matrix, @ptrCast(&rotate_mat))[0..1]),
-            );
-        } else {
-            __pre_mat_uniform.copy_update(&rotate_mat);
-        }
-    } else {
-        if (__pre_mat_uniform.res == .null_handle) {
-            rotate_mat = matrix.identity();
-            __pre_mat_uniform.create_buffer(
-                .{
-                    .len = @sizeOf(matrix),
-                    .typ = .uniform,
-                    .use = .cpu,
-                },
-                std.mem.sliceAsBytes(@as([*]const matrix, @ptrCast(&rotate_mat))[0..1]),
-            );
-        }
     }
 }
 

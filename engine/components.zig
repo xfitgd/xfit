@@ -227,13 +227,12 @@ pub fn button_(_msaa: bool) type {
             }
         }
         pub fn update_uniforms(self: *Self) void {
-            var __set_res: [4]res_union = .{
+            var __set_res: [3]res_union = .{
                 .{ .buf = &self.*.transform.__model_uniform },
                 .{ .buf = &self.*.transform.camera.*.__uniform },
                 .{ .buf = &self.*.transform.projection.*.__uniform },
-                .{ .buf = &__vulkan.__pre_mat_uniform },
             };
-            self.*.__set.__res = __set_res[0..4];
+            self.*.__set.__res = __set_res[0..3];
             __vulkan_allocator.update_descriptor_sets((&self.*.__set)[0..1]);
         }
         pub fn build(self: *Self) void {
