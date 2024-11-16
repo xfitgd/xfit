@@ -30,7 +30,7 @@ pub const icomponent = struct {
         } else {
             if (!math.compare(self.com.scale, .{ 1, 1 })) {
                 if (self.com.rotation != 0) {
-                    return matrix.scalingXY(self.com.scale).multiply(&matrix.rotationZ(self.com.rotation));
+                    return matrix.scalingXY(self.com.scale).multiply(&matrix.rotation2D(self.com.rotation));
                 } else {
                     return matrix.scalingXY(self.com.scale);
                 }
