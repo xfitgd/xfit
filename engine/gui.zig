@@ -22,16 +22,24 @@ pub const icomponent = struct {
                 }
             } else {
                 if (self.com.rotation != 0) {
-                    return matrix.translationXY(self.com.center_pt * mul).multiply(&matrix.rotationZ(self.com.rotation));
+                    return matrix.translationXY(self.com.center_pt * mul).multiply(&matrix.rotation2D(self.com.rotation));
                 } else {
                     return matrix.translationXY(self.com.center_pt * mul);
                 }
             }
         } else {
             if (!math.compare(self.com.scale, .{ 1, 1 })) {
-                return matrix.scalingXY(self.com.scale);
+                if (self.com.rotation != 0) {
+                    return matrix.scalingXY(self.com.scale).multiply(&matrix.rotationZ(self.com.rotation));
+                } else {
+                    return matrix.scalingXY(self.com.scale);
+                }
             } else {
-                return null;
+                if (self.com.rotation != 0) {
+                    return matrix.rotationZ(self.com.rotation);
+                } else {
+                    return null;
+                }
             }
         }
     }
