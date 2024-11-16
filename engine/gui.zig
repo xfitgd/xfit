@@ -13,11 +13,19 @@ pub const icomponent = struct {
     obj: *iobject,
 
     fn base_mat(self: icomponent, mul: point) ?matrix {
-        if (!math.compare(self.com.scale_padding, .{ 0, 0 })) {
+        if (!math.compare(self.com.center_pt, .{ 0, 0 })) {
             if (!math.compare(self.com.scale, .{ 1, 1 })) {
-                return matrix.translationXY(self.com.scale_padding * mul).multiply(&matrix.scalingXY(self.com.scale));
+                if (self.com.rotation != 0) {
+                    return matrix.translationXY(self.com.center_pt * mul).multiply(&matrix.scalingXY(self.com.scale).multiply(&matrix.rotation2D(self.com.rotation)));
+                } else {
+                    return matrix.translationXY(self.com.center_pt * mul).multiply(&matrix.scalingXY(self.com.scale));
+                }
             } else {
-                return matrix.translationXY(self.com.scale_padding * mul);
+                if (self.com.rotation != 0) {
+                    return matrix.translationXY(self.com.center_pt * mul).multiply(&matrix.rotationZ(self.com.rotation));
+                } else {
+                    return matrix.translationXY(self.com.center_pt * mul);
+                }
             }
         } else {
             if (!math.compare(self.com.scale, .{ 1, 1 })) {
@@ -108,15 +116,15 @@ pub const icomponent = struct {
             .left => {
                 switch (self.com.y_align) {
                     .top => {
-                        const base = self.com.scale_padding * point{ 1, -1 } * self.com.scale;
+                        const base = self.com.center_pt * point{ 1, -1 } * self.com.scale;
                         return math.rect.get(base + point{ -proj.*.window_width() / 2 + self.com.pos[0], proj.*.window_height() / 2 - self.com.pos[1] }, _size * self.com.scale).calc_with_canvas(_CANVAS_W, _CANVAS_H);
                     },
                     .middle => {
-                        const base = self.com.scale_padding * self.com.scale;
+                        const base = self.com.center_pt * self.com.scale;
                         return math.rect.get(base + point{ -proj.*.window_width() / 2 + self.com.pos[0], self.com.pos[1] }, _size * self.com.scale).calc_with_canvas(_CANVAS_W, _CANVAS_H);
                     },
                     .bottom => {
-                        const base = self.com.scale_padding * self.com.scale;
+                        const base = self.com.center_pt * self.com.scale;
                         return math.rect.get(base + point{ -proj.*.window_width() / 2 + self.com.pos[0], -proj.*.window_height() / 2 + self.com.pos[1] }, _size * self.com.scale).calc_with_canvas(_CANVAS_W, _CANVAS_H);
                     },
                 }
@@ -124,15 +132,15 @@ pub const icomponent = struct {
             .center => {
                 switch (self.com.y_align) {
                     .top => {
-                        const base = self.com.scale_padding * point{ 1, -1 } * self.com.scale;
+                        const base = self.com.center_pt * point{ 1, -1 } * self.com.scale;
                         return math.rect.get(base + point{ self.com.pos[0], -proj.*.window_height() / 2 + self.com.pos[1] }, _size * self.com.scale).calc_with_canvas(_CANVAS_W, _CANVAS_H);
                     },
                     .middle => {
-                        const base = self.com.scale_padding * self.com.scale;
+                        const base = self.com.center_pt * self.com.scale;
                         return math.rect.get(base + point{ self.com.pos[0], self.com.pos[1] }, _size * self.com.scale).calc_with_canvas(_CANVAS_W, _CANVAS_H);
                     },
                     .bottom => {
-                        const base = self.com.scale_padding * self.com.scale;
+                        const base = self.com.center_pt * self.com.scale;
                         return math.rect.get(base + point{ self.com.pos[0], -proj.*.window_height() / 2 + self.com.pos[1] }, _size * self.com.scale).calc_with_canvas(_CANVAS_W, _CANVAS_H);
                     },
                 }
@@ -140,15 +148,15 @@ pub const icomponent = struct {
             .right => {
                 switch (self.com.y_align) {
                     .top => {
-                        const base = self.com.scale_padding * point{ -1, -1 } * self.com.scale;
+                        const base = self.com.center_pt * point{ -1, -1 } * self.com.scale;
                         return math.rect.get(base + point{ proj.*.window_width() / 2 - self.com.pos[0], -proj.*.window_height() / 2 + self.com.pos[1] }, _size * self.com.scale).calc_with_canvas(_CANVAS_W, _CANVAS_H);
                     },
                     .middle => {
-                        const base = self.com.scale_padding * point{ -1, 1 } * self.com.scale;
+                        const base = self.com.center_pt * point{ -1, 1 } * self.com.scale;
                         return math.rect.get(base + point{ proj.*.window_width() / 2 - self.com.pos[0], self.com.pos[1] }, _size * self.com.scale).calc_with_canvas(_CANVAS_W, _CANVAS_H);
                     },
                     .bottom => {
-                        const base = self.com.scale_padding * point{ -1, 1 } * self.com.scale;
+                        const base = self.com.center_pt * point{ -1, 1 } * self.com.scale;
                         return math.rect.get(base + point{ proj.*.window_width() / 2 - self.com.pos[0], -proj.*.window_height() / 2 + self.com.pos[1] }, _size * self.com.scale).calc_with_canvas(_CANVAS_W, _CANVAS_H);
                     },
                 }
@@ -159,8 +167,9 @@ pub const icomponent = struct {
 
 pub const component = struct {
     pos: point,
-    scale_padding: point = .{ 0, 0 },
+    center_pt: point = .{ 0, 0 },
     scale: point = .{ 1, 1 },
+    rotation: f32 = 0,
     x_align: pos_x = .center,
     y_align: pos_y = .middle,
     pub const pos_x = enum {
