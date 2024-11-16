@@ -49,37 +49,37 @@ pub fn window_height() u32 {
     return @atomicLoad(u32, &__system.init_set.window_height, std.builtin.AtomicOrder.monotonic);
 }
 pub fn window_x() i32 {
-    if (xfit.platform == .android) {
+    if (xfit.is_mobile) {
         return 0;
     }
     return @atomicLoad(i32, &__system.init_set.window_x, std.builtin.AtomicOrder.monotonic);
 }
 pub fn window_y() i32 {
-    if (xfit.platform == .android) {
+    if (xfit.is_mobile) {
         return 0;
     }
     return @atomicLoad(i32, &__system.init_set.window_y, std.builtin.AtomicOrder.monotonic);
 }
 pub fn can_maximize() bool {
-    if (xfit.platform == .android) {
+    if (xfit.is_mobile) {
         return false;
     }
     return @atomicLoad(bool, &__system.init_set.can_maximize, std.builtin.AtomicOrder.monotonic);
 }
 pub fn can_minimize() bool {
-    if (xfit.platform == .android) {
+    if (xfit.is_mobile) {
         return false;
     }
     return @atomicLoad(bool, &__system.init_set.can_minimize, std.builtin.AtomicOrder.monotonic);
 }
 pub fn can_resizewindow() bool {
-    if (xfit.platform == .android) {
+    if (xfit.is_mobile) {
         return false;
     }
     return @atomicLoad(bool, &__system.init_set.can_resizewindow, std.builtin.AtomicOrder.monotonic);
 }
 pub fn get_screen_mode() xfit.screen_mode {
-    if (xfit.platform == .android) {
+    if (xfit.is_mobile) {
         return xfit.screen_mode.WINDOW;
     }
     return @atomicLoad(xfit.screen_mode, &__system.init_set.screen_mode, std.builtin.AtomicOrder.monotonic);

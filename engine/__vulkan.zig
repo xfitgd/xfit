@@ -1075,7 +1075,7 @@ pub fn vulkan_start() void {
         while (i < deviceExtensionCount) : (i += 1) {
             inline for (ext, checked) |t, b| {
                 if (!b.* and std.mem.eql(u8, t, extensions[i].extension_name[0..t.len])) {
-                    if (!(xfit.platform == .android and b == &VK_EXT_full_screen_exclusive_support)) {
+                    if (!(xfit.is_mobile and b == &VK_EXT_full_screen_exclusive_support)) {
                         device_extension_names.append(t.ptr) catch xfit.herrm("vulkan_start dev ex append");
                         b.* = true;
                         xfit.print_log("XFIT SYSLOG : vulkan {s} device ext support\n", .{t});
@@ -1811,7 +1811,7 @@ fn create_framebuffer() void {
 pub var rotate_mat: matrix = matrix.identity();
 
 pub fn refresh_pre_matrix() void {
-    if (xfit.platform == .android) {
+    if (xfit.is_mobile) {
         const orientation = window.get_screen_orientation();
         rotate_mat = switch (orientation) {
             .unknown => matrix.identity(),
@@ -1853,7 +1853,7 @@ fn create_swapchain_and_imageviews(comptime program_start: bool) void {
         return;
     }
 
-    if (xfit.platform == .android) {
+    if (xfit.is_mobile) {
         if (surfaceCap.current_transform.contains(.{ .rotate_90_bit_khr = true })) {
             vkExtent_rotation.width = vkExtent.height;
             vkExtent_rotation.height = vkExtent.width;
@@ -1872,7 +1872,7 @@ fn create_swapchain_and_imageviews(comptime program_start: bool) void {
     } else {
         vkExtent_rotation = vkExtent;
     }
-    if (xfit.platform == .android) { //if mobile
+    if (xfit.is_mobile) { //if mobile
         @atomicStore(u32, &__system.init_set.window_width, @intCast(vkExtent.width), std.builtin.AtomicOrder.monotonic);
         @atomicStore(u32, &__system.init_set.window_height, @intCast(vkExtent.height), std.builtin.AtomicOrder.monotonic);
     }
@@ -2105,11 +2105,9 @@ pub fn recreate_swapchain() void {
     fullscreen_mutex.unlock();
 
     __render_command.refresh_all();
-    //if (xfit.platform == .android) { //if mobile
     root.xfit_size() catch |e| {
         xfit.herr3("xfit_size", e);
     };
-    //}
 
     __vulkan_allocator.execute_and_wait_all_op();
 }

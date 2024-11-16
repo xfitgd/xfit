@@ -44,6 +44,7 @@ pub const SubSystem = @TypeOf(subsystem);
 
 pub const dbg = builtin.mode == .Debug;
 pub const enable_log: bool = @import("build_options").enable_log;
+pub const is_mobile: bool = platform == .android;
 
 pub const __android_entry = if (platform == .android) __android.android.ANativeActivity_createFunc else {};
 //

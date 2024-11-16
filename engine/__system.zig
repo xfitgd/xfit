@@ -153,7 +153,7 @@ pub fn init(_allocator: std.mem.Allocator, init_setting: *const xfit.init_settin
     allocator = _allocator;
 
     monitors = ArrayList(system.monitor_info).init(allocator);
-    if (xfit.platform == .android) {
+    if (xfit.is_mobile) {
         const width = init_set.window_width;
         const height = init_set.window_height;
         init_set = init_setting.*;

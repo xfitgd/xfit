@@ -392,7 +392,7 @@ pub const projection = struct {
     }
     pub fn build(self: *Self, _flag: write_flag) void {
         self.*.__check_alloc.init(__system.allocator);
-        const mat = self.*.proj.multiply(&__vulkan.rotate_mat);
+        const mat = if (xfit.is_mobile) self.*.proj.multiply(&__vulkan.rotate_mat) else self.*.proj;
         self.*.__uniform.create_buffer_copy(.{
             .len = @sizeOf(matrix),
             .typ = .uniform,
@@ -401,7 +401,7 @@ pub const projection = struct {
     }
     ///write_flag가 cpu일때만 호출
     pub fn copy_update(self: *Self) void {
-        const mat = self.*.proj.multiply(&__vulkan.rotate_mat);
+        const mat = if (xfit.is_mobile) self.*.proj.multiply(&__vulkan.rotate_mat) else self.*.proj;
         self.*.__uniform.copy_update(&mat);
     }
 };

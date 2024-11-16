@@ -7,6 +7,8 @@ const raw_input = @import("raw_input.zig");
 const __raw_input = @import("__raw_input.zig");
 const system = @import("system.zig");
 
+//TODO linux support
+
 const win32 = __windows.win32;
 
 pub const XBOX_BUTTONS = packed struct {
@@ -143,18 +145,12 @@ pub fn start(_change_fn: ChangeDeviceFn) raw_input.ERROR!void {
     if (xfit.platform == .windows) {
         raw = .{ .handle = undefined };
         try raw.init(XBOX_MAX_CONTROLLERS, &XBOX_WIN_GUID, change_fn, null);
-    } else if (xfit.platform == .android) {} else {
-        @compileError("not support platform");
     }
 }
 
 pub fn destroy() void {
     if (xfit.platform == .windows) {
         raw.deinit();
-    } else if (xfit.platform == .android) {
-        //__android.xbox_pad_callback = null;
-    } else {
-        @compileError("not support platform");
     }
 }
 
@@ -196,10 +192,6 @@ pub fn set_callback(_fn: CallbackFn) void {
     fn_ = _fn;
     if (xfit.platform == .windows) {
         raw.set_callback(callback);
-    } else if (xfit.platform == .android) {
-        //__android.xbox_pad_callback = callback;
-    } else {
-        @compileError("not support platform");
     }
 }
 
@@ -237,9 +229,6 @@ pub fn set_vibration(
             vib.repeat,
         };
         return try raw.set(device_idx, data[0..data.len]);
-    } else if (xfit.platform == .android) {
-        return 0;
-    } else {
-        @compileError("not support platform");
     }
+    return 0;
 }
