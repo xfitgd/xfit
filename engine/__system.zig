@@ -122,6 +122,7 @@ pub var change_screen_mode: std.atomic.Value(bool) = std.atomic.Value(bool).init
 pub var mouse_leave_func: ?*const fn () void = null;
 pub var mouse_hover_func: ?*const fn () void = null;
 pub var mouse_move_func: ?*const fn (pos: math.point) void = null;
+pub var touch_move_func: ?*const fn (touch_idx: u32, pos: math.point) void = null;
 
 pub var touch_down_func: ?*const fn (touch_idx: u32, pos: math.point) void = null;
 pub var touch_up_func: ?*const fn (touch_idx: u32, pos: math.point) void = null;

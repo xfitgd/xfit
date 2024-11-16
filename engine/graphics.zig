@@ -117,7 +117,7 @@ pub const image_uniform_pool_sizes: [2]descriptor_pool_size = .{
         .cnt = 1,
     },
 };
-pub const image_uniform_pool_binding: [2]c_uint = .{ 0, 4 };
+pub const image_uniform_pool_binding: [2]c_uint = .{ 0, 3 };
 pub const animate_image_uniform_pool_sizes: [2]descriptor_pool_size = .{
     .{
         .typ = .uniform,
@@ -128,7 +128,7 @@ pub const animate_image_uniform_pool_sizes: [2]descriptor_pool_size = .{
         .cnt = 2,
     },
 };
-pub const animate_image_uniform_pool_binding: [2]c_uint = .{ 0, 4 };
+pub const animate_image_uniform_pool_binding: [2]c_uint = .{ 0, 3 };
 pub const tile_image_uniform_pool_sizes: [3]descriptor_pool_size = .{
     .{
         .typ = .uniform,
@@ -143,7 +143,7 @@ pub const tile_image_uniform_pool_sizes: [3]descriptor_pool_size = .{
         .cnt = 1,
     },
 };
-pub const tile_image_uniform_pool_binding: [3]c_uint = .{ 0, 4, 5 };
+//pub const tile_image_uniform_pool_binding: [3]c_uint = .{ 0, 3, 4 };
 
 const iobject_type = enum {
     _shape,

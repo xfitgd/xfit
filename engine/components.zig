@@ -105,14 +105,14 @@ pub fn button_(_msaa: bool) type {
             }
         }
         pub fn on_mouse_move(self: *Self, _mouse_pos: point) void {
-            if (self.state == .UP) {
-                if (self.area.rect.is_point_in(_mouse_pos)) {
+            if (self.area.rect.is_point_in(_mouse_pos)) {
+                if (self.state == .UP) {
                     self.state = .OVER;
                     self.update_color();
                     if (self.on_over != null) self.on_over.?(self.*.user_data, _mouse_pos);
                 }
-            } else if (self.state == .OVER) {
-                if (!self.area.rect.is_point_in(_mouse_pos)) {
+            } else {
+                if (self.state != .UP) {
                     self.state = .UP;
                     self.update_color();
                 }
@@ -142,39 +142,45 @@ pub fn button_(_msaa: bool) type {
                 if (self.on_up != null) self.on_up.?(self.*.user_data, _mouse_pos);
             }
         }
-        pub fn on_touch_down(self: *Self, touch_idx: u32, _mouse_pos: point) void {
+        pub fn on_touch_down(self: *Self, touch_idx: u32, _touch_pos: point) void {
             if (self.state == .UP) {
-                if (self.area.rect.is_point_in(_mouse_pos)) {
+                if (self.area.rect.is_point_in(_touch_pos)) {
                     self.state = .DOWN;
                     self.update_color();
                     self._touch_idx = touch_idx;
-                    if (self.on_down != null) self.on_down.?(self.*.user_data, _mouse_pos);
+                    if (self.on_down != null) self.on_down.?(self.*.user_data, _touch_pos);
                 }
             } else if (self._touch_idx != null and self._touch_idx.? == touch_idx) {
                 self.state = .UP;
                 self._touch_idx = null;
                 self.update_color();
-                if (self.on_up != null) self.on_up.?(self.*.user_data, _mouse_pos);
+                if (self.on_up != null) self.on_up.?(self.*.user_data, _touch_pos);
             }
         }
-        pub fn on_touch_up(self: *Self, touch_idx: u32, _mouse_pos: point) void {
+        pub fn on_touch_up(self: *Self, touch_idx: u32, _touch_pos: point) void {
             if (self.state == .DOWN and self._touch_idx.? == touch_idx) {
                 self.state = .UP;
                 self._touch_idx = null;
                 self.update_color();
-                if (self.on_up != null) self.on_up.?(self.*.user_data, _mouse_pos);
+                if (self.on_up != null) self.on_up.?(self.*.user_data, _touch_pos);
             }
         }
-        pub fn on_mouse_out(self: *Self) void {
-            if (self.state == .DOWN or self.state == .OVER) {
-                self.state = .UP;
-                self.update_color();
-                if (self.state == .DOWN) {
-                    if (self.on_up != null) self.on_up.?(self.*.user_data, null);
+        pub fn on_touch_move(self: *Self, touch_idx: u32, _touch_pos: point) void {
+            if (self.area.rect.is_point_in(_touch_pos)) {
+                if (self._touch_idx == null and self.state == .UP) {
+                    self._touch_idx = touch_idx;
+                    self.state = .OVER;
+                    self.update_color();
+                    if (self.on_over != null) self.on_over.?(self.*.user_data, _touch_pos);
+                }
+            } else if (self._touch_idx != null and self._touch_idx.? == touch_idx) {
+                self._touch_idx = null;
+                if (self.state != .UP) {
+                    self.state = .UP;
+                    self.update_color();
                 }
             }
         }
-
         pub fn make_square_button(_out: []*button_source, scale: point, thickness: f32, _allocator: std.mem.Allocator) !void {
             _out[0].* = button_source.init_for_alloc(_allocator);
             _out[1].* = button_source.init_for_alloc(_allocator);

@@ -250,7 +250,7 @@ pub fn xfit_init() !void {
 
     input.set_key_down_func(key_down);
     input.set_mouse_move_func(mouse_move);
-    input.set_mouse_out_func(mouse_out);
+    input.set_touch_move_func(touch_move);
     input.set_Lmouse_down_func(mouse_down);
     input.set_Lmouse_up_func(mouse_up);
     input.set_touch_down_func(touch_down);
@@ -274,9 +274,6 @@ pub fn xfit_init() !void {
 fn mouse_move(pos: math.point) void {
     g_rect_button.on_mouse_move(pos);
 }
-fn mouse_out() void {
-    g_rect_button.on_mouse_out();
-}
 fn mouse_down(pos: math.point) void {
     g_rect_button.on_mouse_down(pos);
 }
@@ -289,6 +286,9 @@ fn touch_down(touch_idx: u32, pos: math.point) void {
 }
 fn touch_up(touch_idx: u32, pos: math.point) void {
     g_rect_button.on_touch_up(touch_idx, pos);
+}
+fn touch_move(touch_idx: u32, pos: math.point) void {
+    g_rect_button.on_touch_move(touch_idx, pos);
 }
 
 var image_front: bool = false;
