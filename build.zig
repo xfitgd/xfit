@@ -22,9 +22,20 @@ inline fn get_arch_text(arch: std.Target.Cpu.Arch) []const u8 {
     };
 }
 
+var yaml: *std.Build.Dependency = undefined;
+
 ///for : const src_path = b.dependency("xfit_build", .{}).*.path(".").getPath(b);
 pub fn build(b: *std.Build) void {
-    _ = b;
+    yaml = b.dependency("zig-yaml", .{});
+    //?xfit 엔진 내에서 외부 라이브러리 인식하기 위해
+    const result = b.addTest(.{
+        .name = "xfit",
+        .root_source_file = b.path("engine/xfit.zig"),
+    });
+    result.root_module.addImport("yaml", yaml.module("yaml"));
+
+    b.default_step.dependOn(&result.step);
+    //?
 }
 
 pub const run_option = struct {
@@ -306,6 +317,9 @@ pub fn run(
         result.root_module.addImport("build_options", build_options_module);
 
         result.root_module.addImport("xfit", xfit);
+
+        result.root_module.addImport("yaml", yaml.module("yaml"));
+        xfit.addImport("yaml", yaml.module("yaml"));
 
         xfit.addIncludePath(get_lazypath(b, std.fmt.allocPrint(arena_allocator.allocator(), "{s}/include", .{engine_path}) catch unreachable));
         xfit.addIncludePath(get_lazypath(b, std.fmt.allocPrint(arena_allocator.allocator(), "{s}/include/freetype", .{engine_path}) catch unreachable));

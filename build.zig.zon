@@ -1,6 +1,11 @@
 .{
     .name = "xfit_build",
     .version = "0.0.1",
-    .dependencies = .{},
+    .dependencies = .{
+        .@"zig-yaml" = .{
+            .url = "git+https://github.com/kubkon/zig-yaml",
+            .hash = "12208398e1393f83a39d03f3ef4893607650b6227dc7f1eee3db4d163fbc2c0c37ca",
+        },
+    },
     .paths = .{""},
 }
