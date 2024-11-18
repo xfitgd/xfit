@@ -11,5 +11,11 @@
             .hash = "12200db01caa0380c3d87b16fb761c0c0c1ef8eeb9e27d25e6d1fcb1b678c51b4231",
         },
     },
-    .paths = .{""},
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+        "LICENSE",
+        "README.md",
+    },
 }

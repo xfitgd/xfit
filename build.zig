@@ -32,7 +32,7 @@ pub fn build(b: *std.Build) void {
     //?xfit 엔진 내에서 외부 라이브러리 인식하기 위해
     const result = b.addTest(.{
         .name = "xfit",
-        .root_source_file = b.path("engine/xfit.zig"),
+        .root_source_file = b.path("src/xfit.zig"),
     });
     result.root_module.addImport("yaml", yaml.module("yaml"));
     result.root_module.addImport("xml", xml.module("xml"));
@@ -60,7 +60,7 @@ pub fn run(
     defer arena_allocator.deinit();
 
     const src_path = b.dependency("xfit_build", .{}).*.path(".").getPath(b);
-    const engine_path = std.fmt.allocPrint(arena_allocator.allocator(), "{s}/engine", .{src_path}) catch unreachable;
+    const engine_path = std.fmt.allocPrint(arena_allocator.allocator(), "{s}/src", .{src_path}) catch unreachable;
     if (builtin.os.tag == .windows) {
         const path: []u8 = std.fmt.allocPrint(arena_allocator.allocator(), "{s}/shader_compile.bat", .{engine_path}) catch unreachable;
         const realpath: []u8 = std.fs.cwd().realpathAlloc(arena_allocator.allocator(), path) catch unreachable;

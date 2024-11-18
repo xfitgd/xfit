@@ -4,7 +4,7 @@
 /lib
 *.spv
 *.exe
-/engine/shaders/out
+/src/shaders/out
 /com
 
 /examples/zig-out
