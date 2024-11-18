@@ -15,3 +15,4 @@
 - [ini](https://github.com/ziglibs/ini), [zigini](https://github.com/Kawaii-Ash/zigini)
 - [s2s](https://github.com/ziglibs/s2s)
 - [zig-yaml](https://github.com/kubkon/zig-yaml)
+- [zig-xml](https://github.com/ianprime0509/zig-xml)

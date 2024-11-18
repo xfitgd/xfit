@@ -30,6 +30,12 @@ pub const ini = @import("ini.zig");
 pub const s2s = @import("s2s.zig");
 pub const gui = @import("gui.zig");
 pub const yaml = @import("yaml");
+pub const xml = @import("xml");
+
+test {
+    std.testing.refAllDecls(yaml);
+    std.testing.refAllDecls(xml);
+}
 
 //system engine only headers
 const __system = @import("__system.zig");
