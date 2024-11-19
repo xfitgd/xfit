@@ -96,7 +96,7 @@ pub fn set_window_title(title: []const u8) void {
 }
 
 pub fn set_window_size(w: u32, h: u32) void {
-    if (get_screen_mode() != .WINDOW or __system.change_screen_mode.load(.acquire)) return;
+    if (get_screen_mode() != .WINDOW or __system.size_update.load(.acquire)) return;
     __vulkan.fullscreen_mutex.lock();
     defer __vulkan.fullscreen_mutex.unlock();
     if (xfit.platform == .windows) {
@@ -108,7 +108,7 @@ pub fn set_window_size(w: u32, h: u32) void {
     }
 }
 pub fn set_window_pos(x: i32, y: i32) void {
-    if (get_screen_mode() != .WINDOW or __system.change_screen_mode.load(.acquire)) return;
+    if (get_screen_mode() != .WINDOW or __system.size_update.load(.acquire)) return;
     if (xfit.platform == .windows) {
         __windows.set_window_pos(x, y);
     } else if (xfit.platform == .linux) {
@@ -121,7 +121,7 @@ pub fn set_window_pos(x: i32, y: i32) void {
 }
 
 pub fn set_window_mode() void {
-    if (get_screen_mode() == .WINDOW or __system.change_screen_mode.load(.acquire)) return;
+    if (get_screen_mode() == .WINDOW or __system.size_update.load(.acquire)) return;
     __vulkan.fullscreen_mutex.lock();
     defer __vulkan.fullscreen_mutex.unlock();
 
@@ -147,10 +147,10 @@ pub fn set_window_mode() void {
             @atomicStore(window_show, &__system.init_set.window_show, window_show.MINIMIZE, std.builtin.AtomicOrder.monotonic);
         },
     }
-    __system.change_screen_mode.store(true, .release);
+    __system.size_update.store(true, .release);
 }
 pub fn set_window_mode2(pos: math.point(i32), size: math.point(u32), state: system.window_state, _can_maximize: bool, _can_minimize: bool, _can_resizewindow: bool) void {
-    if (__system.change_screen_mode.load(.acquire)) return;
+    if (__system.size_update.load(.acquire)) return;
     __vulkan.fullscreen_mutex.lock();
     defer __vulkan.fullscreen_mutex.unlock();
     if (xfit.platform == .windows) {

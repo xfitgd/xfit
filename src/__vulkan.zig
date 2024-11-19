@@ -2067,6 +2067,7 @@ pub var fullscreen_mutex: std.Thread.Mutex = .{};
 
 pub fn recreate_swapchain() void {
     if (vkDevice == .null_handle) return;
+    first_draw = true;
     fullscreen_mutex.lock();
 
     if (!released_fullscreen_ex and VK_EXT_full_screen_exclusive_support) {
@@ -2099,18 +2100,19 @@ pub fn recreate_swapchain() void {
 
     set_fullscreen_ex();
 
-    __system.size_update.store(false, .monotonic);
-    __system.change_screen_mode.store(false, .release);
+    __system.size_update.store(false, .release);
 
     fullscreen_mutex.unlock();
 
-    __render_command.refresh_all();
+    __render_command.__refresh_all();
     root.xfit_size() catch |e| {
         xfit.herr3("xfit_size", e);
     };
 
     __vulkan_allocator.execute_and_wait_all_op();
 }
+
+var first_draw: bool = true;
 
 pub fn drawFrame() void {
     var imageIndex: u32 = 0;
@@ -2121,15 +2123,19 @@ pub fn drawFrame() void {
     if (vkExtent.width <= 0 or vkExtent.height <= 0) {
         recreate_swapchain();
         return;
-    } else if (__system.size_update.load(.monotonic) or __system.change_screen_mode.load(.acquire)) {
+    } else if (__system.size_update.load(.acquire)) {
         recreate_swapchain();
     }
 
     if (graphics.render_cmd != null) {
-        const waitForFences_result = vkd.?.waitForFences(1, @ptrCast(&vkInFlightFence[state.frame]), vk.TRUE, std.math.maxInt(u64)) catch |e| {
-            xfit.herr3("__vulkan.wait_for_fences.vkWaitForFences", e);
-        };
-        xfit.herr(waitForFences_result == .success, "__vulkan.wait_for_fences.vkWaitForFences : {}", .{waitForFences_result});
+        if (first_draw) {
+            first_draw = false;
+        } else {
+            const waitForFences_result = vkd.?.waitForFences(1, @ptrCast(&vkInFlightFence[state.frame]), vk.TRUE, std.math.maxInt(u64)) catch |e| {
+                xfit.herr3("__vulkan.wait_for_fences.vkWaitForFences", e);
+            };
+            xfit.herr(waitForFences_result == .success, "__vulkan.wait_for_fences.vkWaitForFences : {}", .{waitForFences_result});
+        }
 
         const acquireNextImageKHR_result = vkd.?.acquireNextImageKHR(vkSwapchain, std.math.maxInt(u64), vkImageAvailableSemaphore[state.frame], .null_handle) catch |e| {
             if (e == error.OutOfDateKHR) {
@@ -2154,8 +2160,6 @@ pub fn drawFrame() void {
             xfit.herr2("__vulkan.drawFrame.acquireNextImageKHR : {}", .{acquireNextImageKHR_result.result});
         }
         imageIndex = acquireNextImageKHR_result.image_index;
-
-        vkd.?.resetFences(1, @ptrCast(&vkInFlightFence[state.frame])) catch |e| xfit.herr3("__vulkan.drawFrame.resetFences", e);
 
         const cmds = std.heap.c_allocator.alloc(vk.CommandBuffer, graphics.render_cmd.?.len + 1) catch xfit.herrm("drawframe cmds alloc");
         defer std.heap.c_allocator.free(cmds);
@@ -2208,6 +2212,8 @@ pub fn drawFrame() void {
         vkd.?.cmdEndRenderPass(vkCommandBuffer[state.frame]);
         vkd.?.endCommandBuffer(vkCommandBuffer[state.frame]) catch |e| xfit.herr3("__vulkan.drawFrame.endCommandBuffer", e);
 
+        vkd.?.resetFences(1, @ptrCast(&vkInFlightFence[state.frame])) catch |e| xfit.herr3("__vulkan.drawFrame.resetFences", e);
+
         __vulkan_allocator.submit_mutex.lock();
         vkd.?.queueSubmit(vkGraphicsQueue, 1, @ptrCast(&submitInfo), vkInFlightFence[state.frame]) catch |e| xfit.herr3("__vulkan.drawFrame.queueSubmit", e);
         __vulkan_allocator.submit_mutex.unlock();
@@ -2221,17 +2227,16 @@ pub fn drawFrame() void {
             .p_swapchains = @ptrCast(&swapChains),
             .p_image_indices = @ptrCast(&imageIndex),
         };
-        state.frame = (state.frame + 1) % render_command.MAX_FRAME;
         __vulkan_allocator.submit_mutex.lock();
         const queuePresentKHR_result = vkd.?.queuePresentKHR(vkPresentQueue, &presentInfo) catch |e| {
             if (e == error.OutOfDateKHR) {
-                recreate_swapchain();
                 __vulkan_allocator.submit_mutex.unlock();
+                recreate_swapchain();
                 return;
             } else if (e == error.SurfaceLostKHR) {
+                __vulkan_allocator.submit_mutex.unlock();
                 recreateSurface();
                 recreate_swapchain();
-                __vulkan_allocator.submit_mutex.unlock();
                 return;
             } else {
                 xfit.herr3("__vulkan.drawFrame.queuePresentKHR", e);
@@ -2241,18 +2246,22 @@ pub fn drawFrame() void {
 
         if (queuePresentKHR_result == .error_out_of_date_khr) {
             recreate_swapchain();
+            return;
         } else if (queuePresentKHR_result == .suboptimal_khr) {
             var prop: vk.SurfaceCapabilitiesKHR = undefined;
             prop = vki.?.getPhysicalDeviceSurfaceCapabilitiesKHR(vk_physical_device, vkSurface) catch |e| xfit.herr3("__vulkan.drawFrame.getPhysicalDeviceSurfaceCapabilitiesKHR", e);
             if (prop.current_extent.width != vkExtent.width or prop.current_extent.height != vkExtent.height) {
                 recreate_swapchain();
+                return;
             }
         } else if (queuePresentKHR_result == .error_surface_lost_khr) {
             recreateSurface();
             recreate_swapchain();
+            return;
         } else {
             xfit.herr(queuePresentKHR_result == .success, "__vulkan.drawFrame.vkQueuePresentKHR : {}", .{queuePresentKHR_result});
         }
+        state.frame = (state.frame + 1) % render_command.MAX_FRAME;
     }
 }
 

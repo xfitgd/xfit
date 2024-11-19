@@ -354,7 +354,7 @@ pub fn set_vsync(_vSync: vSync_mode) void {
     __vulkan.fullscreen_mutex.lock();
     defer __vulkan.fullscreen_mutex.unlock();
     __system.init_set.vSync = _vSync;
-    __system.size_update.store(true, .monotonic);
+    __system.size_update.store(true, .release);
 }
 
 pub const screen_mode = enum { WINDOW, BORDERLESSSCREEN, FULLSCREEN };

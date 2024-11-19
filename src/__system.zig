@@ -117,7 +117,6 @@ pub var Rmouse_up_func: ?*const fn (pos: math.point) void = null;
 pub var mouse_scroll_func: ?*const fn (dt: i32) void = null;
 
 pub var size_update: std.atomic.Value(bool) = std.atomic.Value(bool).init(false);
-pub var change_screen_mode: std.atomic.Value(bool) = std.atomic.Value(bool).init(false);
 
 pub var mouse_leave_func: ?*const fn () void = null;
 pub var mouse_hover_func: ?*const fn () void = null;

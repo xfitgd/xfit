@@ -469,7 +469,7 @@ pub fn linux_loop() void {
                         // root.xfit_size() catch |e| {
                         //     xfit.herr3("xfit_size", e);
                         // };
-                        __system.size_update.store(true, .monotonic);
+                        __system.size_update.store(true, .release);
                     }
                     //xfit.print_log("w{d}, h{d}\n", .{ event.xconfigure.width, event.xconfigure.height });
                 }

@@ -485,7 +485,7 @@ fn engine_handle_cmd(_cmd: AppEvent) void {
                     start_sem.wait();
                     app.inited = true;
                 } else {
-                    __system.size_update.store(true, .monotonic);
+                    __system.size_update.store(true, .release);
                 }
             }
         },
@@ -514,12 +514,14 @@ fn engine_handle_cmd(_cmd: AppEvent) void {
             };
         },
         AppEvent.APP_CMD_WINDOW_RESIZED => {
+            __vulkan.fullscreen_mutex.lock();
             var prop: vk.SurfaceCapabilitiesKHR = undefined;
             __vulkan.load_instance_and_device();
             prop = __vulkan.vki.?.getPhysicalDeviceSurfaceCapabilitiesKHR(__vulkan.vk_physical_device, __vulkan.vkSurface) catch unreachable;
             if (prop.current_extent.width != __vulkan.vkExtent.width or prop.current_extent.height != __vulkan.vkExtent.height) {
-                __system.size_update.store(true, .monotonic);
+                __system.size_update.store(true, .release);
             }
+            __vulkan.fullscreen_mutex.unlock();
         },
         else => {},
     }

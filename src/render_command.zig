@@ -47,10 +47,30 @@ pub fn init() *Self {
     __render_command.mutex.unlock();
     return self;
 }
+pub fn __refresh_cmds(self: *Self) void {
+    __vulkan.load_instance_and_device();
+    for (&self.__command_buffers) |*cmd| {
+        if (cmd.*.len == __vulkan.get_swapchain_image_length()) continue;
+        __vulkan.vkd.?.freeCommandBuffers(__vulkan.vkCommandPool, @intCast(cmd.*.len), cmd.*.ptr);
+        __system.allocator.free(cmd.*);
+
+        cmd.* = __system.allocator.alloc(vk.CommandBuffer, __vulkan.get_swapchain_image_length()) catch
+            xfit.herrm("render_command.__command_buffers.alloc");
+
+        const allocInfo: vk.CommandBufferAllocateInfo = .{
+            .command_pool = __vulkan.vkCommandPool,
+            .level = .primary,
+            .command_buffer_count = @intCast(__vulkan.get_swapchain_image_length()),
+        };
+
+        __vulkan.vkd.?.allocateCommandBuffers(&allocInfo, cmd.*.ptr) catch |e|
+            xfit.herr3("render_command vkAllocateCommandBuffers vkCommandPool", e);
+    }
+}
 pub fn deinit(self: *Self) void {
     __vulkan.load_instance_and_device();
     for (&self.__command_buffers) |*cmd| {
-        __vulkan.vkd.?.freeCommandBuffers(__vulkan.vkCommandPool, @intCast(__vulkan.get_swapchain_image_length()), cmd.*.ptr);
+        __vulkan.vkd.?.freeCommandBuffers(__vulkan.vkCommandPool, @intCast(self.__command_buffers.len), cmd.*.ptr);
         __system.allocator.free(cmd.*);
     }
     var i: usize = 0;

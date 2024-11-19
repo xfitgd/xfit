@@ -692,6 +692,7 @@ fn WindowProc(hwnd: HWND, uMsg: u32, wParam: win32.WPARAM, lParam: win32.LPARAM)
             system.a_fn_call(__system.window_move_func, .{}) catch {};
         },
         win32.WM_SIZE => {
+            __vulkan.fullscreen_mutex.lock();
             @atomicStore(u32, &__system.init_set.window_width, win32.LOWORD(lParam), std.builtin.AtomicOrder.monotonic);
             @atomicStore(u32, &__system.init_set.window_height, win32.HIWORD(lParam), std.builtin.AtomicOrder.monotonic);
 
@@ -699,8 +700,9 @@ fn WindowProc(hwnd: HWND, uMsg: u32, wParam: win32.WPARAM, lParam: win32.LPARAM)
                 // root.xfit_size() catch |e| {
                 //     xfit.herr3("xfit_size", e);
                 // };
-                __system.size_update.store(true, .monotonic);
+                __system.size_update.store(true, .release);
             }
+            __vulkan.fullscreen_mutex.unlock();
         },
         win32.WM_MOUSEMOVE => {
             var mouse_event: win32.TRACKMOUSEEVENT = .{ .cbSize = @sizeOf(win32.TRACKMOUSEEVENT), .dwFlags = win32.TME_HOVER | win32.TME_LEAVE, .hwndTrack = hWnd, .dwHoverTime = 10 };

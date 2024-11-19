@@ -11,8 +11,19 @@ pub fn start() void {
     render_cmd_list = ArrayList(*render_command).init(__system.allocator);
 }
 
+pub fn __refresh_all() void {
+    mutex.lock();
+    defer mutex.unlock();
+    if (render_cmd_list == null) return;
+    for (render_cmd_list.?.items) |cmd| {
+        cmd.*.__refresh_cmds();
+        cmd.*.refresh();
+    }
+}
+
 pub fn refresh_all() void {
     mutex.lock();
+    defer mutex.unlock();
     if (render_cmd_list == null) return;
     for (render_cmd_list.?.items) |cmd| {
         cmd.*.refresh();
