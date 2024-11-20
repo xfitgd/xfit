@@ -3,8 +3,8 @@
 //x86_64-windows(linux)
 const std = @import("std");
 
-pub const ANDROID_PATH = "/usr/local/android";
-pub const ANDROID_NDK_PATH = std.fmt.comptimePrint("{s}/ndk/27.2.12479018", .{ANDROID_PATH});
+pub const ANDROID_PATH = "/usr/local/Android/Sdk";
+pub const ANDROID_NDK_PATH = std.fmt.comptimePrint("{s}/ndk/28.0.12674087", .{ANDROID_PATH});
 pub const ANDROID_VER = 35;
 pub const ANDROID_BUILD_TOOL_VER = "35.0.0";
 
