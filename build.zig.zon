@@ -3,11 +3,11 @@
     .version = "0.0.1",
     .dependencies = .{
         .@"zig-yaml" = .{
-            .url = "git+https://github.com/kubkon/zig-yaml",
+            .url = "git+https://github.com/kubkon/zig-yaml#a551d00ab041f4799420ab224cdc3efdf978092c",
             .hash = "12208398e1393f83a39d03f3ef4893607650b6227dc7f1eee3db4d163fbc2c0c37ca",
         },
         .xml = .{
-            .url = "git+https://github.com/ianprime0509/zig-xml",
+            .url = "git+https://github.com/ianprime0509/zig-xml#5656de48d8febd88f80ca9876591a2bec4daffad",
             .hash = "12200db01caa0380c3d87b16fb761c0c0c1ef8eeb9e27d25e6d1fcb1b678c51b4231",
         },
     },

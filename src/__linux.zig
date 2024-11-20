@@ -38,7 +38,7 @@ pub fn system_linux_start() void {
     defer c.XRRFreeScreenResources(screens_res);
 
     i = 0;
-    while (i < screens_res.*.noutput) : (i += 1) {
+    while (i < screens_res.*.ncrtc) : (i += 1) {
         const crtc_info = c.XRRGetCrtcInfo(display, screens_res, screens_res.*.crtcs[i]);
         const output = c.XRRGetOutputInfo(display, screens_res, screens_res.*.outputs[i]);
         defer c.XRRFreeCrtcInfo(crtc_info);
