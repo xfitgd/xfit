@@ -387,6 +387,8 @@ pub fn linux_start() void {
     _ = c.XMoveWindow(display, wnd, __system.init_set.window_x, __system.init_set.window_y);
     _ = c.XFlush(display);
 
+    __system.save_prev_window_state(); //최초 값 초기화
+
     //left %ld right %ld top %ld bottom %ld
     //xfit.print_log("{d},{d},{d},{d}\n", .{ window_extent[0], window_extent[1], window_extent[2], window_extent[3] });
 
@@ -470,6 +472,44 @@ pub fn linux_loop() void {
                         // root.xfit_size() catch |e| {
                         //     xfit.herr3("xfit_size", e);
                         // };
+                        var res_atom: c.Atom = undefined;
+                        var res_fmt: c_int = undefined;
+                        var res_num: c_ulong = undefined;
+                        var res_remain: c_ulong = undefined;
+                        var res_data: [*c]u8 = undefined;
+                        if (c.XGetWindowProperty(
+                            display,
+                            wnd,
+                            c.XInternAtom(display, "_NET_WM_STATE", c.True),
+                            0,
+                            std.math.maxInt(c_long),
+                            c.False,
+                            c.AnyPropertyType,
+                            &res_atom,
+                            &res_fmt,
+                            &res_num,
+                            &res_remain,
+                            &res_data,
+                        ) == c.Success) {
+                            var i: c_ulong = 0;
+                            var is_fullscreen: bool = false;
+                            while (i < res_num) : (i += 1) {
+                                const res_data_long: [*c]c_ulong = @ptrCast(@alignCast(res_data));
+                                if (res_data_long[i] == c.XInternAtom(display, "_NET_WM_STATE_FULLSCREEN", c.True)) {
+                                    reset_size_hint();
+                                    @atomicStore(xfit.screen_mode, &__system.init_set.screen_mode, .FULLSCREEN, std.builtin.AtomicOrder.monotonic);
+                                    is_fullscreen = true;
+                                    break;
+                                }
+                            }
+                            if (!is_fullscreen and window.get_screen_mode() != .WINDOW) {
+                                @atomicStore(xfit.screen_mode, &__system.init_set.screen_mode, .WINDOW, std.builtin.AtomicOrder.monotonic);
+                                set_size_hint(true);
+                                if (__vulkan.is_fullscreen_ex) {
+                                    __vulkan.is_fullscreen_ex = false;
+                                }
+                            }
+                        }
                         __system.size_update.store(true, .release);
                     }
                     //xfit.print_log("w{d}, h{d}\n", .{ event.xconfigure.width, event.xconfigure.height });
@@ -565,6 +605,12 @@ pub fn linux_loop() void {
                     }
                 }
                 system.a_fn_call(__system.mouse_move_func, .{mm}) catch {};
+            },
+            c.MapNotify => {
+                xfit.print_log("MapNotify\n", .{});
+            },
+            c.UnmapNotify => {
+                xfit.print_log("UnmapNotify\n", .{});
             },
             else => {},
         }
