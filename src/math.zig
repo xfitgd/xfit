@@ -825,9 +825,9 @@ pub fn matrix_inverse(_matrix: anytype) !@TypeOf(_matrix) {
     v0[2] = @shuffle(float_T, mt[2], mt[0], [4]i32{ 1, 3, ~@as(i32, 1), ~@as(i32, 3) });
     v1[2] = @shuffle(float_T, mt[3], mt[1], [4]i32{ 0, 2, ~@as(i32, 0), ~@as(i32, 2) });
 
-    d0 = mulAdd(float_T, -v0[0], v1[0], d0);
-    d1 = mulAdd(float_T, -v0[1], v1[1], d1);
-    d2 = mulAdd(float_T, -v0[2], v1[2], d2);
+    d0 = mulAdd(-v0[0], v1[0], d0);
+    d1 = mulAdd(-v0[1], v1[1], d1);
+    d2 = mulAdd(-v0[2], v1[2], d2);
 
     v0[0] = @shuffle(float_T, mt[1], undefined, [4]i32{ 1, 2, 0, 1 });
     v1[0] = @shuffle(float_T, d0, d2, [4]i32{ ~@as(i32, 1), 1, 3, 0 });
@@ -852,10 +852,10 @@ pub fn matrix_inverse(_matrix: anytype) !@TypeOf(_matrix) {
     v0[3] = @shuffle(float_T, mt[2], undefined, [4]i32{ 3, 2, 3, 1 });
     v1[3] = @shuffle(float_T, d1, d2, [4]i32{ 2, 1, ~@as(i32, 2), 0 });
 
-    c0 = mulAdd(float_T, -v0[0], v1[0], c0);
-    c2 = mulAdd(float_T, -v0[1], v1[1], c2);
-    c4 = mulAdd(float_T, -v0[2], v1[2], c4);
-    c6 = mulAdd(float_T, -v0[3], v1[3], c6);
+    c0 = mulAdd(-v0[0], v1[0], c0);
+    c2 = mulAdd(-v0[1], v1[1], c2);
+    c4 = mulAdd(-v0[2], v1[2], c4);
+    c6 = mulAdd(-v0[3], v1[3], c6);
 
     v0[0] = @shuffle(float_T, mt[1], undefined, [4]i32{ 3, 0, 3, 0 });
     v1[0] = @shuffle(float_T, d0, d2, [4]i32{ 2, ~@as(i32, 1), ~@as(i32, 0), 2 });
