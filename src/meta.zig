@@ -1,3 +1,5 @@
+//! Union is not supported
+
 const std = @import("std");
 
 fn _init_default_value_and_undefined(in_field: anytype) void {
@@ -15,11 +17,15 @@ fn _init_default_value_and_undefined(in_field: anytype) void {
 
 pub fn init_default_value_and_undefined(struct_T: type) struct_T {
     var value: struct_T = undefined;
-    inline for (std.meta.fields(struct_T)) |field| {
+    const fields = std.meta.fields(struct_T);
+    if (@TypeOf(fields) != []const std.builtin.Type.StructField) @compileError("Expected struct type");
+    inline for (fields) |field| {
         @setEvalBranchQuota(10_000);
         if (field.default_value != null) {
             if (@typeInfo(field.type) == .@"struct") {
                 _init_default_value_and_undefined(@field(value, field.name));
+            } else if (@typeInfo(field.type) == .@"union") {
+                @compileError("Union is not supported");
             } else {
                 @field(value, field.name) = @as(*const field.type, @alignCast(@ptrCast(field.default_value.?))).*;
             }
@@ -42,11 +48,11 @@ pub fn set_value(field: anytype, value: anytype) void {
 pub fn create_bit_field(comptime struct_T: type) type {
     const fields = std.meta.fields(struct_T);
     if (@TypeOf(fields) != []const std.builtin.Type.StructField) @compileError("Expected struct type");
-    var tuple_fields: [fields.len]std.builtin.Type.StructField = undefined;
+    var output_fields: [fields.len]std.builtin.Type.StructField = undefined;
     inline for (fields, 0..) |T, i| {
         @setEvalBranchQuota(10_000);
         const default_value = false;
-        tuple_fields[i] = .{
+        output_fields[i] = .{
             .name = T.name,
             .type = bool,
             .default_value = @ptrCast(&default_value),
@@ -60,7 +66,7 @@ pub fn create_bit_field(comptime struct_T: type) type {
             .is_tuple = false,
             .layout = .auto,
             .decls = &.{},
-            .fields = &tuple_fields,
+            .fields = &output_fields,
         },
     });
 }
