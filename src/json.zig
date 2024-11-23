@@ -185,6 +185,13 @@ fn parse_node(scanner: *Scanner, allocator: std.mem.Allocator, string: []const u
         } else {
             return false; //이미 설정됬거나 이름이 안맞으면 나감.
         }
+    } else if (typeinfo == .pointer and @typeInfo(typeinfo.pointer.child) == .@"struct") {
+        if (typeinfo.pointer.size != .Slice) @compileError("Unsupported pointer size");
+        if (!out_bits.* and std.mem.eql(u8, field_name.?[0..field_name.?.len], string)) {
+            out_bits.* = true;
+            node.* = try parse_array(typeinfo.pointer.child, allocator, scanner); //여기서 값을 설정함.
+        }
+        return false;
     }
     //위에서 필드 이름과 비교 했으므로 여기선 오류가 나지 않는 이상 값을 설정해야한다.
     switch (typeinfo) {
@@ -212,7 +219,7 @@ fn parse_node(scanner: *Scanner, allocator: std.mem.Allocator, string: []const u
     }
 }
 
-pub fn parse_object(NODE_T: type, allocator: std.mem.Allocator, scanner: *Scanner, comptime bit_check_func: fn (anytype) bool) !NODE_T {
+pub fn parse_object(NODE_T: type, allocator: std.mem.Allocator, scanner: *Scanner) !NODE_T {
     const node_bits_T = meta.create_bit_field(NODE_T);
     var node_bits: node_bits_T = .{};
 
@@ -234,9 +241,8 @@ pub fn parse_object(NODE_T: type, allocator: std.mem.Allocator, scanner: *Scanne
                 );
             },
             .object_end => {
-                if (!bit_check_func(node_bits)) {
-                    return generic_parse_json_error.invalid_json_object;
-                }
+                const declList = std.meta.declList(NODE_T, fn (anytype) bool);
+                if (declList.len > 0 and !declList[0].*(node_bits)) return generic_parse_json_error.invalid_json_object;
                 node_bits = .{};
                 break;
             },
@@ -246,7 +252,7 @@ pub fn parse_object(NODE_T: type, allocator: std.mem.Allocator, scanner: *Scanne
     return node; // node is not deallocated when leaving the function
 }
 
-pub fn parse_array(NODE_T: type, allocator: std.mem.Allocator, scanner: *Scanner, comptime bit_check_func: fn (anytype) bool) ![]NODE_T {
+pub fn parse_array(NODE_T: type, allocator: std.mem.Allocator, scanner: *Scanner) ![]NODE_T {
     const node_bits_T = meta.create_bit_field(NODE_T);
     var node_bits: node_bits_T = .{};
 
@@ -274,9 +280,8 @@ pub fn parse_array(NODE_T: type, allocator: std.mem.Allocator, scanner: *Scanner
                             );
                         },
                         .object_end => {
-                            if (!bit_check_func(node_bits)) {
-                                return generic_parse_json_error.invalid_json_object;
-                            }
+                            const declList = std.meta.declList(NODE_T, fn (anytype) bool);
+                            if (declList.len > 0 and !declList[0].*(node_bits)) return generic_parse_json_error.invalid_json_object;
                             node_bits = .{};
                             break;
                         },

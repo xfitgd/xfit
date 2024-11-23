@@ -59,7 +59,7 @@ pub fn create_bit_field(comptime struct_T: type) type {
                     in_fields = std.meta.fields(@typeInfo(T.type).optional.child);
                 } else if (@typeInfo(T.type) == .@"struct") {
                     in_fields = std.meta.fields(T.type);
-                } else {
+                } else { // } else if (@typeInfo(T.type) == .pointer and @typeInfo(T.type).pointer.size == .Slice and @typeInfo(@typeInfo(T.type).pointer.child) == .@"struct") {
                     output_fields[i] = .{
                         .name = T.name,
                         .type = bool,

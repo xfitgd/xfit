@@ -41,21 +41,27 @@ pub fn gltf_(comptime float_T: type) type {
             name: []const u8,
             mesh: ?u32 = null,
             children: ?[]u32 = null,
+            pub fn bit_check(bits: anytype) bool { //이름은 중복되지 않게 아무거나 형식으로 감지한다.
+                return (bits.name and ((bits.rotation and bits.translation and bits.scale) or bits.matrix));
+            }
         };
 
         pub const SCENES = struct {
             name: []const u8,
             nodes: []u32,
+            pub const bit_check: fn (anytype) bool = json.all_bits_true;
         };
 
         pub const ASSET = struct {
             generator: []const u8,
             version: []const u8,
+            pub const bit_check: fn (anytype) bool = json.all_bits_true;
         };
 
         pub const BUFFERS = struct {
             byteLength: usize,
             uri: []const u8,
+            pub const bit_check: fn (anytype) bool = json.all_bits_true;
         };
 
         pub const BUFFERVIEWS = struct {
@@ -63,6 +69,7 @@ pub fn gltf_(comptime float_T: type) type {
             byteLength: usize,
             byteOffset: usize,
             target: u32,
+            pub const bit_check: fn (anytype) bool = json.all_bits_true;
         };
         pub const ACCESSORS = struct {
             componentType: u32,
@@ -72,14 +79,10 @@ pub fn gltf_(comptime float_T: type) type {
             byteOffset: usize,
             min: ?math.point3d_(float_T) = null,
             max: ?math.point3d_(float_T) = null,
+            pub fn bit_check(bits: anytype) bool {
+                return (bits.componentType and bits.type and bits.count and bits.bufferView and bits.byteOffset);
+            }
         };
-
-        fn node_bits_true(bits: anytype) bool {
-            return (bits.name and ((bits.rotation and bits.translation and bits.scale) or bits.matrix));
-        }
-        fn accessor_bits_true(bits: anytype) bool {
-            return (bits.componentType and bits.type and bits.count and bits.bufferView and bits.byteOffset);
-        }
 
         arena_allocator: std.heap.ArenaAllocator = undefined,
         error_diagnostics: std.json.Diagnostics = undefined,
@@ -118,25 +121,25 @@ pub fn gltf_(comptime float_T: type) type {
                     .string => {
                         if (!objsB.asset and std.mem.eql(u8, token.string, "asset")) {
                             objsB.asset = true;
-                            self.*.asset = try json.parse_object(ASSET, self.*.arena_allocator.allocator(), &scanner, json.all_bits_true);
+                            self.*.asset = try json.parse_object(ASSET, self.*.arena_allocator.allocator(), &scanner);
                         } else if (!objsB.scene and std.mem.eql(u8, token.string, "scene")) {
                             objsB.scene = true;
                             self.*.scene = try json.get_int(u32, &scanner);
                         } else if (!objsB.scenes and std.mem.eql(u8, token.string, "scenes")) {
                             objsB.scenes = true;
-                            self.*.scenes = try json.parse_array(SCENES, self.*.arena_allocator.allocator(), &scanner, json.all_bits_true);
+                            self.*.scenes = try json.parse_array(SCENES, self.*.arena_allocator.allocator(), &scanner);
                         } else if (!objsB.nodes and std.mem.eql(u8, token.string, "nodes")) {
                             objsB.nodes = true;
-                            self.*.nodes = try json.parse_array(NODE, self.*.arena_allocator.allocator(), &scanner, node_bits_true);
+                            self.*.nodes = try json.parse_array(NODE, self.*.arena_allocator.allocator(), &scanner);
                         } else if (!objsB.buffers and std.mem.eql(u8, token.string, "buffers")) {
                             objsB.buffers = true;
-                            self.*.buffers = try json.parse_array(BUFFERS, self.*.arena_allocator.allocator(), &scanner, json.all_bits_true);
+                            self.*.buffers = try json.parse_array(BUFFERS, self.*.arena_allocator.allocator(), &scanner);
                         } else if (!objsB.buffer_views and std.mem.eql(u8, token.string, "bufferViews")) {
                             objsB.buffer_views = true;
-                            self.*.buffer_views = try json.parse_array(BUFFERVIEWS, self.*.arena_allocator.allocator(), &scanner, json.all_bits_true);
+                            self.*.buffer_views = try json.parse_array(BUFFERVIEWS, self.*.arena_allocator.allocator(), &scanner);
                         } else if (!objsB.accessors and std.mem.eql(u8, token.string, "accessors")) {
                             objsB.accessors = true;
-                            self.*.accessors = try json.parse_array(ACCESSORS, self.*.arena_allocator.allocator(), &scanner, accessor_bits_true);
+                            self.*.accessors = try json.parse_array(ACCESSORS, self.*.arena_allocator.allocator(), &scanner);
                         }
                     },
                     .end_of_document => break,
@@ -204,6 +207,7 @@ test "gltf_parse_test" {
     ;
 
     try self.parse(std.testing.allocator, test_gltf);
+    defer self.deinit();
 
     try std.testing.expectEqualSlices(u8, "test", self.asset.generator);
     try std.testing.expectEqualSlices(u8, "2.0", self.asset.version);
@@ -217,6 +221,4 @@ test "gltf_parse_test" {
     try std.testing.expectEqual(@Vector(4, f32){ 0.0, 0.0, 0.0, 1.0 }, self.nodes[0].rotation.?);
     try std.testing.expectEqual(@Vector(3, f32){ 1.0, 1.0, 1.0 }, self.nodes[0].scale.?);
     try std.testing.expectEqual(@as(u32, 0), self.nodes[0].mesh.?);
-
-    self.deinit();
 }
