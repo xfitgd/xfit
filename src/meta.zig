@@ -48,20 +48,52 @@ pub fn set_value(field: anytype, value: anytype) void {
 }
 
 pub fn create_bit_field(comptime struct_T: type) type {
+    const func = struct {
+        pub fn add_field(comptime fields: []const std.builtin.Type.StructField, comptime output_fields: []std.builtin.Type.StructField) void {
+            inline for (fields, 0..) |T, i| {
+                @setEvalBranchQuota(10_000);
+
+                comptime var in_fields: []const std.builtin.Type.StructField = undefined;
+
+                if (@typeInfo(T.type) == .optional and @typeInfo(@typeInfo(T.type).optional.child) == .@"struct") {
+                    in_fields = std.meta.fields(@typeInfo(T.type).optional.child);
+                } else if (@typeInfo(T.type) == .@"struct") {
+                    in_fields = std.meta.fields(T.type);
+                } else {
+                    output_fields[i] = .{
+                        .name = T.name,
+                        .type = bool,
+                        .default_value = @ptrCast(&false),
+                        .is_comptime = false,
+                        .alignment = 0,
+                    };
+                    continue;
+                }
+                var _output_fields: [in_fields.len]std.builtin.Type.StructField = undefined;
+
+                add_field(in_fields, _output_fields[0..]);
+
+                const _struct_T = @Type(.{
+                    .@"struct" = .{
+                        .is_tuple = false,
+                        .layout = .auto,
+                        .decls = &.{},
+                        .fields = &_output_fields,
+                    },
+                });
+                output_fields[i] = .{
+                    .name = T.name,
+                    .type = _struct_T,
+                    .default_value = @ptrCast(&_struct_T{}),
+                    .is_comptime = false,
+                    .alignment = 0,
+                };
+            }
+        }
+    };
     const fields = std.meta.fields(struct_T);
-    if (@TypeOf(fields) != []const std.builtin.Type.StructField) @compileError("Expected struct type");
     var output_fields: [fields.len]std.builtin.Type.StructField = undefined;
-    inline for (fields, 0..) |T, i| {
-        @setEvalBranchQuota(10_000);
-        const default_value = false;
-        output_fields[i] = .{
-            .name = T.name,
-            .type = bool,
-            .default_value = @ptrCast(&default_value),
-            .is_comptime = false,
-            .alignment = 0,
-        };
-    }
+    comptime func.add_field(fields, output_fields[0..]);
 
     return @Type(.{
         .@"struct" = .{
