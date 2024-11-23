@@ -24,13 +24,14 @@ inline fn get_arch_text(arch: std.Target.Cpu.Arch) []const u8 {
 
 var yaml: *std.Build.Dependency = undefined;
 var xml: *std.Build.Dependency = undefined;
+var unit_tests: *std.Build.Step.Compile = undefined;
 
 ///? const src_path = b.dependency("xfit_build", .{}).*.path(".").getPath(b);
 pub fn build(b: *std.Build) void {
     yaml = b.dependency("zig-yaml", .{});
     xml = b.dependency("xml", .{});
 
-    const unit_tests = b.addTest(.{
+    unit_tests = b.addTest(.{
         .root_source_file = b.path("src/xfit.zig"),
         .target = b.standardTargetOptions(.{}),
         .optimize = b.standardOptimizeOption(.{}),
@@ -361,4 +362,8 @@ pub fn run(
     cmd.step.dependOn(install_step);
 
     b.default_step.dependOn(&cmd.step);
+
+    const run_unit_tests = b.addRunArtifact(unit_tests);
+    const test_step = b.step("test", "Run unit tests");
+    test_step.dependOn(&run_unit_tests.step);
 }
