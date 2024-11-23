@@ -2,6 +2,7 @@ const std = @import("std");
 const root = @import("root");
 const builtin = @import("builtin");
 
+pub const meta = @import("meta.zig");
 pub const system = @import("system.zig");
 pub const animator = @import("animator.zig");
 pub const asset_file = @import("asset_file.zig");
@@ -31,8 +32,11 @@ pub const s2s = @import("s2s.zig");
 pub const gui = @import("gui.zig");
 pub const yaml = @import("yaml");
 pub const xml = @import("xml");
+pub const generic_parse_json = @import("generic_parse_json.zig");
+pub const gltf = @import("gltf.zig");
 
 test {
+    std.testing.refAllDecls(gltf);
     std.testing.refAllDecls(yaml);
     std.testing.refAllDecls(xml);
 }

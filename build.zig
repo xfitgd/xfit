@@ -39,6 +39,19 @@ pub fn build(b: *std.Build) void {
 
     b.default_step.dependOn(&result.step);
     //?
+
+    const unit_tests = b.addTest(.{
+        .root_source_file = b.path("src/xfit.zig"),
+        .target = b.standardTargetOptions(.{}),
+        .optimize = b.standardOptimizeOption(.{}),
+    });
+    unit_tests.root_module.addImport("yaml", yaml.module("yaml"));
+    unit_tests.root_module.addImport("xml", xml.module("xml"));
+
+    const run_unit_tests = b.addRunArtifact(unit_tests);
+
+    const test_step = b.step("test", "Run unit tests");
+    test_step.dependOn(&run_unit_tests.step);
 }
 
 pub const run_option = struct {

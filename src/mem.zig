@@ -2,13 +2,8 @@ const std = @import("std");
 const system = @import("system.zig");
 const xfit = @import("xfit.zig");
 
-pub usingnamespace std.mem;
-
 //TODO 검증되지 않음
 
-pub inline fn memcpy_nonarray(dest: anytype, src: anytype) void {
-    @memcpy(std.mem.asBytes(dest), std.mem.asBytes(src));
-}
 //// pub inline fn align_ptr_cast(dest_type: type, src: anytype) dest_type {
 ////     return @as(dest_type, @ptrCast(@alignCast(src)));
 //// }
