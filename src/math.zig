@@ -876,7 +876,7 @@ pub fn matrix_inverse(_matrix: anytype) !@TypeOf(_matrix) {
     c4 = mulAdd(v0[2], v1[2], c4);
     c6 = mulAdd(-v0[3], v1[3], c6);
 
-    var mr = .{
+    var mr = @TypeOf(_matrix){
         .{ c0[0], c1[1], c0[2], c1[3] },
         .{ c2[0], c3[1], c2[2], c3[3] },
         .{ c4[0], c5[1], c4[2], c5[3] },
@@ -896,6 +896,12 @@ pub fn matrix_inverse(_matrix: anytype) !@TypeOf(_matrix) {
     mr[3] /= scale;
 
     return mr;
+}
+
+test "matrix_inverse" {
+    const m = matrix_identity(f32);
+    const inv = try matrix_inverse(m);
+    try std.testing.expect(compare(m, inv));
 }
 
 //  row ↕, col ↔
