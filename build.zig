@@ -25,20 +25,10 @@ inline fn get_arch_text(arch: std.Target.Cpu.Arch) []const u8 {
 var yaml: *std.Build.Dependency = undefined;
 var xml: *std.Build.Dependency = undefined;
 
-///for : const src_path = b.dependency("xfit_build", .{}).*.path(".").getPath(b);
+///? const src_path = b.dependency("xfit_build", .{}).*.path(".").getPath(b);
 pub fn build(b: *std.Build) void {
     yaml = b.dependency("zig-yaml", .{});
     xml = b.dependency("xml", .{});
-    //?xfit 엔진 내에서 외부 라이브러리 인식하기 위해
-    const result = b.addTest(.{
-        .name = "xfit",
-        .root_source_file = b.path("src/xfit.zig"),
-    });
-    result.root_module.addImport("yaml", yaml.module("yaml"));
-    result.root_module.addImport("xml", xml.module("xml"));
-
-    b.default_step.dependOn(&result.step);
-    //?
 
     const unit_tests = b.addTest(.{
         .root_source_file = b.path("src/xfit.zig"),
@@ -47,6 +37,10 @@ pub fn build(b: *std.Build) void {
     });
     unit_tests.root_module.addImport("yaml", yaml.module("yaml"));
     unit_tests.root_module.addImport("xml", xml.module("xml"));
+
+    unit_tests.addIncludePath(b.path("src/include"));
+    unit_tests.addIncludePath(b.path("src/include/freetype"));
+    unit_tests.addIncludePath(b.path("src/include/opus"));
 
     const run_unit_tests = b.addRunArtifact(unit_tests);
 
