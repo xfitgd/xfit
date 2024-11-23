@@ -15,10 +15,12 @@ fn _init_default_value_and_undefined(in_field: anytype) void {
     }
 }
 
-pub fn init_default_value_and_undefined(struct_T: type) struct_T {
-    var value: struct_T = undefined;
-    const fields = std.meta.fields(struct_T);
-    if (@TypeOf(fields) != []const std.builtin.Type.StructField) @compileError("Expected struct type");
+pub fn init_default_value_and_undefined(T: type) T {
+    if (@typeInfo(T) != .@"struct") {
+        return undefined;
+    }
+    var value: T = undefined;
+    const fields = std.meta.fields(T);
     inline for (fields) |field| {
         @setEvalBranchQuota(10_000);
         if (field.default_value != null) {

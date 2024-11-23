@@ -32,7 +32,7 @@ pub const s2s = @import("s2s.zig");
 pub const gui = @import("gui.zig");
 pub const yaml = @import("yaml");
 pub const xml = @import("xml");
-pub const generic_parse_json = @import("generic_parse_json.zig");
+pub const json = @import("json.zig");
 pub const gltf = @import("gltf.zig");
 
 test {
