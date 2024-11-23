@@ -209,11 +209,11 @@ pub fn xfit_init() !void {
     extra_src[extra_src.len - 1] = &shape_src2;
     text_shape.*._shape.extra_src = extra_src;
 
-    text_shape.*._shape.transform.model = matrix.scaling(5, 5, 1.0).multiply(&matrix.translation(-200, 0, 0.5));
+    text_shape.*._shape.transform.model = math.matrix_multiply(math.matrix_scaling(f32, 5.0, 5.0, 1.0), math.matrix_translation(f32, -200.0, 0.0, 0.5));
     text_shape.*.build();
 
     color_trans = graphics.color_transform.init();
-    color_trans.color_mat.e = .{
+    color_trans.color_mat = .{
         .{ -1, 0, 0, 0 },
         .{ 0, -1, 0, 0 },
         .{ 0, 0, -1, 0 },
@@ -224,12 +224,12 @@ pub fn xfit_init() !void {
     img.*._image.color_tran = &color_trans;
     img.*._image.transform.camera = &g_camera;
     img.*._image.transform.projection = &g_proj;
-    img.*._image.transform.model = matrix.scaling(2, 2, 1.0).multiply(&matrix.translation(0, 0, 0.7));
+    img.*._image.transform.model = math.matrix_multiply(math.matrix_scaling(f32, 2, 2, 1.0), math.matrix_translation(f32, 0, 0, 0.7));
     img.*.build();
 
     anim_img.*._anim_image.transform.camera = &g_camera;
     anim_img.*._anim_image.transform.projection = &g_proj;
-    anim_img.*._anim_image.transform.model = matrix.translation(300, -200, 0);
+    anim_img.*._anim_image.transform.model = math.matrix_translation(f32, 300, -200, 0);
     anim_img.*.build();
 
     try objects.append(img);
@@ -353,7 +353,7 @@ fn move_callback() !bool {
 pub fn xfit_update() !void {
     update_mutex.lock();
     shape_src[0].color[3] = shape_alpha;
-    text_shape.*._shape.transform.model = matrix.scaling(5, 5, 1.0).multiply(&matrix.translation(-200 + dx, 0, 0.5));
+    text_shape.*._shape.transform.model = math.matrix_multiply(math.matrix_scaling(f32, 5, 5, 1.0), math.matrix_translation(f32, -200 + dx, 0, 0.5));
     update_mutex.unlock();
 
     text_shape.*._shape.transform.copy_update();

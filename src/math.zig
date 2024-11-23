@@ -54,7 +54,7 @@ pub inline fn test_float_type(comptime T: type) void {
     }
 }
 
-pub inline fn pow(v0: anytype, p: comptime_float) @TypeOf(v0) {
+pub inline fn pow(v0: anytype, p: anytype) @TypeOf(v0) {
     if (p == 2) return v0 * v0;
     if (p == 3) return v0 * v0 * v0;
     return std.math.pow(@TypeOf(v0), v0, @floatCast(p));
@@ -132,7 +132,7 @@ pub fn rect_(comptime T: type) type {
             const info = @typeInfo(_type);
             if (info != .float) @compileError("rect T type must be float");
             if (info.float.bits == 32) return matrix;
-            return matrix_(_type, 4, 4);
+            return matrix_(_type);
         }
         pub fn mul_matrix(self: Self, mat: rect_matrix(T)) Self {
             return .{
@@ -182,6 +182,22 @@ pub const pointi = @Vector(2, i32);
 pub const pointi8 = @Vector(2, i64);
 pub const vector = @Vector(4, f32);
 pub const vector8 = @Vector(4, f64);
+
+pub const point3d = @Vector(3, f32);
+pub const point3d8 = @Vector(3, f64);
+
+pub fn point_(comptime float_T: type) type {
+    if (@typeInfo(float_T) != .float) @compileError("float_T must be a float type");
+    return @Vector(2, float_T);
+}
+pub fn point3d_(comptime float_T: type) type {
+    if (@typeInfo(float_T) != .float) @compileError("float_T must be a float type");
+    return @Vector(3, float_T);
+}
+pub fn vector_(comptime float_T: type) type {
+    if (@typeInfo(float_T) != .float) @compileError("float_T must be a float type");
+    return @Vector(4, float_T);
+}
 
 pub fn length_pow(p1: anytype, p2: anytype) @TypeOf(p1[0], p2[0]) {
     if (@typeInfo(@TypeOf(p1, p2)) == .vector) {
@@ -316,22 +332,22 @@ pub inline fn normalize(v: anytype) @TypeOf(v) {
         @compileError("not a vector, float array type");
     }
 }
-pub inline fn cross2(v0: point, v1: point) f32 {
-    return v0[0] * v1[1] - v0[1] * v1[0];
+pub inline fn cross2(pt0: anytype, pt1: anytype) @TypeOf(pt0[0], pt1[0]) {
+    return pt0[0] * pt1[1] - pt0[1] * pt1[0];
 }
 
-pub inline fn cross3(v0: vector, v1: vector) vector {
-    var xmm0 = @shuffle(f32, v0, undefined, [4]i32{ 1, 2, 0, 3 });
-    var xmm1 = @shuffle(f32, v1, undefined, [4]i32{ 2, 0, 1, 3 });
+pub inline fn cross3(v0: anytype, v1: anytype) vector_(@TypeOf(v0[0], v1[0])) {
+    var xmm0 = @shuffle(@TypeOf(v0[0], v1[0]), v0, undefined, [4]i32{ 1, 2, 0, 3 });
+    var xmm1 = @shuffle(@TypeOf(v0[0], v1[0]), v1, undefined, [4]i32{ 2, 0, 1, 3 });
     var result = xmm0 * xmm1;
-    xmm0 = @shuffle(f32, xmm0, undefined, [4]i32{ 1, 2, 0, 3 });
-    xmm1 = @shuffle(f32, xmm1, undefined, [4]i32{ 2, 0, 1, 3 });
+    xmm0 = @shuffle(@TypeOf(v0[0], v1[0]), xmm0, undefined, [4]i32{ 1, 2, 0, 3 });
+    xmm1 = @shuffle(@TypeOf(v0[0], v1[0]), xmm1, undefined, [4]i32{ 2, 0, 1, 3 });
     result = result - xmm0 * xmm1;
     result[3] = 0;
     return result;
 }
 
-pub const matrix3x3 = matrix_(f32, 3, 3);
+// pub const matrix3x3 = matrix_(f32);
 
 pub const matrix_error = error{ not_exist_inverse_matrix, invaild_near_far, sfov_0, far_near_0, near_far_0, aspect_0, w_0, h_0 };
 
@@ -414,688 +430,651 @@ inline fn mulAdd(v0: anytype, v1: anytype, v2: anytype) @TypeOf(v0, v1, v2) {
     }
 }
 
-pub const matrix = matrix4x4;
+pub const matrix = matrix_(f32);
+pub const matrix8 = matrix_(f64);
+pub fn matrix_(comptime float_T: type) type {
+    if (@typeInfo(float_T) != .float) @compileError("not a float type");
+    return [4]vector_(float_T);
+}
 
-pub const matrix4x4 = struct {
-    const Self = @This();
-    e: [4]vector,
-
-    pub fn init() Self {
-        return Self{
-            .e = .{.{0} ** 4} ** 4,
-        };
-    }
-    pub inline fn translation(x: f32, y: f32, z: f32) Self {
-        return Self{
-            .e = .{
-                .{ 1, 0, 0, 0 },
-                .{ 0, 1, 0, 0 },
-                .{ 0, 0, 1, 0 },
-                .{ x, y, z, 1 },
-            },
-        };
-    }
-    pub inline fn translationXY(p: point) Self {
-        return Self{
-            .e = .{
-                .{ 1, 0, 0, 0 },
-                .{ 0, 1, 0, 0 },
-                .{ 0, 0, 1, 0 },
-                .{ p[0], p[1], 0, 1 },
-            },
-        };
-    }
-    pub inline fn translation_transpose(x: f32, y: f32, z: f32) Self {
-        return Self{
-            .e = .{
-                .{ 1, 0, 0, x },
-                .{ 0, 1, 0, y },
-                .{ 0, 0, 1, z },
-                .{ 0, 0, 0, 1 },
-            },
-        };
-    }
-    pub inline fn translation_inverse(x: f32, y: f32, z: f32) Self {
-        return translation(-x, -y, -z);
-    }
-    pub inline fn translation_transpose_inverse(x: f32, y: f32, z: f32) Self {
-        return translation_transpose(-x, -y, -z);
-    }
-    pub inline fn scaling(x: f32, y: f32, z: f32) Self {
-        return Self{
-            .e = .{
-                .{ x, 0, 0, 0 },
-                .{ 0, y, 0, 0 },
-                .{ 0, 0, z, 0 },
-                .{ 0, 0, 0, 1 },
-            },
-        };
-    }
-    pub inline fn scalingXY(p: point) Self {
-        return Self{
-            .e = .{
-                .{ p[0], 0, 0, 0 },
-                .{ 0, p[1], 0, 0 },
-                .{ 0, 0, 1, 0 },
-                .{ 0, 0, 0, 1 },
-            },
-        };
-    }
-    pub inline fn rotationX(angle: f32) Self {
-        const c = @cos(angle);
-        const s = @sin(angle);
-        return Self{
-            .e = .{
-                .{ 1, 0, 0, 0 },
-                .{ 0, c, s, 0 },
-                .{ 0, -s, c, 0 },
-                .{ 0, 0, 0, 1 },
-            },
-        };
-    }
-    pub inline fn rotationY(angle: f32) Self {
-        const c = @cos(angle);
-        const s = @sin(angle);
-        return Self{
-            .e = .{
-                .{ c, 0, -s, 0 },
-                .{ 0, 1, 0, 0 },
-                .{ s, 0, c, 0 },
-                .{ 0, 0, 0, 1 },
-            },
-        };
-    }
-    pub inline fn rotationZ(angle: f32) Self {
-        const c = @cos(angle);
-        const s = @sin(angle);
-        return Self{
-            .e = .{
-                .{ c, s, 0, 0 },
-                .{ -s, c, 0, 0 },
-                .{ 0, 0, 1, 0 },
-                .{ 0, 0, 0, 1 },
-            },
-        };
-    }
-    pub const rotation2D = rotationZ;
-    pub inline fn rotationX_inverse(angle: f32) Self {
-        const c = @cos(angle);
-        const s = @sin(angle);
-        return Self{
-            .e = .{
-                .{ 1, 0, 0, 0 },
-                .{ 0, c, -s, 0 },
-                .{ 0, s, c, 0 },
-                .{ 0, 0, 0, 1 },
-            },
-        };
-    }
-    pub inline fn rotationY_inverse(angle: f32) Self {
-        const c = @cos(angle);
-        const s = @sin(angle);
-        return Self{
-            .e = .{
-                .{ c, 0, s, 0 },
-                .{ 0, 1, 0, 0 },
-                .{ -s, 0, c, 0 },
-                .{ 0, 0, 0, 1 },
-            },
-        };
-    }
-    pub inline fn rotationZ_inverse(angle: f32) Self {
-        const c = @cos(angle);
-        const s = @sin(angle);
-        return Self{
-            .e = .{
-                .{ c, -s, 0, 0 },
-                .{ s, c, 0, 0 },
-                .{ 0, 0, 1, 0 },
-                .{ 0, 0, 0, 1 },
-            },
-        };
-    }
-    pub const rocationX_transpose = rotationX_inverse;
-    pub const rocationY_transpose = rotationY_inverse;
-    pub const rocationZ_transpose = rotationZ_inverse;
-    pub const rocation2D_transpose = rotationZ_inverse;
-    pub const rotation2D_inverse = rotationZ_inverse;
-    pub fn scaling_inverse(x: f32, y: f32, z: f32) Self {
-        return translation(1 / x, 1 / y, 1 / z);
-    }
-    ///Vulkan 으로 테스트 완료
-    pub fn perspectiveFovLhVulkan(fovy: f32, aspect: f32, near: f32, far: f32) matrix_error!Self {
-        var res = try perspectiveFovLh(fovy, aspect, near, far);
-        res.e[1][1] *= -1;
-        return res;
-    }
-    pub fn perspectiveFovLh(fovy: f32, aspect: f32, near: f32, far: f32) matrix_error!Self {
-        const sfov = std.math.sin(0.5 * fovy);
-        const cfov = std.math.cos(0.5 * fovy);
-
-        if (!(near > 0.0 and far > 0.0 and far > near)) return matrix_error.invaild_near_far;
-        if (compare_n(sfov, 0)) return matrix_error.sfov_0;
-        if (compare_n((far - near), 0)) return matrix_error.far_near_0;
-        if (compare_n(aspect, 0)) return matrix_error.aspect_0;
-        // assert(!approxEqAbs(f32, scfov[0], 0.0, 0.001));
-        // assert(!approxEqAbs(f32, far, near, 0.001));
-        // assert(!approxEqAbs(f32, aspect, 0.0, 0.01));
-
-        const h = cfov / sfov;
-        const w = h / aspect;
-        const r = far / (far - near);
-        return Self{ .e = .{
-            .{ w, 0, 0, 0 },
-            .{ 0, h, 0, 0 },
-            .{ 0, 0, r, 1 },
-            .{ 0, 0, -r * near, 0 },
-        } };
-    }
-    pub fn perspectiveFovRh(fovy: f32, aspect: f32, near: f32, far: f32) matrix_error!Self {
-        const sfov = std.math.sin(0.5 * fovy);
-        const cfov = std.math.cos(0.5 * fovy);
-
-        if (!(near > 0.0 and far > 0.0 and far > near)) return matrix_error.invaild_near_far;
-        if (compare_n(sfov, 0)) return matrix_error.sfov_0;
-        if (compare_n((near - far), 0)) return matrix_error.near_far_0;
-        if (compare_n(aspect, 0)) return matrix_error.aspect_0;
-        // assert(!approxEqAbs(f32, scfov[0], 0.0, 0.001));
-        // assert(!approxEqAbs(f32, far, near, 0.001));
-        // assert(!approxEqAbs(f32, aspect, 0.0, 0.01));
-
-        const h = cfov / sfov;
-        const w = h / aspect;
-        const r = far / (near - far);
-        return Self{ .e = .{
-            .{ w, 0, 0, 0 },
-            .{ 0, h, 0, 0 },
-            .{ 0, 0, r, -1 },
-            .{ 0, 0, r * near, 0 },
-        } };
-    }
-    /// Produces Z values in [-1.0, 1.0] range (OpenGL defaults)
-    pub fn perspectiveFovRhGL(fovy: f32, aspect: f32, near: f32, far: f32) matrix_error!Self {
-        const sfov = @sin(0.5 * fovy);
-        const cfov = @cos(0.5 * fovy);
-
-        if (!(near > 0.0 and far > 0.0 and far > near)) return matrix_error.invaild_near_far;
-        if (compare_n(sfov, 0)) return matrix_error.sfov_0;
-        if (compare_n((near - far), 0)) return matrix_error.near_far_0;
-        if (compare_n(aspect, 0)) return matrix_error.aspect_0;
-        // assert(!approxEqAbs(f32, scfov[0], 0.0, 0.001));
-        // assert(!approxEqAbs(f32, far, near, 0.001));
-        // assert(!approxEqAbs(f32, aspect, 0.0, 0.01));
-
-        const h = cfov / sfov;
-        const w = h / aspect;
-        const r = near - far;
-        return Self{ .e = .{
-            .{ w, 0, 0, 0 },
-            .{ 0, h, 0, 0 },
-            .{ 0, 0, (near + far) / r, -1 },
-            .{ 0, 0, 2 * near * far / r, 0 },
-        } };
-    }
-    ///Vulkan 으로 테스트 완료
-    pub fn orthographicLhVulkan(w: f32, h: f32, near: f32, far: f32) matrix_error!Self {
-        var res = try orthographicLh(w, h, near, far);
-        res.e[1][1] *= -1;
-        return res;
-    }
-    pub fn orthographicLh(w: f32, h: f32, near: f32, far: f32) matrix_error!Self {
-        // assert(!approxEqAbs(f32, w, 0.0, 0.001));
-        // assert(!approxEqAbs(f32, h, 0.0, 0.001));
-        // assert(!approxEqAbs(f32, far, near, 0.001));
-        if (compare_n((far - near), 0)) return matrix_error.far_near_0;
-        if (compare_n(w, 0)) return matrix_error.w_0;
-        if (compare_n(h, 0)) return matrix_error.h_0;
-
-        const r = 1 / (far - near);
-        return Self{
-            .e = .{
-                .{ 2 / w, 0, 0, 0 },
-                .{ 0, 2 / h, 0, 0 },
-                .{ 0, 0, r, 0 },
-                .{ 0, 0, -r * near, 1 },
-            },
-        };
-    }
-    pub fn orthographicRh(w: f32, h: f32, near: f32, far: f32) matrix_error!Self {
-
-        // assert(!approxEqAbs(f32, w, 0.0, 0.001));
-        // assert(!approxEqAbs(f32, h, 0.0, 0.001));
-        // assert(!approxEqAbs(f32, far, near, 0.001));
-        if (compare_n((near - far), 0)) return matrix_error.near_far_0;
-        if (compare_n(w, 0)) return matrix_error.w_0;
-        if (compare_n(h, 0)) return matrix_error.h_0;
-
-        const r = 1 / (near - far);
-        return Self{
-            .e = .{
-                .{ 2 / w, 0, 0, 0 },
-                .{ 0, 2 / h, 0, 0 },
-                .{ 0, 0, r, 0 },
-                .{ 0, 0, r * near, 1 },
-            },
-        };
-    }
-    ///w좌표는 신경 x
-    pub fn lookToLh(eyepos: vector, eyedir: vector, updir: vector) Self {
-        const az = normalize(eyedir);
-        const ax = normalize(cross3(updir, az));
-        const ay = normalize(cross3(az, ax));
-        return .{
-            .e = .{
-                .{ ax[0], ay[0], az[0], 0 },
-                .{ ax[1], ay[1], az[1], 0 },
-                .{ ax[2], ay[2], az[2], 0 },
-                .{ -dot3(ax, eyepos), -dot3(ay, eyepos), -dot3(az, eyepos), 1 },
-            },
-        };
-    }
-    ///w좌표는 신경 x
-    pub fn lookToRh(eyepos: vector, eyedir: vector, updir: vector) Self {
-        return lookToLh(eyepos, -eyedir, updir);
-    }
-    ///Vulkan 으로 테스트 완료, w좌표는 신경 x
-    pub fn lookAtLh(eyepos: vector, focuspos: vector, updir: vector) Self {
-        return lookToLh(eyepos, focuspos - eyepos, updir);
-    }
-    ///w좌표는 신경 x
-    pub fn lookAtRh(eyepos: vector, focuspos: vector, updir: vector) Self {
-        return lookToLh(eyepos, eyepos - focuspos, updir);
-    }
-
-    pub fn identity() Self {
-        return Self{
-            .e = .{
-                .{ 1, 0, 0, 0 },
-                .{ 0, 1, 0, 0 },
-                .{ 0, 0, 1, 0 },
-                .{ 0, 0, 0, 1 },
-            },
-        };
-    }
-    inline fn dot4(v0: vector, v1: vector) f32 {
-        const xmm0 = v0 * v1; // | x0*x1 | y0*y1 | z0*z1 | w0*w1 |
-        return xmm0[0] + xmm0[1] + xmm0[2] + xmm0[3];
-    }
-
-    pub fn multiply(self: *const Self, _matrix: *const Self) Self {
-        var result: Self = undefined;
-        comptime var row = 0;
-        inline while (row < 4) : (row += 1) {
-            const vx = @shuffle(f32, self.*.e[row], undefined, [4]i32{ 0, 0, 0, 0 });
-            const vy = @shuffle(f32, self.*.e[row], undefined, [4]i32{ 1, 1, 1, 1 });
-            const vz = @shuffle(f32, self.*.e[row], undefined, [4]i32{ 2, 2, 2, 2 });
-            const vw = @shuffle(f32, self.*.e[row], undefined, [4]i32{ 3, 3, 3, 3 });
-            result.e[row] = mulAdd(vx, _matrix.*.e[0], vz * _matrix.*.e[2]) + mulAdd(vy, _matrix.*.e[1], vw * _matrix.*.e[3]);
-        }
-        return result;
-    }
-    pub fn mul_vector(self: Self, v: vector) vector {
-        const vx = @shuffle(f32, v, undefined, [4]i32{ 0, 0, 0, 0 });
-        const vy = @shuffle(f32, v, undefined, [4]i32{ 1, 1, 1, 1 });
-        const vz = @shuffle(f32, v, undefined, [4]i32{ 2, 2, 2, 2 });
-        const vw = @shuffle(f32, v, undefined, [4]i32{ 3, 3, 3, 3 });
-        const matT = self.transpose();
-        return mulAdd(vx, matT.e[0], vz * matT.e[2]) + mulAdd(vy, matT.e[1], vw * matT.e[3]);
-    }
-    pub inline fn div_vector(self: Self, v: vector) !vector {
-        return mul_vector(try self.inverse(), v);
-    }
-    pub inline fn mul_point(self: Self, pt: point) point {
-        const xx = point{ self.e[0][0], self.e[0][1] };
-        const yy = point{ self.e[1][0], self.e[1][1] };
-        return .{ dot3(pt, xx) + self.e[0][3], dot3(pt, yy) + self.e[1][3] };
-    }
-    pub inline fn div_point(self: Self, pt: point) !point {
-        return mul_point(try self.inverse(), pt);
-    }
-    pub fn addition(self: *const Self, _matrix: *const Self) Self {
-        var result: Self = undefined;
-        comptime var row = 0;
-        inline while (row < 4) : (row += 1) {
-            result.e[row] = self.*.e[row] + _matrix.*.e[row];
-        }
-        return result;
-    }
-    pub fn subtract(self: *const Self, _matrix: *const Self) Self {
-        var result: Self = undefined;
-        comptime var row = 0;
-        inline while (row < 4) : (row += 1) {
-            result.e[row] = self.*.e[row] - _matrix.*.e[row];
-        }
-        return result;
-    }
-    pub fn transpose(self: *const Self) Self {
-        const temp1 = @shuffle(f32, self.*.e[0], self.*.e[1], [4]i32{ 0, 1, ~@as(i32, 0), ~@as(i32, 1) });
-        const temp3 = @shuffle(f32, self.*.e[0], self.*.e[1], [4]i32{ 2, 3, ~@as(i32, 2), ~@as(i32, 3) });
-        const temp2 = @shuffle(f32, self.*.e[2], self.*.e[3], [4]i32{ 0, 1, ~@as(i32, 0), ~@as(i32, 1) });
-        const temp4 = @shuffle(f32, self.*.e[2], self.*.e[3], [4]i32{ 2, 3, ~@as(i32, 2), ~@as(i32, 3) });
-        return Self{ .e = .{
-            @shuffle(f32, temp1, temp2, [4]i32{ 0, 2, ~@as(i32, 0), ~@as(i32, 2) }),
-            @shuffle(f32, temp1, temp2, [4]i32{ 1, 3, ~@as(i32, 1), ~@as(i32, 3) }),
-            @shuffle(f32, temp3, temp4, [4]i32{ 0, 2, ~@as(i32, 0), ~@as(i32, 2) }),
-            @shuffle(f32, temp3, temp4, [4]i32{ 1, 3, ~@as(i32, 1), ~@as(i32, 3) }),
-        } };
-    }
-    pub fn format(self: *const Self, comptime fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
-        _ = fmt;
-        _ = options;
-
-        try writer.print("{s}\n", .{@typeName(Self)});
-
-        comptime var i = 0;
-        inline while (i < 4) : (i += 1) {
-            try writer.print("{{{d}, {d}, {d}, {d}}}\n", .{ self.e[i][0], self.e[i][1], self.e[i][2], self.e[i][3] });
-        }
-    }
-
-    pub fn determinant(self: *const Self) f32 {
-        var v0 = @shuffle(f32, self.*.e[2], undefined, [4]i32{ 1, 0, 0, 0 });
-        var v1 = @shuffle(f32, self.*.e[3], undefined, [4]i32{ 2, 2, 1, 1 });
-        var v2 = @shuffle(f32, self.*.e[2], undefined, [4]i32{ 1, 0, 0, 0 });
-        var v3 = @shuffle(f32, self.*.e[3], undefined, [4]i32{ 3, 3, 3, 2 });
-        var v4 = @shuffle(f32, self.*.e[2], undefined, [4]i32{ 2, 2, 1, 1 });
-        var v5 = @shuffle(f32, self.*.e[3], undefined, [4]i32{ 3, 3, 3, 2 });
-
-        var p0 = v0 * v1;
-        var p1 = v2 * v3;
-        var p2 = v4 * v5;
-
-        v0 = @shuffle(f32, self.*.e[2], undefined, [4]i32{ 2, 2, 1, 1 });
-        v1 = @shuffle(f32, self.*.e[3], undefined, [4]i32{ 1, 0, 0, 0 });
-        v2 = @shuffle(f32, self.*.e[2], undefined, [4]i32{ 3, 3, 3, 2 });
-        v3 = @shuffle(f32, self.*.e[3], undefined, [4]i32{ 1, 0, 0, 0 });
-        v4 = @shuffle(f32, self.*.e[2], undefined, [4]i32{ 3, 3, 3, 2 });
-        v5 = @shuffle(f32, self.*.e[3], undefined, [4]i32{ 2, 2, 1, 1 });
-
-        p0 = mulAdd(-v0, v1, p0);
-        p1 = mulAdd(-v2, v3, p1);
-        p2 = mulAdd(-v4, v5, p2);
-
-        v0 = @shuffle(f32, self.*.e[1], undefined, [4]i32{ 3, 3, 3, 2 });
-        v1 = @shuffle(f32, self.*.e[1], undefined, [4]i32{ 2, 2, 1, 1 });
-        v2 = @shuffle(f32, self.*.e[1], undefined, [4]i32{ 1, 0, 0, 0 });
-
-        const s = self.e[0] * vector{ 1, -1, 1, -1 };
-        var r = v0 * p0;
-        r = mulAdd(-v1, p1, r);
-        r = mulAdd(v2, p2, r);
-        return dot4(s, r);
-    }
-    pub fn inverse(self: *const Self) !Self {
-        const mt = transpose(self);
-        var v0: [4]vector = undefined;
-        var v1: [4]vector = undefined;
-
-        v0[0] = @shuffle(f32, mt.e[2], undefined, [4]i32{ 0, 0, 1, 1 });
-        v1[0] = @shuffle(f32, mt.e[3], undefined, [4]i32{ 2, 3, 2, 3 });
-        v0[1] = @shuffle(f32, mt.e[0], undefined, [4]i32{ 0, 0, 1, 1 });
-        v1[1] = @shuffle(f32, mt.e[1], undefined, [4]i32{ 2, 3, 2, 3 });
-        v0[2] = @shuffle(f32, mt.e[2], mt.e[0], [4]i32{ 0, 2, ~@as(i32, 0), ~@as(i32, 2) });
-        v1[2] = @shuffle(f32, mt.e[3], mt.e[1], [4]i32{ 1, 3, ~@as(i32, 1), ~@as(i32, 3) });
-
-        var d0 = v0[0] * v1[0];
-        var d1 = v0[1] * v1[1];
-        var d2 = v0[2] * v1[2];
-
-        v0[0] = @shuffle(f32, mt.e[2], undefined, [4]i32{ 2, 3, 2, 3 });
-        v1[0] = @shuffle(f32, mt.e[3], undefined, [4]i32{ 0, 0, 1, 1 });
-        v0[1] = @shuffle(f32, mt.e[0], undefined, [4]i32{ 2, 3, 2, 3 });
-        v1[1] = @shuffle(f32, mt.e[1], undefined, [4]i32{ 0, 0, 1, 1 });
-        v0[2] = @shuffle(f32, mt.e[2], mt.e[0], [4]i32{ 1, 3, ~@as(i32, 1), ~@as(i32, 3) });
-        v1[2] = @shuffle(f32, mt.e[3], mt.e[1], [4]i32{ 0, 2, ~@as(i32, 0), ~@as(i32, 2) });
-
-        d0 = mulAdd(f32, -v0[0], v1[0], d0);
-        d1 = mulAdd(f32, -v0[1], v1[1], d1);
-        d2 = mulAdd(f32, -v0[2], v1[2], d2);
-
-        v0[0] = @shuffle(f32, mt.e[1], undefined, [4]i32{ 1, 2, 0, 1 });
-        v1[0] = @shuffle(f32, d0, d2, [4]i32{ ~@as(i32, 1), 1, 3, 0 });
-        v0[1] = @shuffle(f32, mt.e[0], undefined, [4]i32{ 2, 0, 1, 0 });
-        v1[1] = @shuffle(f32, d0, d2, [4]i32{ 3, ~@as(i32, 1), 1, 2 });
-        v0[2] = @shuffle(f32, mt.e[3], mt.e[0], [4]i32{ 1, 2, 0, 1 });
-        v1[2] = @shuffle(f32, d1, d2, [4]i32{ ~@as(i32, 3), 1, 3, 0 });
-        v0[3] = @shuffle(f32, mt.e[2], mt.e[1], [4]i32{ 2, 0, 1, 0 });
-        v1[3] = @shuffle(f32, d1, d2, [4]i32{ 3, ~@as(i32, 3), 1, 2 });
-
-        var c0 = v0[0] * v1[0];
-        var c2 = v0[1] * v1[1];
-        var c4 = v0[2] * v1[2];
-        var c6 = v0[3] * v1[3];
-
-        v0[0] = @shuffle(f32, mt.e[1], undefined, [4]i32{ 2, 3, 1, 2 });
-        v1[0] = @shuffle(f32, d0, d2, [4]i32{ 3, 0, 1, ~@as(i32, 0) });
-        v0[1] = @shuffle(f32, mt.e[0], undefined, [4]i32{ 3, 2, 3, 1 });
-        v1[1] = @shuffle(f32, d0, d2, [4]i32{ 2, 1, ~@as(i32, 0), 0 });
-        v0[2] = @shuffle(f32, mt.e[3], undefined, [4]i32{ 2, 3, 1, 2 });
-        v1[2] = @shuffle(f32, d1, d2, [4]i32{ 3, 0, 1, ~@as(i32, 2) });
-        v0[3] = @shuffle(f32, mt.e[2], undefined, [4]i32{ 3, 2, 3, 1 });
-        v1[3] = @shuffle(f32, d1, d2, [4]i32{ 2, 1, ~@as(i32, 2), 0 });
-
-        c0 = mulAdd(f32, -v0[0], v1[0], c0);
-        c2 = mulAdd(f32, -v0[1], v1[1], c2);
-        c4 = mulAdd(f32, -v0[2], v1[2], c4);
-        c6 = mulAdd(f32, -v0[3], v1[3], c6);
-
-        v0[0] = @shuffle(f32, mt.e[1], undefined, [4]i32{ 3, 0, 3, 0 });
-        v1[0] = @shuffle(f32, d0, d2, [4]i32{ 2, ~@as(i32, 1), ~@as(i32, 0), 2 });
-        v0[1] = @shuffle(f32, mt.e[0], undefined, [4]i32{ 1, 3, 0, 2 });
-        v1[1] = @shuffle(f32, d0, d2, [4]i32{ ~@as(i32, 1), 0, 3, ~@as(i32, 0) });
-        v0[2] = @shuffle(f32, mt.e[3], undefined, [4]i32{ 3, 0, 3, 0 });
-        v1[2] = @shuffle(f32, d1, d2, [4]i32{ 2, ~@as(i32, 3), ~@as(i32, 2), 2 });
-        v0[3] = @shuffle(f32, mt.e[2], undefined, [4]i32{ 1, 3, 0, 2 });
-        v1[3] = @shuffle(f32, d1, d2, [4]i32{ ~@as(i32, 3), 0, 3, ~@as(i32, 2) });
-
-        const c1 = mulAdd(f32, -v0[0], v1[0], c0);
-        const c3 = mulAdd(f32, v0[1], v1[1], c2);
-        const c5 = mulAdd(f32, -v0[2], v1[2], c4);
-        const c7 = mulAdd(f32, v0[3], v1[3], c6);
-
-        c0 = mulAdd(f32, v0[0], v1[0], c0);
-        c2 = mulAdd(f32, -v0[1], v1[1], c2);
-        c4 = mulAdd(f32, v0[2], v1[2], c4);
-        c6 = mulAdd(f32, -v0[3], v1[3], c6);
-
-        var mr = Self{ .e = [4]vector{
-            .{ c0[0], c1[1], c0[2], c1[3] },
-            .{ c2[0], c3[1], c2[2], c3[3] },
-            .{ c4[0], c5[1], c4[2], c5[3] },
-            .{ c6[0], c7[1], c6[2], c7[3] },
-        } };
-
-        const det = dot4(mr.e[0], mt.e[0]);
-
-        if (compare_n(det, 0)) {
-            return matrix_error.not_exist_inverse_matrix;
-        }
-
-        const scale = @as(vector, @splat(det));
-        mr.e[0] /= scale;
-        mr.e[1] /= scale;
-        mr.e[2] /= scale;
-        mr.e[3] /= scale;
-
-        return mr;
-    }
-};
-
-///  row ↕, col ↔
-pub fn matrix_(comptime T: type, row: comptime_int, col: comptime_int) type {
-    test_number_type(T);
-
-    return struct {
-        const Self = @This();
-        e: [row][col]T,
-
-        pub fn init() Self {
-            return Self{
-                .e = .{.{0} ** col} ** row,
-            };
-        }
-        pub fn identity() Self {
-            if (col == row) { //identity matrix
-                var result: Self = undefined;
-                comptime var i = 0;
-                inline while (i < row) : (i += 1) {
-                    comptime var j = 0;
-                    inline while (j < col) : (j += 1) {
-                        if (i == j) {
-                            result.e[i][j] = 1;
-                        } else {
-                            result.e[i][j] = 0;
-                        }
-                    }
-                }
-                return result;
-            } else {
-                @compileError("identity : not a identity matrix");
-            }
-        }
-        pub fn addition(self: *const Self, _matrix: *const Self) Self {
-            var result: Self = self;
-            comptime var r = 0;
-            comptime var c = 0;
-            inline while (r < row) : (r += 1) {
-                c = 0;
-                inline while (c < col) : (c += 1) {
-                    result.e[r][c] += _matrix.e[r][c];
-                }
-            }
-            return result;
-        }
-        pub fn subtract(self: *const Self, _matrix: *const Self) Self {
-            var result: Self = self;
-            comptime var r = 0;
-            comptime var c = 0;
-            inline while (r < row) : (r += 1) {
-                c = 0;
-                inline while (c < col) : (c += 1) {
-                    result.e[r][c] -= _matrix.e[r][c];
-                }
-            }
-            return result;
-        }
-        ///[row x COL] = [row x col][col x COL] COL 은 _matrix 행렬의 열(column) 갯수입니다.
-        pub fn multiply(self: *const Self, COL: comptime_int, _matrix: *const matrix(T, col, COL)) matrix(T, row, COL) {
-            var result: matrix(T, row, COL) = matrix(T, row, COL).init();
-            comptime var r = 0;
-            comptime var c = 0;
-            comptime var n = 0;
-            inline while (r < row) : (r += 1) {
-                c = 0;
-                inline while (c < COL) : (c += 1) {
-                    n = 0;
-                    inline while (n < COL) : (n += 1) {
-                        result.e[r][c] += self.*.e[r][n] * _matrix.e[n][c];
-                    }
-                }
-            }
-            return result;
-        }
-        fn swap_row(self: *Self, i: isize, j: isize) void {
-            if (i == j) return;
-            var k: usize = 0;
-            while (k < row) : (k += 1) {
-                std.mem.swap(T, &self.e[@intCast(i)][k], &self.e[@intCast(j)][k]);
-            }
-        }
-        pub fn transpose(self: *Self) matrix(T, col, row) {
-            var result: matrix(T, col, row) = undefined;
-            var r: i32 = 0;
-            while (r < row) : (r += 1) {
-                var c: i32 = 0;
-                while (c < col) : (c += 1) {
-                    result.e[c][r] = self.*.e[r][c];
-                }
-            }
-            return result;
-        }
-        fn det(n: comptime_int, _matrix: [n][n]T) T {
-            if (n == 1) return _matrix[0][0];
-
-            var minor_matrix: [n][n - 1][n - 1]T = undefined;
-            var k: usize = 0;
-            while (k < n) : (k += 1) {
-                var i: usize = 0;
-                while (i < (n - 1)) : (i += 1) {
-                    var j: usize = 0;
-                    while (j < n) : (j += 1) {
-                        if (j < k) {
-                            minor_matrix[k][i][j] = _matrix[i + 1][j];
-                        } else if (j > k) {
-                            minor_matrix[k][i][j - 1] = _matrix[i + 1][j];
-                        }
-                    }
-                }
-            }
-            var sum: T = 0;
-            var test_: T = 1;
-            k = 0;
-            while (k < n) : (k += 1) {
-                sum += test_ * _matrix[0][k] * det(n - 1, minor_matrix[k]);
-                test_ *= -1;
-            }
-            return sum;
-        }
-        ///https://nate9389.tistory.com/63
-        pub fn determinant(self: *const Self) T {
-            if (col != row) @compileError("determinant : not a identity matrix");
-            return det(row, self.e);
-        }
-        ///https://blog.naver.com/lovebuthate/221153359469
-        pub fn inverse(self: *Self) !Self {
-            if (col != row) @compileError("inverse : not a identity matrix");
-
-            const nn = col; // 행 열이 어짜피 같으므로 nn 변수로 통일
-            var a: Self = self.*;
-            var b: Self = identity();
-            var k: isize = 0;
-            while (k < nn) : (k += 1) {
-                var t = k - 1;
-                while (t + 1 < nn and self.e[@intCast(t + 1)][@intCast(k)] == 0) : (t += 1) {}
-                if (t == k - 1) t += 1;
-                if (t == nn - 1 and compare_n(self.e[@intCast(t)][@intCast(k)], 0)) return matrix_error.not_exist_inverse_matrix;
-                a.swap_row(k, t);
-                b.swap_row(k, t);
-                const d = a.e[@intCast(k)][@intCast(k)];
-                var j: usize = 0;
-                //k행 k열에 해당하는 수로 k행의 각 숫자를 나눔
-                while (j < nn) : (j += 1) {
-                    a.e[@intCast(k)][j] /= d;
-                    b.e[@intCast(k)][j] /= d;
-                }
-                //k행을 제외한 다른 행에 숫자를 곱하고 더하는 과정
-                var i: usize = 0;
-                while (i < nn) : (i += 1) {
-                    if (i != k) {
-                        const m = a.e[i][@intCast(k)];
-                        var ii: usize = 0;
-                        while (ii < nn) : (ii += 1) {
-                            if (ii >= k) a.e[i][ii] -= a.e[@intCast(k)][ii] * m;
-                            b.e[i][ii] -= b.e[@intCast(k)][ii] * m;
-                        }
-                    }
-                }
-            }
-            return b;
-        }
-        pub fn format(self: *const Self, comptime fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
-            _ = fmt;
-            _ = options;
-
-            try writer.print("{s}\n", .{@typeName(Self)});
-
-            comptime var i = 0;
-            inline while (i < row) : (i += 1) {
-                comptime var j = 0;
-                try writer.print("{{", .{});
-                inline while (j < col - 1) : (j += 1) {
-                    try writer.print("{d}, ", .{self.e[i][j]});
-                }
-                try writer.print("{d}}}\n", .{self.e[i][j]});
-            }
-        }
+pub fn matrix_init(comptime float_T: type) matrix_(float_T) {
+    return .{.{0} ** 4} ** 4;
+}
+pub inline fn matrix_translation(comptime float_T: type, x: float_T, y: float_T, z: float_T) matrix_(float_T) {
+    return .{
+        .{ 1, 0, 0, 0 },
+        .{ 0, 1, 0, 0 },
+        .{ 0, 0, 1, 0 },
+        .{ x, y, z, 1 },
     };
 }
+pub inline fn matrix_translationXY(comptime float_T: type, p: point_(float_T)) matrix_(float_T) {
+    return .{
+        .{ 1, 0, 0, 0 },
+        .{ 0, 1, 0, 0 },
+        .{ 0, 0, 1, 0 },
+        .{ p[0], p[1], 0, 1 },
+    };
+}
+pub inline fn matrix_translation_transpose(comptime float_T: type, x: float_T, y: float_T, z: float_T) matrix_(float_T) {
+    return .{
+        .{ 1, 0, 0, x },
+        .{ 0, 1, 0, y },
+        .{ 0, 0, 1, z },
+        .{ 0, 0, 0, 1 },
+    };
+}
+pub inline fn matrix_translation_inverse(comptime float_T: type, x: float_T, y: float_T, z: float_T) matrix_(float_T) {
+    return matrix_translation(-x, -y, -z);
+}
+pub inline fn matrix_translation_transpose_inverse(comptime float_T: type, x: float_T, y: float_T, z: float_T) matrix_(float_T) {
+    return matrix_translation_transpose(-x, -y, -z);
+}
+pub inline fn matrix_scaling(comptime float_T: type, x: float_T, y: float_T, z: float_T) matrix_(float_T) {
+    return .{
+        .{ x, 0, 0, 0 },
+        .{ 0, y, 0, 0 },
+        .{ 0, 0, z, 0 },
+        .{ 0, 0, 0, 1 },
+    };
+}
+pub inline fn matrix_scalingXY(comptime float_T: type, p: point_(float_T)) matrix_(float_T) {
+    return .{
+        .{ p[0], 0, 0, 0 },
+        .{ 0, p[1], 0, 0 },
+        .{ 0, 0, 1, 0 },
+        .{ 0, 0, 0, 1 },
+    };
+}
+pub inline fn matrix_rotationX(comptime float_T: type, angle: float_T) matrix_(float_T) {
+    const c = @cos(angle);
+    const s = @sin(angle);
+    return .{
+        .{ 1, 0, 0, 0 },
+        .{ 0, c, s, 0 },
+        .{ 0, -s, c, 0 },
+        .{ 0, 0, 0, 1 },
+    };
+}
+pub inline fn matrix_rotationY(comptime float_T: type, angle: float_T) matrix_(float_T) {
+    const c = @cos(angle);
+    const s = @sin(angle);
+    return .{
+        .{ c, 0, -s, 0 },
+        .{ 0, 1, 0, 0 },
+        .{ s, 0, c, 0 },
+        .{ 0, 0, 0, 1 },
+    };
+}
+pub inline fn matrix_rotationZ(comptime float_T: type, angle: float_T) matrix_(float_T) {
+    const c = @cos(angle);
+    const s = @sin(angle);
+    return .{
+        .{ c, s, 0, 0 },
+        .{ -s, c, 0, 0 },
+        .{ 0, 0, 1, 0 },
+        .{ 0, 0, 0, 1 },
+    };
+}
+pub const matrix_rotation2D = matrix_rotationZ;
+pub inline fn matrix_rotationX_inverse(comptime float_T: type, angle: float_T) matrix_(float_T) {
+    const c = @cos(angle);
+    const s = @sin(angle);
+    return .{
+        .{ 1, 0, 0, 0 },
+        .{ 0, c, -s, 0 },
+        .{ 0, s, c, 0 },
+        .{ 0, 0, 0, 1 },
+    };
+}
+pub inline fn matrix_rotationY_inverse(comptime float_T: type, angle: float_T) matrix_(float_T) {
+    const c = @cos(angle);
+    const s = @sin(angle);
+    return .{
+        .{ c, 0, s, 0 },
+        .{ 0, 1, 0, 0 },
+        .{ -s, 0, c, 0 },
+        .{ 0, 0, 0, 1 },
+    };
+}
+pub inline fn matrix_rotationZ_inverse(comptime float_T: type, angle: float_T) matrix_(float_T) {
+    const c = @cos(angle);
+    const s = @sin(angle);
+    return .{
+        .{ c, -s, 0, 0 },
+        .{ s, c, 0, 0 },
+        .{ 0, 0, 1, 0 },
+        .{ 0, 0, 0, 1 },
+    };
+}
+pub const matrix_rocationX_transpose = matrix_rotationX_inverse;
+pub const matrix_rocationY_transpose = matrix_rotationY_inverse;
+pub const matrix_rocationZ_transpose = matrix_rotationZ_inverse;
+pub const matrix_rocation2D_transpose = matrix_rotationZ_inverse;
+pub const matrix_rotation2D_inverse = matrix_rotationZ_inverse;
+pub fn matrix_scaling_inverse(comptime float_T: type, x: float_T, y: float_T, z: float_T) matrix_(float_T) {
+    return matrix_translation(1 / x, 1 / y, 1 / z);
+}
+///Vulkan 으로 테스트 완료
+pub fn matrix_perspectiveFovLhVulkan(comptime float_T: type, fovy: float_T, aspect: float_T, near: float_T, far: float_T) matrix_error!matrix_(float_T) {
+    var res = try matrix_perspectiveFovLh(fovy, aspect, near, far);
+    res[1][1] *= -1;
+    return res;
+}
+pub fn matrix_perspectiveFovLh(comptime float_T: type, fovy: float_T, aspect: float_T, near: float_T, far: float_T) matrix_error!matrix_(float_T) {
+    const sfov = std.math.sin(0.5 * fovy);
+    const cfov = std.math.cos(0.5 * fovy);
+
+    if (!(near > 0.0 and far > 0.0 and far > near)) return matrix_error.invaild_near_far;
+    if (compare_n(sfov, 0)) return matrix_error.sfov_0;
+    if (compare_n((far - near), 0)) return matrix_error.far_near_0;
+    if (compare_n(aspect, 0)) return matrix_error.aspect_0;
+    // assert(!approxEqAbs(f32, scfov[0], 0.0, 0.001));
+    // assert(!approxEqAbs(f32, far, near, 0.001));
+    // assert(!approxEqAbs(f32, aspect, 0.0, 0.01));
+
+    const h = cfov / sfov;
+    const w = h / aspect;
+    const r = far / (far - near);
+    return .{
+        .{ w, 0, 0, 0 },
+        .{ 0, h, 0, 0 },
+        .{ 0, 0, r, 1 },
+        .{ 0, 0, -r * near, 0 },
+    };
+}
+pub fn matrix_perspectiveFovRh(comptime float_T: type, fovy: float_T, aspect: float_T, near: float_T, far: float_T) matrix_error!matrix_(float_T) {
+    const sfov = std.math.sin(0.5 * fovy);
+    const cfov = std.math.cos(0.5 * fovy);
+
+    if (!(near > 0.0 and far > 0.0 and far > near)) return matrix_error.invaild_near_far;
+    if (compare_n(sfov, 0)) return matrix_error.sfov_0;
+    if (compare_n((near - far), 0)) return matrix_error.near_far_0;
+    if (compare_n(aspect, 0)) return matrix_error.aspect_0;
+    // assert(!approxEqAbs(f32, scfov[0], 0.0, 0.001));
+    // assert(!approxEqAbs(f32, far, near, 0.001));
+    // assert(!approxEqAbs(f32, aspect, 0.0, 0.01));
+
+    const h = cfov / sfov;
+    const w = h / aspect;
+    const r = far / (near - far);
+    return .{
+        .{ w, 0, 0, 0 },
+        .{ 0, h, 0, 0 },
+        .{ 0, 0, r, -1 },
+        .{ 0, 0, r * near, 0 },
+    };
+}
+/// Produces Z values in [-1.0, 1.0] range (OpenGL defaults)
+pub fn matrix_perspectiveFovRhGL(comptime float_T: type, fovy: float_T, aspect: float_T, near: float_T, far: float_T) matrix_error!matrix_(float_T) {
+    const sfov = @sin(0.5 * fovy);
+    const cfov = @cos(0.5 * fovy);
+
+    if (!(near > 0.0 and far > 0.0 and far > near)) return matrix_error.invaild_near_far;
+    if (compare_n(sfov, 0)) return matrix_error.sfov_0;
+    if (compare_n((near - far), 0)) return matrix_error.near_far_0;
+    if (compare_n(aspect, 0)) return matrix_error.aspect_0;
+    // assert(!approxEqAbs(f32, scfov[0], 0.0, 0.001));
+    // assert(!approxEqAbs(f32, far, near, 0.001));
+    // assert(!approxEqAbs(f32, aspect, 0.0, 0.01));
+
+    const h = cfov / sfov;
+    const w = h / aspect;
+    const r = near - far;
+    return .{
+        .{ w, 0, 0, 0 },
+        .{ 0, h, 0, 0 },
+        .{ 0, 0, (near + far) / r, -1 },
+        .{ 0, 0, 2 * near * far / r, 0 },
+    };
+}
+///Vulkan 으로 테스트 완료
+pub fn matrix_orthographicLhVulkan(comptime float_T: type, w: float_T, h: float_T, near: float_T, far: float_T) matrix_error!matrix_(float_T) {
+    var res = try matrix_orthographicLh(float_T, w, h, near, far);
+    res[1][1] *= -1;
+    return res;
+}
+pub fn matrix_orthographicLh(comptime float_T: type, w: float_T, h: float_T, near: float_T, far: float_T) matrix_error!matrix_(float_T) {
+    // assert(!approxEqAbs(f32, w, 0.0, 0.001));
+    // assert(!approxEqAbs(f32, h, 0.0, 0.001));
+    // assert(!approxEqAbs(f32, far, near, 0.001));
+    if (compare_n((far - near), 0)) return matrix_error.far_near_0;
+    if (compare_n(w, 0)) return matrix_error.w_0;
+    if (compare_n(h, 0)) return matrix_error.h_0;
+
+    const r = 1 / (far - near);
+    return .{
+        .{ 2 / w, 0, 0, 0 },
+        .{ 0, 2 / h, 0, 0 },
+        .{ 0, 0, r, 0 },
+        .{ 0, 0, -r * near, 1 },
+    };
+}
+pub fn matrix_orthographicRh(comptime float_T: type, w: float_T, h: float_T, near: float_T, far: float_T) matrix_error!matrix_(float_T) {
+
+    // assert(!approxEqAbs(f32, w, 0.0, 0.001));
+    // assert(!approxEqAbs(f32, h, 0.0, 0.001));
+    // assert(!approxEqAbs(f32, far, near, 0.001));
+    if (compare_n((near - far), 0)) return matrix_error.near_far_0;
+    if (compare_n(w, 0)) return matrix_error.w_0;
+    if (compare_n(h, 0)) return matrix_error.h_0;
+
+    const r = 1 / (near - far);
+    return .{
+        .{ 2 / w, 0, 0, 0 },
+        .{ 0, 2 / h, 0, 0 },
+        .{ 0, 0, r, 0 },
+        .{ 0, 0, r * near, 1 },
+    };
+}
+///w좌표는 신경 x
+pub fn matrix_lookToLh(comptime float_T: type, eyepos_vector: vector_(float_T), eyedir_vector: vector_(float_T), updir_vector: vector_(float_T)) matrix_(float_T) {
+    const az = normalize(eyedir_vector);
+    const ax = normalize(cross3(updir_vector, az));
+    const ay = normalize(cross3(az, ax));
+    return .{
+        .{ ax[0], ay[0], az[0], 0 },
+        .{ ax[1], ay[1], az[1], 0 },
+        .{ ax[2], ay[2], az[2], 0 },
+        .{ -dot3(ax, eyepos_vector), -dot3(ay, eyepos_vector), -dot3(az, eyepos_vector), 1 },
+    };
+}
+///w좌표는 신경 x
+pub fn matrix_lookToRh(comptime float_T: type, eyepos_vector: vector_(float_T), eyedir_vector: vector_(float_T), updir_vector: vector_(float_T)) matrix_(float_T) {
+    return matrix_lookToLh(float_T, eyepos_vector, -eyedir_vector, updir_vector);
+}
+///Vulkan 으로 테스트 완료, w좌표는 신경 x
+pub fn matrix_lookAtLh(comptime float_T: type, eyepos_vector: vector_(float_T), focuspos_vector: vector_(float_T), updir_vector: vector_(float_T)) matrix_(float_T) {
+    return matrix_lookToLh(float_T, eyepos_vector, focuspos_vector - eyepos_vector, updir_vector);
+}
+///w좌표는 신경 x
+pub fn matrix_lookAtRh(comptime float_T: type, eyepos_vector: vector_(float_T), focuspos_vector: vector_(float_T), updir_vector: vector_(float_T)) matrix_(float_T) {
+    return matrix_lookToLh(float_T, eyepos_vector, eyepos_vector - focuspos_vector, updir_vector);
+}
+
+pub fn matrix_identity(comptime T: type) matrix_(T) {
+    return .{
+        .{ 1, 0, 0, 0 },
+        .{ 0, 1, 0, 0 },
+        .{ 0, 0, 1, 0 },
+        .{ 0, 0, 0, 1 },
+    };
+}
+inline fn dot4(v0: anytype, v1: anytype) @TypeOf(v0[0], v1[0]) {
+    const xmm0 = v0 * v1; // | x0*x1 | y0*y1 | z0*z1 | w0*w1 |
+    return xmm0[0] + xmm0[1] + xmm0[2] + xmm0[3];
+}
+
+pub fn matrix_multiply(_matrix: anytype, _target_matrix: anytype) @TypeOf(_matrix, _target_matrix) {
+    var result: @TypeOf(_matrix) = undefined;
+    comptime var row = 0;
+    const float_T = @TypeOf(_matrix[0][0], _target_matrix[0][0]);
+    inline while (row < 4) : (row += 1) {
+        const vx = @shuffle(float_T, _matrix[row], undefined, [4]i32{ 0, 0, 0, 0 });
+        const vy = @shuffle(float_T, _matrix[row], undefined, [4]i32{ 1, 1, 1, 1 });
+        const vz = @shuffle(float_T, _matrix[row], undefined, [4]i32{ 2, 2, 2, 2 });
+        const vw = @shuffle(float_T, _matrix[row], undefined, [4]i32{ 3, 3, 3, 3 });
+        result[row] = mulAdd(vx, _target_matrix[0], vz * _target_matrix[2]) + mulAdd(vy, _target_matrix[1], vw * _target_matrix[3]);
+    }
+    return result;
+}
+pub fn matrix_mul_vector(_matrix: anytype, _target_vector: anytype) vector_(@TypeOf(_matrix[0][0])) {
+    const vx = @shuffle(@TypeOf(_matrix[0][0], _target_vector[0]), _target_vector, undefined, [4]i32{ 0, 0, 0, 0 });
+    const vy = @shuffle(@TypeOf(_matrix[0][0], _target_vector[0]), _target_vector, undefined, [4]i32{ 1, 1, 1, 1 });
+    const vz = @shuffle(@TypeOf(_matrix[0][0], _target_vector[0]), _target_vector, undefined, [4]i32{ 2, 2, 2, 2 });
+    const vw = @shuffle(@TypeOf(_matrix[0][0], _target_vector[0]), _target_vector, undefined, [4]i32{ 3, 3, 3, 3 });
+    const matT = matrix_transpose(_matrix);
+    return mulAdd(vx, matT[0], vz * matT[2]) + mulAdd(vy, matT[1], vw * matT[3]);
+}
+pub inline fn matrix_div_vector(_matrix: anytype, _target_vector: anytype) !vector_(@TypeOf(_matrix[0][0])) {
+    return matrix_mul_vector(try matrix_inverse(_matrix), _target_vector);
+}
+pub inline fn matrix_mul_point(_matrix: anytype, pt: anytype) !point_(@TypeOf(_matrix[0][0])) {
+    const xx = point{ _matrix[0][0], _matrix[0][1] };
+    const yy = point{ _matrix[1][0], _matrix[1][1] };
+    return .{ dot3(pt, xx) + _matrix[0][3], dot3(pt, yy) + _matrix[1][3] };
+}
+pub inline fn matrix_div_point(_matrix: anytype, pt: anytype) !point_(@TypeOf(_matrix[0][0])) {
+    return matrix_mul_point(try matrix_inverse(_matrix), pt);
+}
+pub fn matrix_addition(_matrix: anytype, _target_matrix: anytype) @TypeOf(_matrix, _target_matrix) {
+    var result: @TypeOf(_matrix, _target_matrix) = undefined;
+    comptime var row = 0;
+    inline while (row < 4) : (row += 1) {
+        result[row] = _matrix[row] + _target_matrix[row];
+    }
+    return result;
+}
+pub fn matrix_subtract(_matrix: anytype, _target_matrix: anytype) @TypeOf(_matrix, _target_matrix) {
+    var result: @TypeOf(_matrix, _target_matrix) = undefined;
+    comptime var row = 0;
+    inline while (row < 4) : (row += 1) {
+        result[row] = _matrix[row] - _target_matrix[row];
+    }
+    return result;
+}
+pub fn matrix_transpose(_matrix: anytype) @TypeOf(_matrix) {
+    const float_T = @TypeOf(_matrix[0][0]);
+    const temp1 = @shuffle(float_T, _matrix[0], _matrix[1], [4]i32{ 0, 1, ~@as(i32, 0), ~@as(i32, 1) });
+    const temp3 = @shuffle(float_T, _matrix[0], _matrix[1], [4]i32{ 2, 3, ~@as(i32, 2), ~@as(i32, 3) });
+    const temp2 = @shuffle(float_T, _matrix[2], _matrix[3], [4]i32{ 0, 1, ~@as(i32, 0), ~@as(i32, 1) });
+    const temp4 = @shuffle(float_T, _matrix[2], _matrix[3], [4]i32{ 2, 3, ~@as(i32, 2), ~@as(i32, 3) });
+    return .{
+        @shuffle(float_T, temp1, temp2, [4]i32{ 0, 2, ~@as(i32, 0), ~@as(i32, 2) }),
+        @shuffle(float_T, temp1, temp2, [4]i32{ 1, 3, ~@as(i32, 1), ~@as(i32, 3) }),
+        @shuffle(float_T, temp3, temp4, [4]i32{ 0, 2, ~@as(i32, 0), ~@as(i32, 2) }),
+        @shuffle(float_T, temp3, temp4, [4]i32{ 1, 3, ~@as(i32, 1), ~@as(i32, 3) }),
+    };
+}
+
+pub fn matrix_determinant(_matrix: anytype) @TypeOf(_matrix[0][0]) {
+    const float_T = @TypeOf(_matrix[0][0]);
+    var v0 = @shuffle(float_T, _matrix[2], undefined, [4]i32{ 1, 0, 0, 0 });
+    var v1 = @shuffle(float_T, _matrix[3], undefined, [4]i32{ 2, 2, 1, 1 });
+    var v2 = @shuffle(float_T, _matrix[2], undefined, [4]i32{ 1, 0, 0, 0 });
+    var v3 = @shuffle(float_T, _matrix[3], undefined, [4]i32{ 3, 3, 3, 2 });
+    var v4 = @shuffle(float_T, _matrix[2], undefined, [4]i32{ 2, 2, 1, 1 });
+    var v5 = @shuffle(float_T, _matrix[3], undefined, [4]i32{ 3, 3, 3, 2 });
+
+    var p0 = v0 * v1;
+    var p1 = v2 * v3;
+    var p2 = v4 * v5;
+
+    v0 = @shuffle(float_T, _matrix[2], undefined, [4]i32{ 2, 2, 1, 1 });
+    v1 = @shuffle(float_T, _matrix[3], undefined, [4]i32{ 1, 0, 0, 0 });
+    v2 = @shuffle(float_T, _matrix[2], undefined, [4]i32{ 3, 3, 3, 2 });
+    v3 = @shuffle(float_T, _matrix[3], undefined, [4]i32{ 1, 0, 0, 0 });
+    v4 = @shuffle(float_T, _matrix[2], undefined, [4]i32{ 3, 3, 3, 2 });
+    v5 = @shuffle(float_T, _matrix[3], undefined, [4]i32{ 2, 2, 1, 1 });
+
+    p0 = mulAdd(-v0, v1, p0);
+    p1 = mulAdd(-v2, v3, p1);
+    p2 = mulAdd(-v4, v5, p2);
+
+    v0 = @shuffle(float_T, _matrix[1], undefined, [4]i32{ 3, 3, 3, 2 });
+    v1 = @shuffle(float_T, _matrix[1], undefined, [4]i32{ 2, 2, 1, 1 });
+    v2 = @shuffle(float_T, _matrix[1], undefined, [4]i32{ 1, 0, 0, 0 });
+
+    const s = _matrix[0] * @TypeOf(_matrix[0]){ 1, -1, 1, -1 };
+    var r = v0 * p0;
+    r = mulAdd(-v1, p1, r);
+    r = mulAdd(v2, p2, r);
+    return dot4(s, r);
+}
+pub fn matrix_inverse(_matrix: anytype) !@TypeOf(_matrix) {
+    const mt = matrix_transpose(_matrix);
+    const float_T = @TypeOf(_matrix[0][0]);
+    var v0: [4]@TypeOf(_matrix[0]) = undefined;
+    var v1: [4]@TypeOf(_matrix[0]) = undefined;
+
+    v0[0] = @shuffle(float_T, mt[2], undefined, [4]i32{ 0, 0, 1, 1 });
+    v1[0] = @shuffle(float_T, mt[3], undefined, [4]i32{ 2, 3, 2, 3 });
+    v0[1] = @shuffle(float_T, mt[0], undefined, [4]i32{ 0, 0, 1, 1 });
+    v1[1] = @shuffle(float_T, mt[1], undefined, [4]i32{ 2, 3, 2, 3 });
+    v0[2] = @shuffle(float_T, mt[2], mt[0], [4]i32{ 0, 2, ~@as(i32, 0), ~@as(i32, 2) });
+    v1[2] = @shuffle(float_T, mt[3], mt[1], [4]i32{ 1, 3, ~@as(i32, 1), ~@as(i32, 3) });
+
+    var d0 = v0[0] * v1[0];
+    var d1 = v0[1] * v1[1];
+    var d2 = v0[2] * v1[2];
+
+    v0[0] = @shuffle(float_T, mt[2], undefined, [4]i32{ 2, 3, 2, 3 });
+    v1[0] = @shuffle(float_T, mt[3], undefined, [4]i32{ 0, 0, 1, 1 });
+    v0[1] = @shuffle(float_T, mt[0], undefined, [4]i32{ 2, 3, 2, 3 });
+    v1[1] = @shuffle(float_T, mt[1], undefined, [4]i32{ 0, 0, 1, 1 });
+    v0[2] = @shuffle(float_T, mt[2], mt[0], [4]i32{ 1, 3, ~@as(i32, 1), ~@as(i32, 3) });
+    v1[2] = @shuffle(float_T, mt[3], mt[1], [4]i32{ 0, 2, ~@as(i32, 0), ~@as(i32, 2) });
+
+    d0 = mulAdd(float_T, -v0[0], v1[0], d0);
+    d1 = mulAdd(float_T, -v0[1], v1[1], d1);
+    d2 = mulAdd(float_T, -v0[2], v1[2], d2);
+
+    v0[0] = @shuffle(float_T, mt[1], undefined, [4]i32{ 1, 2, 0, 1 });
+    v1[0] = @shuffle(float_T, d0, d2, [4]i32{ ~@as(i32, 1), 1, 3, 0 });
+    v0[1] = @shuffle(float_T, mt[0], undefined, [4]i32{ 2, 0, 1, 0 });
+    v1[1] = @shuffle(float_T, d0, d2, [4]i32{ 3, ~@as(i32, 1), 1, 2 });
+    v0[2] = @shuffle(float_T, mt[3], mt[0], [4]i32{ 1, 2, 0, 1 });
+    v1[2] = @shuffle(float_T, d1, d2, [4]i32{ ~@as(i32, 3), 1, 3, 0 });
+    v0[3] = @shuffle(float_T, mt[2], mt[1], [4]i32{ 2, 0, 1, 0 });
+    v1[3] = @shuffle(float_T, d1, d2, [4]i32{ 3, ~@as(i32, 3), 1, 2 });
+
+    var c0 = v0[0] * v1[0];
+    var c2 = v0[1] * v1[1];
+    var c4 = v0[2] * v1[2];
+    var c6 = v0[3] * v1[3];
+
+    v0[0] = @shuffle(float_T, mt[1], undefined, [4]i32{ 2, 3, 1, 2 });
+    v1[0] = @shuffle(float_T, d0, d2, [4]i32{ 3, 0, 1, ~@as(i32, 0) });
+    v0[1] = @shuffle(float_T, mt[0], undefined, [4]i32{ 3, 2, 3, 1 });
+    v1[1] = @shuffle(float_T, d0, d2, [4]i32{ 2, 1, ~@as(i32, 0), 0 });
+    v0[2] = @shuffle(float_T, mt[3], undefined, [4]i32{ 2, 3, 1, 2 });
+    v1[2] = @shuffle(float_T, d1, d2, [4]i32{ 3, 0, 1, ~@as(i32, 2) });
+    v0[3] = @shuffle(float_T, mt[2], undefined, [4]i32{ 3, 2, 3, 1 });
+    v1[3] = @shuffle(float_T, d1, d2, [4]i32{ 2, 1, ~@as(i32, 2), 0 });
+
+    c0 = mulAdd(float_T, -v0[0], v1[0], c0);
+    c2 = mulAdd(float_T, -v0[1], v1[1], c2);
+    c4 = mulAdd(float_T, -v0[2], v1[2], c4);
+    c6 = mulAdd(float_T, -v0[3], v1[3], c6);
+
+    v0[0] = @shuffle(float_T, mt[1], undefined, [4]i32{ 3, 0, 3, 0 });
+    v1[0] = @shuffle(float_T, d0, d2, [4]i32{ 2, ~@as(i32, 1), ~@as(i32, 0), 2 });
+    v0[1] = @shuffle(float_T, mt[0], undefined, [4]i32{ 1, 3, 0, 2 });
+    v1[1] = @shuffle(float_T, d0, d2, [4]i32{ ~@as(i32, 1), 0, 3, ~@as(i32, 0) });
+    v0[2] = @shuffle(float_T, mt[3], undefined, [4]i32{ 3, 0, 3, 0 });
+    v1[2] = @shuffle(float_T, d1, d2, [4]i32{ 2, ~@as(i32, 3), ~@as(i32, 2), 2 });
+    v0[3] = @shuffle(float_T, mt[2], undefined, [4]i32{ 1, 3, 0, 2 });
+    v1[3] = @shuffle(float_T, d1, d2, [4]i32{ ~@as(i32, 3), 0, 3, ~@as(i32, 2) });
+
+    const c1 = mulAdd(-v0[0], v1[0], c0);
+    const c3 = mulAdd(v0[1], v1[1], c2);
+    const c5 = mulAdd(-v0[2], v1[2], c4);
+    const c7 = mulAdd(v0[3], v1[3], c6);
+
+    c0 = mulAdd(v0[0], v1[0], c0);
+    c2 = mulAdd(-v0[1], v1[1], c2);
+    c4 = mulAdd(v0[2], v1[2], c4);
+    c6 = mulAdd(-v0[3], v1[3], c6);
+
+    var mr = .{
+        .{ c0[0], c1[1], c0[2], c1[3] },
+        .{ c2[0], c3[1], c2[2], c3[3] },
+        .{ c4[0], c5[1], c4[2], c5[3] },
+        .{ c6[0], c7[1], c6[2], c7[3] },
+    };
+
+    const det = dot4(mr[0], mt[0]);
+
+    if (compare_n(det, 0)) {
+        return matrix_error.not_exist_inverse_matrix;
+    }
+
+    const scale = @as(@TypeOf(_matrix[0]), @splat(det));
+    mr[0] /= scale;
+    mr[1] /= scale;
+    mr[2] /= scale;
+    mr[3] /= scale;
+
+    return mr;
+}
+
+//  row ↕, col ↔
+// pub fn matrix_(comptime T: type, row: comptime_int, col: comptime_int) type {
+//     test_number_type(T);
+
+//     if (T == f32 and row == 4 and col == 4) return matrix;
+
+// return struct {
+//     const Self = @This();
+//     e: [row][col]T,
+
+//     pub fn init() Self {
+//         return Self{
+//             .e = .{.{0} ** col} ** row,
+//         };
+//     }
+//     pub fn identity() Self {
+//         if (col == row) { //identity matrix
+//             var result: Self = undefined;
+//             comptime var i = 0;
+//             inline while (i < row) : (i += 1) {
+//                 comptime var j = 0;
+//                 inline while (j < col) : (j += 1) {
+//                     if (i == j) {
+//                         result.e[i][j] = 1;
+//                     } else {
+//                         result.e[i][j] = 0;
+//                     }
+//                 }
+//             }
+//             return result;
+//         } else {
+//             @compileError("identity : not a identity matrix");
+//         }
+//     }
+//     pub fn addition(self: *const Self, _matrix: *const Self) Self {
+//         var result: Self = self;
+//         comptime var r = 0;
+//         comptime var c = 0;
+//         inline while (r < row) : (r += 1) {
+//             c = 0;
+//             inline while (c < col) : (c += 1) {
+//                 result.e[r][c] += _matrix.e[r][c];
+//             }
+//         }
+//         return result;
+//     }
+//     pub fn subtract(self: *const Self, _matrix: *const Self) Self {
+//         var result: Self = self;
+//         comptime var r = 0;
+//         comptime var c = 0;
+//         inline while (r < row) : (r += 1) {
+//             c = 0;
+//             inline while (c < col) : (c += 1) {
+//                 result.e[r][c] -= _matrix.e[r][c];
+//             }
+//         }
+//         return result;
+//     }
+//     ///[row x COL] = [row x col][col x COL] COL 은 _matrix 행렬의 열(column) 갯수입니다.
+//     pub fn multiply(self: *const Self, COL: comptime_int, _matrix: *const matrix(T, col, COL)) matrix(T, row, COL) {
+//         var result: matrix(T, row, COL) = matrix(T, row, COL).init();
+//         comptime var r = 0;
+//         comptime var c = 0;
+//         comptime var n = 0;
+//         inline while (r < row) : (r += 1) {
+//             c = 0;
+//             inline while (c < COL) : (c += 1) {
+//                 n = 0;
+//                 inline while (n < COL) : (n += 1) {
+//                     result.e[r][c] += self.*.e[r][n] * _matrix.e[n][c];
+//                 }
+//             }
+//         }
+//         return result;
+//     }
+//     fn swap_row(self: *Self, i: isize, j: isize) void {
+//         if (i == j) return;
+//         var k: usize = 0;
+//         while (k < row) : (k += 1) {
+//             std.mem.swap(T, &self.e[@intCast(i)][k], &self.e[@intCast(j)][k]);
+//         }
+//     }
+//     pub fn transpose(self: *Self) matrix(T, col, row) {
+//         var result: matrix(T, col, row) = undefined;
+//         var r: i32 = 0;
+//         while (r < row) : (r += 1) {
+//             var c: i32 = 0;
+//             while (c < col) : (c += 1) {
+//                 result.e[c][r] = self.*.e[r][c];
+//             }
+//         }
+//         return result;
+//     }
+//     fn det(n: comptime_int, _matrix: [n][n]T) T {
+//         if (n == 1) return _matrix[0][0];
+
+//         var minor_matrix: [n][n - 1][n - 1]T = undefined;
+//         var k: usize = 0;
+//         while (k < n) : (k += 1) {
+//             var i: usize = 0;
+//             while (i < (n - 1)) : (i += 1) {
+//                 var j: usize = 0;
+//                 while (j < n) : (j += 1) {
+//                     if (j < k) {
+//                         minor_matrix[k][i][j] = _matrix[i + 1][j];
+//                     } else if (j > k) {
+//                         minor_matrix[k][i][j - 1] = _matrix[i + 1][j];
+//                     }
+//                 }
+//             }
+//         }
+//         var sum: T = 0;
+//         var test_: T = 1;
+//         k = 0;
+//         while (k < n) : (k += 1) {
+//             sum += test_ * _matrix[0][k] * det(n - 1, minor_matrix[k]);
+//             test_ *= -1;
+//         }
+//         return sum;
+//     }
+//     ///https://nate9389.tistory.com/63
+//     pub fn determinant(self: *const Self) T {
+//         if (col != row) @compileError("determinant : not a identity matrix");
+//         return det(row, self.e);
+//     }
+//     ///https://blog.naver.com/lovebuthate/221153359469
+//     pub fn inverse(self: *Self) !Self {
+//         if (col != row) @compileError("inverse : not a identity matrix");
+
+//         const nn = col; // 행 열이 어짜피 같으므로 nn 변수로 통일
+//         var a: Self = self.*;
+//         var b: Self = identity();
+//         var k: isize = 0;
+//         while (k < nn) : (k += 1) {
+//             var t = k - 1;
+//             while (t + 1 < nn and self.e[@intCast(t + 1)][@intCast(k)] == 0) : (t += 1) {}
+//             if (t == k - 1) t += 1;
+//             if (t == nn - 1 and compare_n(self.e[@intCast(t)][@intCast(k)], 0)) return matrix_error.not_exist_inverse_matrix;
+//             a.swap_row(k, t);
+//             b.swap_row(k, t);
+//             const d = a.e[@intCast(k)][@intCast(k)];
+//             var j: usize = 0;
+//             //k행 k열에 해당하는 수로 k행의 각 숫자를 나눔
+//             while (j < nn) : (j += 1) {
+//                 a.e[@intCast(k)][j] /= d;
+//                 b.e[@intCast(k)][j] /= d;
+//             }
+//             //k행을 제외한 다른 행에 숫자를 곱하고 더하는 과정
+//             var i: usize = 0;
+//             while (i < nn) : (i += 1) {
+//                 if (i != k) {
+//                     const m = a.e[i][@intCast(k)];
+//                     var ii: usize = 0;
+//                     while (ii < nn) : (ii += 1) {
+//                         if (ii >= k) a.e[i][ii] -= a.e[@intCast(k)][ii] * m;
+//                         b.e[i][ii] -= b.e[@intCast(k)][ii] * m;
+//                     }
+//                 }
+//             }
+//         }
+//         return b;
+//     }
+//     pub fn format(self: *const Self, comptime fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
+//         _ = fmt;
+//         _ = options;
+
+//         try writer.print("{s}\n", .{@typeName(Self)});
+
+//         comptime var i = 0;
+//         inline while (i < row) : (i += 1) {
+//             comptime var j = 0;
+//             try writer.print("{{", .{});
+//             inline while (j < col - 1) : (j += 1) {
+//                 try writer.print("{d}, ", .{self.e[i][j]});
+//             }
+//             try writer.print("{d}}}\n", .{self.e[i][j]});
+//         }
+//     }
+// };
+//}

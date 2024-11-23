@@ -505,24 +505,24 @@ pub const line = struct {
                 const ltMinusLs = lt - ls;
                 const mtMinusMs = mt - ms;
 
-                mat.e[0][0] = @floatCast(ls * ms);
-                mat.e[0][1] = @floatCast(ls * ls * ls);
-                mat.e[0][2] = @floatCast(ms * ms * ms);
+                mat[0][0] = @floatCast(ls * ms);
+                mat[0][1] = @floatCast(ls * ls * ls);
+                mat[0][2] = @floatCast(ms * ms * ms);
 
-                mat.e[1][0] = @floatCast((1.0 / 3.0) * (3.0 * ls * ms - ls * mt - lt * ms));
-                mat.e[1][1] = @floatCast(ls * ls * (ls - lt));
-                mat.e[1][2] = @floatCast(ms * ms * (ms - mt));
+                mat[1][0] = @floatCast((1.0 / 3.0) * (3.0 * ls * ms - ls * mt - lt * ms));
+                mat[1][1] = @floatCast(ls * ls * (ls - lt));
+                mat[1][2] = @floatCast(ms * ms * (ms - mt));
 
-                mat.e[2][0] = @floatCast((1.0 / 3.0) * (lt * (mt - 2.0 * ms) + ls * (3.0 * ms - 2.0 * mt)));
-                mat.e[2][1] = @floatCast(ltMinusLs * ltMinusLs * ls);
-                mat.e[2][2] = @floatCast(mtMinusMs * mtMinusMs * ms);
+                mat[2][0] = @floatCast((1.0 / 3.0) * (lt * (mt - 2.0 * ms) + ls * (3.0 * ms - 2.0 * mt)));
+                mat[2][1] = @floatCast(ltMinusLs * ltMinusLs * ls);
+                mat[2][2] = @floatCast(mtMinusMs * mtMinusMs * ms);
 
-                mat.e[3][0] = @floatCast(ltMinusLs * mtMinusMs);
-                mat.e[3][1] = @floatCast(-(ltMinusLs * ltMinusLs * ltMinusLs));
-                mat.e[3][2] = @floatCast(-(mtMinusMs * mtMinusMs * mtMinusMs));
+                mat[3][0] = @floatCast(ltMinusLs * mtMinusMs);
+                mat[3][1] = @floatCast(-(ltMinusLs * ltMinusLs * ltMinusLs));
+                mat[3][2] = @floatCast(-(mtMinusMs * mtMinusMs * mtMinusMs));
 
-                if (mat.e[0][0] > 0) flip = true;
-                //xfit.print_debug("serpentine {} {d}", .{ flip, mat.e[0][0] });
+                if (mat[0][0] > 0) flip = true;
+                //xfit.print_debug("serpentine {} {d}", .{ flip, mat[0][0] });
             },
             .loop => {
                 const t1 = sqrt(4.0 * d1 * d3 - 3.0 * d2 * d2);
@@ -545,23 +545,23 @@ pub const line = struct {
                     const ltMinusLs = lt - ls;
                     const mtMinusMs = mt - ms;
 
-                    mat.e[0][0] = @floatCast(ls * ms);
-                    mat.e[0][1] = @floatCast(ls * ls * ms);
-                    mat.e[0][2] = @floatCast(ls * ms * ms);
+                    mat[0][0] = @floatCast(ls * ms);
+                    mat[0][1] = @floatCast(ls * ls * ms);
+                    mat[0][2] = @floatCast(ls * ms * ms);
 
-                    mat.e[1][0] = @floatCast((1.0 / 3.0) * (-ls * mt - lt * ms + 3.0 * ls * ms));
-                    mat.e[1][1] = @floatCast(-(1.0 / 3.0) * ls * (ls * (mt - 3.0 * ms) + 2.0 * lt * ms));
-                    mat.e[1][2] = @floatCast(-(1.0 / 3.0) * ms * (ls * (2.0 * mt - 3.0 * ms) + lt * ms));
+                    mat[1][0] = @floatCast((1.0 / 3.0) * (-ls * mt - lt * ms + 3.0 * ls * ms));
+                    mat[1][1] = @floatCast(-(1.0 / 3.0) * ls * (ls * (mt - 3.0 * ms) + 2.0 * lt * ms));
+                    mat[1][2] = @floatCast(-(1.0 / 3.0) * ms * (ls * (2.0 * mt - 3.0 * ms) + lt * ms));
 
-                    mat.e[2][0] = @floatCast((1.0 / 3.0) * (lt * (mt - 2.0 * ms) + ls * (3.0 * ms - 2.0 * mt)));
-                    mat.e[2][1] = @floatCast((1.0 / 3.0) * ltMinusLs * (ls * (2.0 * mt - 3.0 * ms) + lt * ms));
-                    mat.e[2][2] = @floatCast((1.0 / 3.0) * mtMinusMs * (ls * (mt - 3.0 * ms) + 2.0 * lt * ms));
+                    mat[2][0] = @floatCast((1.0 / 3.0) * (lt * (mt - 2.0 * ms) + ls * (3.0 * ms - 2.0 * mt)));
+                    mat[2][1] = @floatCast((1.0 / 3.0) * ltMinusLs * (ls * (2.0 * mt - 3.0 * ms) + lt * ms));
+                    mat[2][2] = @floatCast((1.0 / 3.0) * mtMinusMs * (ls * (mt - 3.0 * ms) + 2.0 * lt * ms));
 
-                    mat.e[3][0] = @floatCast(ltMinusLs * mtMinusMs);
-                    mat.e[3][1] = @floatCast(-(ltMinusLs * ltMinusLs) * mtMinusMs);
-                    mat.e[3][2] = @floatCast(-ltMinusLs * mtMinusMs * mtMinusMs);
+                    mat[3][0] = @floatCast(ltMinusLs * mtMinusMs);
+                    mat[3][1] = @floatCast(-(ltMinusLs * ltMinusLs) * mtMinusMs);
+                    mat[3][2] = @floatCast(-ltMinusLs * mtMinusMs * mtMinusMs);
 
-                    //if (repeat == -1) flip = ((d1 > 0 and mat.e[0][0] < 0) or (d1 < 0 and mat.e[0][0] > 0));
+                    //if (repeat == -1) flip = ((d1 > 0 and mat[0][0] < 0) or (d1 < 0 and mat[0][0] > 0));
                     //xfit.print_debug("loop flip {}", .{flip});
                 }
             },
@@ -570,40 +570,40 @@ pub const line = struct {
                 const lt = 3.0 * d2;
                 const lsMinusLt = ls - lt;
 
-                mat.e[0][0] = @floatCast(ls);
-                mat.e[0][1] = @floatCast(ls * ls * ls);
-                mat.e[0][2] = 1;
+                mat[0][0] = @floatCast(ls);
+                mat[0][1] = @floatCast(ls * ls * ls);
+                mat[0][2] = 1;
 
-                mat.e[1][0] = @floatCast((ls - (1.0 / 3.0) * lt));
-                mat.e[1][1] = @floatCast(ls * ls * lsMinusLt);
-                mat.e[1][2] = 1;
+                mat[1][0] = @floatCast((ls - (1.0 / 3.0) * lt));
+                mat[1][1] = @floatCast(ls * ls * lsMinusLt);
+                mat[1][2] = 1;
 
-                mat.e[2][0] = @floatCast((ls - (2.0 / 3.0) * lt));
-                mat.e[2][1] = @floatCast(lsMinusLt * lsMinusLt * ls);
-                mat.e[2][2] = 1;
+                mat[2][0] = @floatCast((ls - (2.0 / 3.0) * lt));
+                mat[2][1] = @floatCast(lsMinusLt * lsMinusLt * ls);
+                mat[2][2] = 1;
 
-                mat.e[3][0] = @floatCast(lsMinusLt);
-                mat.e[3][1] = @floatCast(lsMinusLt * lsMinusLt * lsMinusLt);
-                mat.e[3][2] = 1;
+                mat[3][0] = @floatCast(lsMinusLt);
+                mat[3][1] = @floatCast(lsMinusLt * lsMinusLt * lsMinusLt);
+                mat[3][2] = 1;
 
                 //xfit.print_debug("cusp {}", .{flip});
             },
             .quadratic => {
-                mat.e[0][0] = 0;
-                mat.e[0][1] = 0;
-                mat.e[0][2] = 0;
+                mat[0][0] = 0;
+                mat[0][1] = 0;
+                mat[0][2] = 0;
 
-                mat.e[1][0] = -(1.0 / 3.0);
-                mat.e[1][1] = 0;
-                mat.e[1][2] = (1.0 / 3.0);
+                mat[1][0] = -(1.0 / 3.0);
+                mat[1][1] = 0;
+                mat[1][2] = (1.0 / 3.0);
 
-                mat.e[2][0] = -(2.0 / 3.0);
-                mat.e[2][1] = -(1.0 / 3.0);
-                mat.e[2][2] = (2.0 / 3.0);
+                mat[2][0] = -(2.0 / 3.0);
+                mat[2][1] = -(1.0 / 3.0);
+                mat[2][2] = (2.0 / 3.0);
 
-                mat.e[3][0] = -1;
-                mat.e[3][1] = -1;
-                mat.e[3][2] = 1;
+                mat[3][0] = -1;
+                mat[3][1] = -1;
+                mat[3][2] = 1;
 
                 //if (math.cross2(_control0 - _start, _control1 - _control0) < 0) flip = true;
                 //xfit.print_debug("quadratic {}", .{flip});
@@ -657,24 +657,24 @@ pub const line = struct {
         //if (repeat == 1) flip = !flip;
 
         if (flip) {
-            mat.e[0][0] *= -1;
-            mat.e[0][1] *= -1;
-            mat.e[1][0] *= -1;
-            mat.e[1][1] *= -1;
-            mat.e[2][0] *= -1;
-            mat.e[2][1] *= -1;
-            mat.e[3][0] *= -1;
-            mat.e[3][1] *= -1;
+            mat[0][0] *= -1;
+            mat[0][1] *= -1;
+            mat[1][0] *= -1;
+            mat[1][1] *= -1;
+            mat[2][0] *= -1;
+            mat[2][1] *= -1;
+            mat[3][0] *= -1;
+            mat[3][1] *= -1;
         }
         out_vertices[in_out_vertice_len.*].pos = _start;
         out_vertices[in_out_vertice_len.* + 1].pos = _control0;
         out_vertices[in_out_vertice_len.* + 2].pos = _control1;
         out_vertices[in_out_vertice_len.* + 3].pos = _end;
 
-        out_vertices[in_out_vertice_len.*].uvw = .{ mat.e[0][0], mat.e[0][1], mat.e[0][2] };
-        out_vertices[in_out_vertice_len.* + 1].uvw = .{ mat.e[1][0], mat.e[1][1], mat.e[1][2] };
-        out_vertices[in_out_vertice_len.* + 2].uvw = .{ mat.e[2][0], mat.e[2][1], mat.e[2][2] };
-        out_vertices[in_out_vertice_len.* + 3].uvw = .{ mat.e[3][0], mat.e[3][1], mat.e[3][2] };
+        out_vertices[in_out_vertice_len.*].uvw = .{ mat[0][0], mat[0][1], mat[0][2] };
+        out_vertices[in_out_vertice_len.* + 1].uvw = .{ mat[1][0], mat[1][1], mat[1][2] };
+        out_vertices[in_out_vertice_len.* + 2].uvw = .{ mat[2][0], mat[2][1], mat[2][2] };
+        out_vertices[in_out_vertice_len.* + 3].uvw = .{ mat[3][0], mat[3][1], mat[3][2] };
 
         {
             var i: u32 = 0;

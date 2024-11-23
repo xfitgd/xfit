@@ -342,10 +342,10 @@ pub const projection = struct {
     __window_height: std.atomic.Value(f32) = undefined,
 
     pub inline fn refresh_window_width(self: *Self) void {
-        self.*.__window_width.store(2.0 / self.*.proj.e[0][0], .monotonic);
+        self.*.__window_width.store(2.0 / self.*.proj[0][0], .monotonic);
     }
     pub inline fn refresh_window_height(self: *Self) void {
-        self.*.__window_height.store(2.0 / self.*.proj.e[1][1], .monotonic);
+        self.*.__window_height.store(2.0 / self.*.proj[1][1], .monotonic);
     }
     pub inline fn window_width(self: Self) f32 {
         return self.__window_width.load(.monotonic);
@@ -360,7 +360,8 @@ pub const projection = struct {
         const width = @as(f32, @floatFromInt(window.window_width()));
         const height = @as(f32, @floatFromInt(window.window_height()));
         const ratio = if (width / height > _width / _height) _height / height else _width / width;
-        self.*.proj = try matrix.orthographicLhVulkan(
+        self.*.proj = try math.matrix_orthographicLhVulkan(
+            f32,
             width * ratio,
             height * ratio,
             near,
@@ -371,7 +372,8 @@ pub const projection = struct {
     }
     pub fn init_matrix_perspective(self: *Self, fov: f32) matrix_error!void {
         const ratio = @as(f32, @floatFromInt(window.window_width())) / @as(f32, @floatFromInt(window.window_height()));
-        self.*.proj = try matrix.perspectiveFovLhVulkan(
+        self.*.proj = try math.matrix_perspectiveFovLhVulkan(
+            f32,
             fov,
             ratio,
             0.1,
@@ -379,7 +381,8 @@ pub const projection = struct {
         );
     }
     pub fn init_matrix_perspective2(self: *Self, fov: f32, near: f32, far: f32) matrix_error!void {
-        self.*.proj = try matrix.perspectiveFovLhVulkan(
+        self.*.proj = try math.matrix_perspectiveFovLhVulkan(
+            f32,
             fov,
             @as(f32, @floatFromInt(window.window_width())) / @as(f32, @floatFromInt(window.window_height())),
             near,
@@ -413,7 +416,7 @@ pub const camera = struct {
 
     /// w좌표는 신경 x, 시스템 초기화 후 호출
     pub fn init(eyepos: vector, focuspos: vector, updir: vector) Self {
-        var res = Self{ .view = matrix.lookAtLh(eyepos, focuspos, updir) };
+        var res = Self{ .view = math.matrix_lookAtLh(f32, eyepos, focuspos, updir) };
         res.__check_alloc.init(__system.allocator);
         return res;
     }
@@ -445,7 +448,7 @@ pub const color_transform = struct {
 
     /// w좌표는 신경 x, 시스템 초기화 후 호출
     pub fn init() Self {
-        const res = Self{ .color_mat = matrix.identity() };
+        const res = Self{ .color_mat = math.matrix_identity(f32) };
         return res;
     }
     pub inline fn deinit(self: *Self) void {
@@ -473,7 +476,7 @@ pub const transform = struct {
 
     parent_type: iobject_type,
 
-    model: matrix = matrix.identity(),
+    model: matrix = math.matrix_identity(f32),
     ///이 값 자체가 변경되면 iobject.update_uniforms 필요
     camera: *camera = undefined,
     ///이 값 자체가 변경되면 iobject.update_uniforms 필요
@@ -489,8 +492,8 @@ pub const transform = struct {
     // inline fn get_mat_set_wh(self: *Self, _type: type) matrix {
     //     const e: *_type = @fieldParentPtr("transform", self);
     //     var mat = self.*.model;
-    //     mat.e[0][0] *= @floatFromInt(e.*.src.*.width);
-    //     mat.e[1][1] *= @floatFromInt(e.*.src.*.height);
+    //     mat[0][0] *= @floatFromInt(e.*.src.*.width);
+    //     mat[1][1] *= @floatFromInt(e.*.src.*.height);
     //     return mat;
     // }
     pub inline fn __build(self: *Self) void {

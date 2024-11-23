@@ -39,6 +39,8 @@ test {
     std.testing.refAllDecls(gltf);
     std.testing.refAllDecls(yaml);
     std.testing.refAllDecls(xml);
+    std.testing.refAllDecls(math);
+    std.testing.refAllDecls(geometry);
 }
 
 //system engine only headers

@@ -9,6 +9,7 @@ pub const gltf_error = error{
 const Scanner = std.json.Scanner;
 const Token = std.json.Token;
 const ArrayList = std.ArrayList;
+const math = @import("math.zig");
 
 fn node_bits_true(bits: anytype) bool {
     const node_bits = bits;
@@ -40,10 +41,10 @@ pub fn gltf_(comptime float_T: type) type {
         };
 
         const NODE = struct {
-            rotation: ?@Vector(4, float_T) = null,
-            translation: ?@Vector(3, float_T) = null,
-            scale: ?@Vector(3, float_T) = null,
-            matrix: ?[4]@Vector(4, float_T) = null,
+            rotation: ?math.vector_(float_T) = null,
+            translation: ?math.point3d_(float_T) = null,
+            scale: ?math.point3d_(float_T) = null,
+            matrix: ?math.matrix_(float_T) = null,
             name: []u8,
             mesh: ?u32 = null,
             children: ?[]u32 = null,
