@@ -15,3 +15,4 @@
 !zip_x86_64.exe
 !zip_aarch64.exe
 .cursorrules
+*.log
