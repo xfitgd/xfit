@@ -16,27 +16,27 @@ pub const icomponent = struct {
         if (!math.compare(self.com.center_pt, .{ 0, 0 })) {
             if (!math.compare(self.com.scale, .{ 1, 1 })) {
                 if (self.com.rotation != 0) {
-                    return matrix.translationXY(self.com.center_pt * mul).multiply(&matrix.scalingXY(self.com.scale).multiply(&matrix.rotation2D(self.com.rotation)));
+                    return math.matrix_multiply(math.matrix_translationXY(f32, self.com.center_pt * mul), math.matrix_multiply(math.matrix_scalingXY(f32, self.com.scale), math.matrix_rotation2D(f32, self.com.rotation)));
                 } else {
-                    return matrix.translationXY(self.com.center_pt * mul).multiply(&matrix.scalingXY(self.com.scale));
+                    return math.matrix_multiply(math.matrix_translationXY(f32, self.com.center_pt * mul), math.matrix_scalingXY(f32, self.com.scale));
                 }
             } else {
                 if (self.com.rotation != 0) {
-                    return matrix.translationXY(self.com.center_pt * mul).multiply(&matrix.rotation2D(self.com.rotation));
+                    return math.matrix_multiply(math.matrix_translationXY(f32, self.com.center_pt * mul), math.matrix_rotation2D(f32, self.com.rotation));
                 } else {
-                    return matrix.translationXY(self.com.center_pt * mul);
+                    return math.matrix_translationXY(f32, self.com.center_pt * mul);
                 }
             }
         } else {
             if (!math.compare(self.com.scale, .{ 1, 1 })) {
                 if (self.com.rotation != 0) {
-                    return matrix.scalingXY(self.com.scale).multiply(&matrix.rotation2D(self.com.rotation));
+                    return math.matrix_multiply(math.matrix_scalingXY(f32, self.com.scale), math.matrix_rotation2D(f32, self.com.rotation));
                 } else {
-                    return matrix.scalingXY(self.com.scale);
+                    return math.matrix_scalingXY(f32, self.com.scale);
                 }
             } else {
                 if (self.com.rotation != 0) {
-                    return matrix.rotationZ(self.com.rotation);
+                    return math.matrix_rotationZ(f32, self.com.rotation);
                 } else {
                     return null;
                 }
@@ -53,18 +53,18 @@ pub const icomponent = struct {
                 switch (self.com.y_align) {
                     .top => {
                         const base = self.base_mat(point{ 1, -1 });
-                        const model = matrix.translationXY(.{ -proj.*.window_width() / 2 + self.com.pos[0], proj.*.window_height() / 2 - self.com.pos[1] });
-                        transform.*.model = if (base != null) base.?.multiply(&model) else model;
+                        const model = math.matrix_translationXY(f32, .{ -proj.*.window_width() / 2 + self.com.pos[0], proj.*.window_height() / 2 - self.com.pos[1] });
+                        transform.*.model = if (base != null) math.matrix_multiply(base.?, model) else model;
                     },
                     .middle => {
                         const base = self.base_mat(point{ 1, 1 });
-                        const model = matrix.translationXY(.{ -proj.*.window_width() / 2 + self.com.pos[0], self.com.pos[1] });
-                        transform.*.model = if (base != null) base.?.multiply(&model) else model;
+                        const model = math.matrix_translationXY(f32, .{ -proj.*.window_width() / 2 + self.com.pos[0], self.com.pos[1] });
+                        transform.*.model = if (base != null) math.matrix_multiply(base.?, model) else model;
                     },
                     .bottom => {
                         const base = self.base_mat(point{ 1, 1 });
-                        const model = matrix.translationXY(.{ -proj.*.window_width() / 2 + self.com.pos[0], -proj.*.window_height() / 2 + self.com.pos[1] });
-                        transform.*.model = if (base != null) base.?.multiply(&model) else model;
+                        const model = math.matrix_translationXY(f32, .{ -proj.*.window_width() / 2 + self.com.pos[0], -proj.*.window_height() / 2 + self.com.pos[1] });
+                        transform.*.model = if (base != null) math.matrix_multiply(base.?, model) else model;
                     },
                 }
             },
@@ -72,18 +72,18 @@ pub const icomponent = struct {
                 switch (self.com.y_align) {
                     .top => {
                         const base = self.base_mat(point{ 1, -1 });
-                        const model = matrix.translationXY(.{ self.com.pos[0], proj.*.window_height() / 2 - self.com.pos[1] });
-                        transform.*.model = if (base != null) base.?.multiply(&model) else model;
+                        const model = math.matrix_translationXY(f32, .{ self.com.pos[0], proj.*.window_height() / 2 - self.com.pos[1] });
+                        transform.*.model = if (base != null) math.matrix_multiply(base.?, model) else model;
                     },
                     .middle => {
                         const base = self.base_mat(point{ 1, 1 });
-                        const model = matrix.translationXY(.{ self.com.pos[0], self.com.pos[1] });
-                        transform.*.model = if (base != null) base.?.multiply(&model) else model;
+                        const model = math.matrix_translationXY(f32, .{ self.com.pos[0], self.com.pos[1] });
+                        transform.*.model = if (base != null) math.matrix_multiply(base.?, model) else model;
                     },
                     .bottom => {
                         const base = self.base_mat(point{ 1, 1 });
-                        const model = matrix.translationXY(.{ self.com.pos[0], -proj.*.window_height() / 2 + self.com.pos[1] });
-                        transform.*.model = if (base != null) base.?.multiply(&model) else model;
+                        const model = math.matrix_translationXY(f32, .{ self.com.pos[0], -proj.*.window_height() / 2 + self.com.pos[1] });
+                        transform.*.model = if (base != null) math.matrix_multiply(base.?, model) else model;
                     },
                 }
             },
@@ -91,18 +91,18 @@ pub const icomponent = struct {
                 switch (self.com.y_align) {
                     .top => {
                         const base = self.base_mat(point{ -1, -1 });
-                        const model = matrix.translationXY(.{ proj.*.window_width() / 2 - self.com.pos[0], proj.*.window_height() / 2 - self.com.pos[1] });
-                        transform.*.model = if (base != null) base.?.multiply(&model) else model;
+                        const model = math.matrix_translationXY(f32, .{ proj.*.window_width() / 2 - self.com.pos[0], proj.*.window_height() / 2 - self.com.pos[1] });
+                        transform.*.model = if (base != null) math.matrix_multiply(base.?, model) else model;
                     },
                     .middle => {
                         const base = self.base_mat(point{ -1, 1 });
-                        const model = matrix.translationXY(.{ proj.*.window_width() / 2 - self.com.pos[0], self.com.pos[1] });
-                        transform.*.model = if (base != null) base.?.multiply(&model) else model;
+                        const model = math.matrix_translationXY(f32, .{ proj.*.window_width() / 2 - self.com.pos[0], self.com.pos[1] });
+                        transform.*.model = if (base != null) math.matrix_multiply(base.?, model) else model;
                     },
                     .bottom => {
                         const base = self.base_mat(point{ -1, 1 });
-                        const model = matrix.translationXY(.{ proj.*.window_width() / 2 - self.com.pos[0], -proj.*.window_height() / 2 + self.com.pos[1] });
-                        transform.*.model = if (base != null) base.?.multiply(&model) else model;
+                        const model = math.matrix_translationXY(f32, .{ proj.*.window_width() / 2 - self.com.pos[0], -proj.*.window_height() / 2 + self.com.pos[1] });
+                        transform.*.model = if (base != null) math.matrix_multiply(base.?, model) else model;
                     },
                 }
             },
