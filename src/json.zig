@@ -177,19 +177,27 @@ fn parse_node_check(scanner: *Scanner, allocator: std.mem.Allocator, node: anyty
     return true;
 }
 
-fn parse_node(scanner: *Scanner, allocator: std.mem.Allocator, string: []const u8, comptime field_name: ?[:0]const u8, out_bits: anytype, node: anytype) !bool {
+fn parse_node(scanner: *Scanner, allocator: std.mem.Allocator, string: []const u8, comptime field_name: [:0]const u8, out_bits: anytype, node: anytype) !bool {
     const typeinfo = @typeInfo(@TypeOf(node.*));
-    if (typeinfo != .@"struct") {
-        if (!out_bits.* and std.mem.eql(u8, field_name.?[0..field_name.?.len], string)) {
+    if (typeinfo == .pointer and @typeInfo(typeinfo.pointer.child) == .@"struct") {
+        if (typeinfo.pointer.size != .Slice) @compileError("Unsupported pointer size");
+        if (!out_bits.* and std.mem.eql(u8, field_name[0..field_name.len], string)) {
+            out_bits.* = true;
+            node.* = try parse_array(typeinfo.pointer.child, allocator, scanner); //여기서 값을 설정함.
+            return true;
+        }
+        return false;
+    } else if (typeinfo != .@"struct") {
+        if (!out_bits.* and std.mem.eql(u8, field_name[0..field_name.len], string)) {
             out_bits.* = true;
         } else {
             return false; //이미 설정됬거나 이름이 안맞으면 나감.
         }
-    } else if (typeinfo == .pointer and @typeInfo(typeinfo.pointer.child) == .@"struct") {
-        if (typeinfo.pointer.size != .Slice) @compileError("Unsupported pointer size");
-        if (!out_bits.* and std.mem.eql(u8, field_name.?[0..field_name.?.len], string)) {
+    } else {
+        if (!out_bits.* and std.mem.eql(u8, field_name[0..field_name.len], string)) {
             out_bits.* = true;
-            node.* = try parse_array(typeinfo.pointer.child, allocator, scanner); //여기서 값을 설정함.
+            node.* = try parse_object(@TypeOf(node.*), allocator, scanner); //여기서 값을 설정함.
+            return true;
         }
         return false;
     }
@@ -198,20 +206,6 @@ fn parse_node(scanner: *Scanner, allocator: std.mem.Allocator, string: []const u
         .optional => |info| {
             node.* = undefined;
             return try parse_node_check(scanner, allocator, &node.*.?, @typeInfo(info.child));
-        },
-        .@"struct" => |info| {
-            inline for (info.fields) |in_field| {
-                @setEvalBranchQuota(10_000);
-                if (try parse_node(
-                    scanner,
-                    allocator,
-                    string,
-                    in_field.name,
-                    &@field(out_bits.*, in_field.name),
-                    &@field(node.*, in_field.name),
-                )) return true;
-            }
-            return false;
         },
         else => {
             return try parse_node_check(scanner, allocator, node, typeinfo);
@@ -231,14 +225,16 @@ pub fn parse_object(NODE_T: type, allocator: std.mem.Allocator, scanner: *Scanne
         const token2 = try scanner.next();
         switch (token2) {
             .string => |string| {
-                _ = try parse_node(
-                    scanner,
-                    allocator,
-                    string,
-                    null,
-                    &node_bits,
-                    &node,
-                );
+                inline for (std.meta.fields(NODE_T)) |field| {
+                    _ = try parse_node(
+                        scanner,
+                        allocator,
+                        string,
+                        field.name,
+                        &@field(node_bits, field.name),
+                        &@field(node, field.name),
+                    );
+                }
             },
             .object_end => {
                 const declList = std.meta.declList(NODE_T, fn (anytype) bool);
@@ -254,9 +250,9 @@ pub fn parse_object(NODE_T: type, allocator: std.mem.Allocator, scanner: *Scanne
 
 pub fn parse_array(NODE_T: type, allocator: std.mem.Allocator, scanner: *Scanner) ![]NODE_T {
     const node_bits_T = meta.create_bit_field(NODE_T);
-    var node_bits: node_bits_T = .{};
 
     if (try scanner.next() != .array_begin) return generic_parse_json_error.invalid_json_object;
+    //std.debug.print("token: begin\n", .{});
 
     var array = ArrayList(NODE_T).init(allocator);
     while (true) {
@@ -265,27 +261,32 @@ pub fn parse_array(NODE_T: type, allocator: std.mem.Allocator, scanner: *Scanner
             .object_begin => {
                 try array.append(meta.init_default_value_and_undefined(NODE_T));
                 const last = &array.items[array.items.len - 1];
+                var node_bits: node_bits_T = .{};
 
                 while (true) {
                     const token2 = try scanner.next();
+                    //std.debug.print("token: {}\n", .{token2});
                     switch (token2) {
                         .string => |string| {
-                            _ = try parse_node(
-                                scanner,
-                                allocator,
-                                string,
-                                null,
-                                &node_bits,
-                                last,
-                            );
+                            inline for (std.meta.fields(NODE_T)) |field| {
+                                _ = try parse_node(
+                                    scanner,
+                                    allocator,
+                                    string,
+                                    field.name,
+                                    &@field(node_bits, field.name),
+                                    &@field(last.*, field.name),
+                                );
+                            }
                         },
                         .object_end => {
                             const declList = std.meta.declList(NODE_T, fn (anytype) bool);
                             if (declList.len > 0 and !declList[0].*(node_bits)) return generic_parse_json_error.invalid_json_object;
-                            node_bits = .{};
                             break;
                         },
-                        else => return generic_parse_json_error.invalid_json_object,
+                        else => {
+                            return generic_parse_json_error.invalid_json_object;
+                        },
                     }
                 }
             },

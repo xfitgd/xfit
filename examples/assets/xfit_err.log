@@ -1,0 +1,5 @@
+Sun, 24 Nov 2024 20:38:25 UTC @ ERR font0.init load_error
+Sun, 24 Nov 2024 20:49:19 UTC @ ERR font0.init load_error
+/home/seongjun/projects/xfit/src/font.zig:60:9: 0x11a9880 in init (XfitTest)
+        return font_error.load_error;
+        ^

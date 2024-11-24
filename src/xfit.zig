@@ -145,8 +145,8 @@ pub inline fn herr3(funcion_name: []const u8, err: anyerror) void {
     print_error("ERR {s} {s}\n", .{ funcion_name, @errorName(err) });
     unreachable;
 }
-
-pub fn print_error(comptime fmt: []const u8, args: anytype) void {
+//?print_error 와 이 함수를 호출하는 herr..함수들은 반드시 inline 으로 선언해야 함
+pub inline fn print_error(comptime fmt: []const u8, args: anytype) void {
     @branchHint(.cold);
     const now_str = datetime.Datetime.now().formatHttp(std.heap.c_allocator) catch return;
     defer std.heap.c_allocator.free(now_str);
@@ -160,7 +160,13 @@ pub fn print_error(comptime fmt: []const u8, args: anytype) void {
 
         var str2 = std.ArrayList(u8).init(std.heap.c_allocator);
         defer str2.deinit();
-        std.debug.writeCurrentStackTrace(str2.writer(), debug_info, .no_color, @returnAddress()) catch return;
+        const error_trace: ?*std.builtin.StackTrace = @errorReturnTrace(); //? 얘 때문에 inline 으로 선언해야 함
+        if (error_trace != null) {
+            std.debug.writeStackTrace(error_trace.?.*, str2.writer(), debug_info, .no_color) catch {};
+        } else {
+            std.debug.writeCurrentStackTrace(str2.writer(), debug_info, .no_color, @returnAddress()) catch {};
+        }
+
         std.debug.print("{s}\n{s}", .{ str, str2.items });
 
         system.a_fn_call(__system.error_handling_func, .{ str, str2.items }) catch {};
@@ -180,7 +186,12 @@ pub fn print_error(comptime fmt: []const u8, args: anytype) void {
         var str2 = std.ArrayList(u8).init(std.heap.c_allocator);
         defer str2.deinit();
 
-        std.debug.writeCurrentStackTrace(str2.writer(), debug_info, .no_color, @returnAddress()) catch return;
+        const error_trace: ?*std.builtin.StackTrace = @errorReturnTrace();
+        if (error_trace != null) {
+            std.debug.writeStackTrace(error_trace.?.*, str2.writer(), debug_info, .no_color) catch {};
+        } else {
+            std.debug.writeCurrentStackTrace(str2.writer(), debug_info, .no_color, @returnAddress()) catch {};
+        }
         str2.append(0) catch return;
         _ = __android.android.__android_log_write(__android.android.ANDROID_LOG_ERROR, "xfit", str2.items.ptr);
 

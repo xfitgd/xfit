@@ -16,21 +16,16 @@ pub fn gltf_(comptime float_T: type) type {
     return struct {
         const Self = @This();
 
-        const OBJECTS_BITS = struct {
-            none: bool = false,
-            asset: bool = false,
-            scene: bool = false,
-            scenes: bool = false,
-            nodes: bool = false,
-            meshes: bool = false,
-            materials: bool = false,
-            textures: bool = false,
-            images: bool = false,
-            buffer_views: bool = false,
-            buffers: bool = false,
-            accessors: bool = false,
-            animations: bool = false,
-            skins: bool = false,
+        const DATA = struct {
+            asset: ASSET,
+            scene: u32,
+            scenes: []SCENES,
+            nodes: []NODE,
+            meshes: []MESHS,
+            accessors: []ACCESSORS,
+            buffer_views: []BUFFERVIEWS,
+            buffers: []BUFFERS,
+            //pub const bit_check: fn (anytype) bool = json.all_bits_true;
         };
 
         pub const NODE = struct {
@@ -83,28 +78,40 @@ pub fn gltf_(comptime float_T: type) type {
                 return (bits.componentType and bits.type and bits.count and bits.bufferView and bits.byteOffset);
             }
         };
+        pub const MESHS = struct {
+            name: []const u8,
+            primitives: []PRIMITIVES,
+            pub const bit_check: fn (anytype) bool = json.all_bits_true;
+        };
+        pub const PRIMITIVES = struct {
+            material: u32,
+            mode: u32,
+            attributes: ATTRIBUTES,
+            indices: u32,
+            pub const bit_check: fn (anytype) bool = json.all_bits_true;
+        };
+        pub const ATTRIBUTES = struct {
+            NORMAL: u32,
+            POSITION: u32,
+            TEXCOORD_0: u32,
+            pub const bit_check: fn (anytype) bool = json.all_bits_true;
+        };
 
-        arena_allocator: std.heap.ArenaAllocator = undefined,
+        arena_allocator: ?std.heap.ArenaAllocator = null,
         error_diagnostics: std.json.Diagnostics = undefined,
         __cursor_pointer: usize = 0,
-        scenes: []SCENES = undefined,
-        nodes: []NODE = undefined,
-        scene: u32 = undefined,
-        asset: ASSET = undefined,
-        buffers: []BUFFERS = undefined,
-        buffer_views: []BUFFERVIEWS = undefined,
-        accessors: []ACCESSORS = undefined,
+        data: DATA = undefined,
 
         pub fn parse(self: *Self, allocator: std.mem.Allocator, data: []const u8) !void {
-            if (self.*.__cursor_pointer != 0) deinit(self);
+            if (self.*.arena_allocator != null) deinit(self);
             self.*.arena_allocator = std.heap.ArenaAllocator.init(allocator);
             var scanner = std.json.Scanner.initCompleteInput(allocator, data);
             self.*.error_diagnostics = .{};
             scanner.enableDiagnostics(&self.*.error_diagnostics);
 
             errdefer {
-                self.*.arena_allocator.deinit();
-                self.*.__cursor_pointer = 0;
+                self.*.arena_allocator.?.deinit();
+                self.*.arena_allocator = null;
             }
 
             defer {
@@ -113,46 +120,13 @@ pub fn gltf_(comptime float_T: type) type {
                 scanner.deinit();
             }
 
-            var objsB: OBJECTS_BITS = .{};
-
-            while (true) {
-                const token = try scanner.next();
-                switch (token) {
-                    .string => {
-                        if (!objsB.asset and std.mem.eql(u8, token.string, "asset")) {
-                            objsB.asset = true;
-                            self.*.asset = try json.parse_object(ASSET, self.*.arena_allocator.allocator(), &scanner);
-                        } else if (!objsB.scene and std.mem.eql(u8, token.string, "scene")) {
-                            objsB.scene = true;
-                            self.*.scene = try json.get_int(u32, &scanner);
-                        } else if (!objsB.scenes and std.mem.eql(u8, token.string, "scenes")) {
-                            objsB.scenes = true;
-                            self.*.scenes = try json.parse_array(SCENES, self.*.arena_allocator.allocator(), &scanner);
-                        } else if (!objsB.nodes and std.mem.eql(u8, token.string, "nodes")) {
-                            objsB.nodes = true;
-                            self.*.nodes = try json.parse_array(NODE, self.*.arena_allocator.allocator(), &scanner);
-                        } else if (!objsB.buffers and std.mem.eql(u8, token.string, "buffers")) {
-                            objsB.buffers = true;
-                            self.*.buffers = try json.parse_array(BUFFERS, self.*.arena_allocator.allocator(), &scanner);
-                        } else if (!objsB.buffer_views and std.mem.eql(u8, token.string, "bufferViews")) {
-                            objsB.buffer_views = true;
-                            self.*.buffer_views = try json.parse_array(BUFFERVIEWS, self.*.arena_allocator.allocator(), &scanner);
-                        } else if (!objsB.accessors and std.mem.eql(u8, token.string, "accessors")) {
-                            objsB.accessors = true;
-                            self.*.accessors = try json.parse_array(ACCESSORS, self.*.arena_allocator.allocator(), &scanner);
-                        }
-                    },
-                    .end_of_document => break,
-                    .object_begin => {},
-                    .object_end => {},
-                    else => {},
-                }
-            }
+            self.*.data = try json.parse_object(DATA, self.*.arena_allocator.?.allocator(), &scanner);
         }
 
         pub fn deinit(self: *Self) void {
-            if (self.*.__cursor_pointer == 0) return;
-            self.*.arena_allocator.deinit();
+            if (self.*.arena_allocator == null) return;
+            self.*.arena_allocator.?.deinit();
+            self.*.arena_allocator = null;
         }
     };
 }
@@ -177,6 +151,23 @@ test "gltf_parse_test" {
         \\                0
         \\            ]
         \\        }
+        \\    ],
+        \\   "meshes": [
+        \\        {
+        \\            "name": "Building2",
+        \\            "primitives": [
+        \\                {
+        \\                    "material": 0,
+        \\                    "mode": 4,
+        \\                    "attributes": {
+        \\                        "NORMAL": 2,
+        \\                        "POSITION": 1,
+        \\                        "TEXCOORD_0": 3
+        \\                    },
+        \\                    "indices": 0
+        \\                }
+        \\            ]
+        \\        } 
         \\    ],
         \\    "nodes": [
         \\        {
@@ -206,19 +197,31 @@ test "gltf_parse_test" {
         \\}
     ;
 
-    try self.parse(std.testing.allocator, test_gltf);
+    self.parse(std.testing.allocator, test_gltf) catch |e| {
+        std.debug.print("line: {}\n", .{self.error_diagnostics.getLine()});
+        std.debug.print("column: {}\n", .{self.error_diagnostics.getColumn()});
+        return e;
+    };
     defer self.deinit();
 
-    try std.testing.expectEqualSlices(u8, "test", self.asset.generator);
-    try std.testing.expectEqualSlices(u8, "2.0", self.asset.version);
+    try std.testing.expectEqualSlices(u8, "test", self.data.asset.generator);
+    try std.testing.expectEqualSlices(u8, "2.0", self.data.asset.version);
 
-    try std.testing.expectEqualSlices(u8, "Root Scene", self.scenes[0].name);
-    try std.testing.expectEqualSlices(u32, &[_]u32{0}, self.scenes[0].nodes);
+    try std.testing.expectEqualSlices(u8, "Root Scene", self.data.scenes[0].name);
+    try std.testing.expectEqualSlices(u32, &[_]u32{0}, self.data.scenes[0].nodes);
 
-    try std.testing.expectEqualSlices(u8, "RootNode", self.nodes[0].name);
-    try std.testing.expectEqualSlices(u32, &[_]u32{1}, self.nodes[0].children.?);
-    try std.testing.expectEqual(@Vector(3, f32){ 0.0, 0.0, 0.0 }, self.nodes[0].translation.?);
-    try std.testing.expectEqual(@Vector(4, f32){ 0.0, 0.0, 0.0, 1.0 }, self.nodes[0].rotation.?);
-    try std.testing.expectEqual(@Vector(3, f32){ 1.0, 1.0, 1.0 }, self.nodes[0].scale.?);
-    try std.testing.expectEqual(@as(u32, 0), self.nodes[0].mesh.?);
+    try std.testing.expectEqualSlices(u8, "RootNode", self.data.nodes[0].name);
+    try std.testing.expectEqualSlices(u32, &[_]u32{1}, self.data.nodes[0].children.?);
+    try std.testing.expectEqual(@Vector(3, f32){ 0.0, 0.0, 0.0 }, self.data.nodes[0].translation.?);
+    try std.testing.expectEqual(@Vector(4, f32){ 0.0, 0.0, 0.0, 1.0 }, self.data.nodes[0].rotation.?);
+    try std.testing.expectEqual(@Vector(3, f32){ 1.0, 1.0, 1.0 }, self.data.nodes[0].scale.?);
+    try std.testing.expectEqual(@as(u32, 0), self.data.nodes[0].mesh.?);
+
+    try std.testing.expectEqualSlices(u8, "Building2", self.data.meshes[0].name);
+    try std.testing.expectEqual(@as(u32, 0), self.data.meshes[0].primitives[0].material);
+    try std.testing.expectEqual(@as(u32, 4), self.data.meshes[0].primitives[0].mode);
+    try std.testing.expectEqual(@as(u32, 2), self.data.meshes[0].primitives[0].attributes.NORMAL);
+    try std.testing.expectEqual(@as(u32, 1), self.data.meshes[0].primitives[0].attributes.POSITION);
+    try std.testing.expectEqual(@as(u32, 3), self.data.meshes[0].primitives[0].attributes.TEXCOORD_0);
+    try std.testing.expectEqual(@as(u32, 0), self.data.meshes[0].primitives[0].indices);
 }
