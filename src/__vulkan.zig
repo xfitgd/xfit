@@ -2168,8 +2168,7 @@ pub fn drawFrame() void {
         var cmdidx: usize = 1;
 
         for (graphics.render_cmd.?) |*cmd| {
-            if (@atomicLoad(bool, &cmd.*.*.__refesh[state.frame], .monotonic)) {
-                @atomicStore(bool, &cmd.*.*.__refesh[state.frame], false, .monotonic);
+            if (@cmpxchgStrong(bool, &cmd.*.*.__refesh[state.frame], true, false, .monotonic, .monotonic) == null) {
                 recordCommandBuffer(cmd, @intCast(state.frame));
             }
             if (cmd.*.*.scene != null and cmd.*.*.scene.?.len > 0) {
