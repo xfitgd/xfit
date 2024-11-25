@@ -1,5 +1,4 @@
 const std = @import("std");
-const builtin = @import("builtin");
 
 const system = @import("system.zig");
 const window = @import("window.zig");

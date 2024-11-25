@@ -9,7 +9,7 @@
 const std = @import("std");
 const meta = @import("meta.zig");
 
-pub const generic_parse_json_error = error{
+pub const json_error = error{
     invalid_json_object,
 };
 
@@ -20,20 +20,20 @@ const ArrayList = std.ArrayList;
 pub inline fn get_string(allocator: std.mem.Allocator, scanner: *Scanner) ![]u8 {
     const next_token = try scanner.next();
     if (next_token != .string) {
-        return generic_parse_json_error.invalid_json_object;
+        return json_error.invalid_json_object;
     }
     return try allocator.dupe(u8, next_token.string);
 }
 pub fn get_int(comptime T: type, scanner: *Scanner) !T {
     const next_token = try scanner.next();
-    if (next_token != .number) return generic_parse_json_error.invalid_json_object;
+    if (next_token != .number) return json_error.invalid_json_object;
 
     if (@typeInfo(T).int.signedness == .signed) return try std.fmt.parseInt(T, next_token.number, 10);
     return try std.fmt.parseUnsigned(T, next_token.number, 10);
 }
 pub fn get_float(comptime T: type, scanner: *Scanner) !T {
     const next_token = try scanner.next();
-    if (next_token != .number) return generic_parse_json_error.invalid_json_object;
+    if (next_token != .number) return json_error.invalid_json_object;
     return try std.fmt.parseFloat(T, next_token.number);
 }
 
@@ -45,7 +45,7 @@ fn parse_node_check(scanner: *Scanner, allocator: std.mem.Allocator, node: anyty
                     switch (info.child) {
                         u8 => node.* = @constCast(try get_string(allocator, scanner)),
                         inline usize, u32, i32, f32, f64 => |t| {
-                            if (try scanner.next() != .array_begin) return generic_parse_json_error.invalid_json_object;
+                            if (try scanner.next() != .array_begin) return json_error.invalid_json_object;
                             var arrayT = ArrayList(t).init(allocator);
                             while (true) {
                                 const token3 = try scanner.next();
@@ -60,7 +60,7 @@ fn parse_node_check(scanner: *Scanner, allocator: std.mem.Allocator, node: anyty
                                         }
                                     },
                                     .array_end => break,
-                                    else => return generic_parse_json_error.invalid_json_object,
+                                    else => return json_error.invalid_json_object,
                                 }
                             }
                             node.* = arrayT.items;
@@ -76,7 +76,7 @@ fn parse_node_check(scanner: *Scanner, allocator: std.mem.Allocator, node: anyty
                 const info2 = @typeInfo(info.child).vector;
                 switch (info2.child) {
                     inline usize, u32, i32, f32, f64 => |t| {
-                        if (try scanner.next() != .array_begin) return generic_parse_json_error.invalid_json_object;
+                        if (try scanner.next() != .array_begin) return json_error.invalid_json_object;
 
                         comptime var i = 0;
                         inline while (i < info.len) : (i += 1) {
@@ -94,18 +94,18 @@ fn parse_node_check(scanner: *Scanner, allocator: std.mem.Allocator, node: anyty
                                             else => @compileError("Unsupported type"),
                                         }
                                     },
-                                    else => return generic_parse_json_error.invalid_json_object,
+                                    else => return json_error.invalid_json_object,
                                 }
                             }
                         }
-                        if (try scanner.next() != .array_end) return generic_parse_json_error.invalid_json_object;
+                        if (try scanner.next() != .array_end) return json_error.invalid_json_object;
                     },
                     else => @compileError("Unsupported pointer child type"),
                 }
             } else {
                 switch (info.child) {
                     inline usize, u32, i32, f32, f64 => |t| {
-                        if (try scanner.next() != .array_begin) return generic_parse_json_error.invalid_json_object;
+                        if (try scanner.next() != .array_begin) return json_error.invalid_json_object;
                         comptime var i = 0;
                         inline while (i < info.len) : (i += 1) {
                             const token3 = try scanner.next();
@@ -119,10 +119,10 @@ fn parse_node_check(scanner: *Scanner, allocator: std.mem.Allocator, node: anyty
                                         else => @compileError("Unsupported type"),
                                     }
                                 },
-                                else => return generic_parse_json_error.invalid_json_object,
+                                else => return json_error.invalid_json_object,
                             }
                         }
-                        if (try scanner.next() != .array_end) return generic_parse_json_error.invalid_json_object;
+                        if (try scanner.next() != .array_end) return json_error.invalid_json_object;
                     },
                     else => @compileError("Unsupported array child type"),
                 }
@@ -130,7 +130,7 @@ fn parse_node_check(scanner: *Scanner, allocator: std.mem.Allocator, node: anyty
         },
         .int => |info| {
             const next_token = try scanner.next();
-            if (next_token != .number) return generic_parse_json_error.invalid_json_object;
+            if (next_token != .number) return json_error.invalid_json_object;
             const IntT = std.meta.Int(info.signedness, info.bits);
             node.* = if (info.signedness == .signed)
                 try std.fmt.parseInt(IntT, next_token.number, 10)
@@ -139,14 +139,14 @@ fn parse_node_check(scanner: *Scanner, allocator: std.mem.Allocator, node: anyty
         },
         .float => |info| {
             const next_token = try scanner.next();
-            if (next_token != .number) return generic_parse_json_error.invalid_json_object;
+            if (next_token != .number) return json_error.invalid_json_object;
             const FloatT = std.meta.Float(info.bits);
             node.* = try std.fmt.parseFloat(FloatT, next_token.number);
         },
         .vector => |info| {
             switch (info.child) {
                 inline usize, u32, i32, f32, f64 => |t| {
-                    if (try scanner.next() != .array_begin) return generic_parse_json_error.invalid_json_object;
+                    if (try scanner.next() != .array_begin) return json_error.invalid_json_object;
 
                     comptime var i = 0;
                     inline while (i < info.len) : (i += 1) {
@@ -161,10 +161,10 @@ fn parse_node_check(scanner: *Scanner, allocator: std.mem.Allocator, node: anyty
                                     else => @compileError("Unsupported type"),
                                 }
                             },
-                            else => return generic_parse_json_error.invalid_json_object,
+                            else => return json_error.invalid_json_object,
                         }
                     }
-                    if (try scanner.next() != .array_end) return generic_parse_json_error.invalid_json_object;
+                    if (try scanner.next() != .array_end) return json_error.invalid_json_object;
                 },
                 else => @compileError("Unsupported pointer child type"),
             }
@@ -217,7 +217,7 @@ pub fn parse_object(NODE_T: type, allocator: std.mem.Allocator, scanner: *Scanne
     const node_bits_T = meta.create_bit_field(NODE_T);
     var node_bits: node_bits_T = .{};
 
-    if (try scanner.next() != .object_begin) return generic_parse_json_error.invalid_json_object;
+    if (try scanner.next() != .object_begin) return json_error.invalid_json_object;
 
     var node: NODE_T = meta.init_default_value_and_undefined(NODE_T);
 
@@ -238,11 +238,11 @@ pub fn parse_object(NODE_T: type, allocator: std.mem.Allocator, scanner: *Scanne
             },
             .object_end => {
                 const declList = std.meta.declList(NODE_T, fn (anytype) bool);
-                if (declList.len > 0 and !declList[0].*(node_bits)) return generic_parse_json_error.invalid_json_object;
+                if (declList.len > 0 and !declList[0].*(node_bits)) return json_error.invalid_json_object;
                 node_bits = .{};
                 break;
             },
-            else => return generic_parse_json_error.invalid_json_object,
+            else => return json_error.invalid_json_object,
         }
     }
     return node; // node is not deallocated when leaving the function
@@ -251,7 +251,7 @@ pub fn parse_object(NODE_T: type, allocator: std.mem.Allocator, scanner: *Scanne
 pub fn parse_array(NODE_T: type, allocator: std.mem.Allocator, scanner: *Scanner) ![]NODE_T {
     const node_bits_T = meta.create_bit_field(NODE_T);
 
-    if (try scanner.next() != .array_begin) return generic_parse_json_error.invalid_json_object;
+    if (try scanner.next() != .array_begin) return json_error.invalid_json_object;
     //std.debug.print("token: begin\n", .{});
 
     var array = ArrayList(NODE_T).init(allocator);
@@ -281,11 +281,11 @@ pub fn parse_array(NODE_T: type, allocator: std.mem.Allocator, scanner: *Scanner
                         },
                         .object_end => {
                             const declList = std.meta.declList(NODE_T, fn (anytype) bool);
-                            if (declList.len > 0 and !declList[0].*(node_bits)) return generic_parse_json_error.invalid_json_object;
+                            if (declList.len > 0 and !declList[0].*(node_bits)) return json_error.invalid_json_object;
                             break;
                         },
                         else => {
-                            return generic_parse_json_error.invalid_json_object;
+                            return json_error.invalid_json_object;
                         },
                     }
                 }

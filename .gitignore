@@ -11,6 +11,7 @@
 /examples/com
 /examples/lib
 /examples/.zig-cache
+/xfit-docs
 
 !zip_x86_64.exe
 !zip_aarch64.exe

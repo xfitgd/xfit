@@ -31,10 +31,13 @@ pub fn build(b: *std.Build) void {
     yaml = b.dependency("zig-yaml", .{});
     xml = b.dependency("xml", .{});
 
+    const target = b.standardTargetOptions(.{});
+    const optimize = b.standardOptimizeOption(.{});
+
     unit_tests = b.addTest(.{
         .root_source_file = b.path("src/xfit.zig"),
-        .target = b.standardTargetOptions(.{}),
-        .optimize = b.standardOptimizeOption(.{}),
+        .target = target,
+        .optimize = optimize,
     });
     unit_tests.root_module.addImport("yaml", yaml.module("yaml"));
     unit_tests.root_module.addImport("xml", xml.module("xml"));
@@ -47,6 +50,25 @@ pub fn build(b: *std.Build) void {
 
     const test_step = b.step("test", "Run unit tests");
     test_step.dependOn(&run_unit_tests.step);
+    b.default_step.dependOn(&run_unit_tests.step);
+
+    const xfit_docs = b.addStaticLibrary(.{
+        .name = "xfit",
+        .root_source_file = b.path("src/xfit.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+
+    //? 빌드 시 문서 생성 zig build to emit docs
+    const install_docs = b.addInstallDirectory(.{
+        .source_dir = xfit_docs.getEmittedDocs(),
+        .install_dir = .prefix,
+        .install_subdir = "xfit-docs",
+    });
+
+    const docs_step = b.step("docs", "Generate docs");
+    docs_step.dependOn(&install_docs.step);
+    b.default_step.dependOn(&install_docs.step);
 }
 
 pub const run_option = struct {
