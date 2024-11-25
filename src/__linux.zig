@@ -606,12 +606,12 @@ pub fn linux_loop() void {
                 }
                 system.a_fn_call(__system.mouse_move_func, .{mm}) catch {};
             },
-            c.MapNotify => {
-                xfit.print_log("MapNotify\n", .{});
-            },
-            c.UnmapNotify => {
-                xfit.print_log("UnmapNotify\n", .{});
-            },
+            // c.MapNotify => {
+            //     xfit.print_log("MapNotify\n", .{});
+            // },
+            // c.UnmapNotify => {
+            //     xfit.print_log("UnmapNotify\n", .{});
+            // },
             else => {},
         }
     }
