@@ -25402,8 +25402,8 @@ pub fn BaseWrapper(comptime apis: []const ApiInfo) type {
                 if (loader(Instance.null_handle, name)) |cmd_ptr| {
                     @field(self.dispatch, field.name) = @ptrCast(cmd_ptr);
                 } else {
-                    //std.log.err("Command loading failed for \"{s}\".", .{field.name});
-                    //return error.CommandLoadFailure; //! 오류 처리 안하고 그냥 넘어간다. -> 애플리케이션 내에서 호출 가능 여부 판단
+                    std.log.err("Command loading failed for \"{s}\".", .{field.name});
+                    return error.CommandLoadFailure;
                 }
             }
             return self;
@@ -25961,8 +25961,8 @@ pub fn InstanceWrapper(comptime apis: []const ApiInfo) type {
                 if (loader(instance, name)) |cmd_ptr| {
                     @field(self.dispatch, field.name) = @ptrCast(cmd_ptr);
                 } else {
-                    //std.log.err("Command loading failed for \"{s}\".", .{field.name});
-                    //return error.CommandLoadFailure; //! 오류 처리 안하고 그냥 넘어간다. -> 애플리케이션 내에서 호출 가능 여부 판단
+                    std.log.err("Command loading failed for \"{s}\".", .{field.name});
+                    return error.CommandLoadFailure;
                 }
             }
             return self;
@@ -30441,8 +30441,8 @@ pub fn DeviceWrapper(comptime apis: []const ApiInfo) type {
                 if (loader(device, name)) |cmd_ptr| {
                     @field(self.dispatch, field.name) = @ptrCast(cmd_ptr);
                 } else {
-                    // std.log.err("Command loading failed for \"{s}\".", .{field.name});
-                    // return error.CommandLoadFailure; //! 오류 처리 안하고 그냥 넘어간다. -> 애플리케이션 내에서 호출 가능 여부 판단
+                    std.log.err("Command loading failed for \"{s}\".", .{field.name});
+                    return error.CommandLoadFailure;
                 }
             }
             return self;

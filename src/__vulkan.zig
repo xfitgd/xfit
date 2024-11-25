@@ -854,7 +854,7 @@ pub fn vulkan_start() void {
         vkGetInstanceProcAddr = @alignCast(@ptrCast(std.c.dlsym(vulkanF, "vkGetInstanceProcAddr") orelse xfit.herrm("vulkan load vkGetInstanceProcAddr")));
     }
 
-    vkb = BaseDispatch.load(vkGetInstanceProcAddr) catch unreachable;
+    vkb = BaseDispatch.loadNoFail(vkGetInstanceProcAddr);
 
     var appInfo: vk.ApplicationInfo = .{
         .p_application_name = __system.title.ptr,
@@ -963,7 +963,7 @@ pub fn vulkan_start() void {
         vkInstance = vkb.createInstance(&createInfo, null) catch |e|
             xfit.herr3("__vulkan.vulkan_startCreateInstance", e);
 
-        instance_wrap = InstanceDispatch.load(vkInstance, vkGetInstanceProcAddr) catch unreachable;
+        instance_wrap = InstanceDispatch.loadNoFail(vkInstance, vkGetInstanceProcAddr);
         vki = Instance.init(vkInstance, &instance_wrap);
     }
 
@@ -1093,7 +1093,7 @@ pub fn vulkan_start() void {
         };
 
         vkDevice = vki.?.createDevice(vk_physical_device, &deviceCreateInfo, null) catch |e| xfit.herr3("__vulkan_start createDevice", e);
-        device_wrap = DeviceDispatch.load(vkDevice, instance_wrap.dispatch.vkGetDeviceProcAddr) catch unreachable;
+        device_wrap = DeviceDispatch.loadNoFail(vkDevice, instance_wrap.dispatch.vkGetDeviceProcAddr);
         vkd = Device.init(vkDevice, &device_wrap);
     }
 
