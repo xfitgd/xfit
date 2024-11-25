@@ -8,7 +8,7 @@
 
 ### 구현 내용 - coming soon
 
-### 레퍼런스 - 
+### 레퍼런스 - Reference
 > xfit 프로젝트를 빌드하면 오프라인 문서 파일이 생성됩니다.(또는 zig build docs) 각 함수, 속성들 설명(주석)은 천천히 추가하겠습니다.
 
 ## using libraries
