@@ -33,7 +33,7 @@ pub const gui = @import("gui.zig");
 pub const yaml = @import("yaml");
 pub const xml = @import("xml");
 pub const json = @import("json.zig");
-pub const gltf = @import("gltf.zig");
+pub const gltf = @import("gltf");
 
 test {
     std.testing.refAllDecls(gltf);

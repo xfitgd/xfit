@@ -24,12 +24,14 @@ inline fn get_arch_text(arch: std.Target.Cpu.Arch) []const u8 {
 
 var yaml: *std.Build.Dependency = undefined;
 var xml: *std.Build.Dependency = undefined;
+var gltf: *std.Build.Dependency = undefined;
 var unit_tests: *std.Build.Step.Compile = undefined;
 
 ///? const src_path = b.dependency("xfit_build", .{}).*.path(".").getPath(b);
 pub fn build(b: *std.Build) void {
     yaml = b.dependency("zig-yaml", .{});
     xml = b.dependency("xml", .{});
+    gltf = b.dependency("zgltf", .{});
 
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
@@ -41,6 +43,7 @@ pub fn build(b: *std.Build) void {
     });
     unit_tests.root_module.addImport("yaml", yaml.module("yaml"));
     unit_tests.root_module.addImport("xml", xml.module("xml"));
+    unit_tests.root_module.addImport("gltf", gltf.module("zgltf"));
 
     unit_tests.addIncludePath(b.path("src/include"));
     unit_tests.addIncludePath(b.path("src/include/freetype"));
