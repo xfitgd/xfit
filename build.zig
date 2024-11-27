@@ -28,7 +28,7 @@ var gltf: *std.Build.Dependency = undefined;
 var unit_tests: *std.Build.Step.Compile = undefined;
 
 ///? const src_path = b.dependency("xfit_build", .{}).*.path(".").getPath(b);
-pub fn build(b: *std.Build) void {
+pub fn build(b: *std.Build) !void {
     yaml = b.dependency("zig-yaml", .{});
     xml = b.dependency("xml", .{});
     gltf = b.dependency("zgltf", .{});
@@ -88,26 +88,27 @@ pub const run_option = struct {
 pub fn run(
     b: *std.Build,
     option: run_option,
-) void {
+) !void {
     var arena_allocator = std.heap.ArenaAllocator.init(b.allocator);
     defer arena_allocator.deinit();
 
     const src_path = b.dependency("xfit_build", .{}).*.path(".").getPath(b);
-    const engine_path = std.fmt.allocPrint(arena_allocator.allocator(), "{s}/src", .{src_path}) catch unreachable;
+    const engine_path = try std.fmt.allocPrint(arena_allocator.allocator(), "{s}/src", .{src_path});
+
     if (builtin.os.tag == .windows) {
-        const path: []u8 = std.fmt.allocPrint(arena_allocator.allocator(), "{s}/shader_compile.bat", .{engine_path}) catch unreachable;
-        const realpath: []u8 = std.fs.cwd().realpathAlloc(arena_allocator.allocator(), path) catch unreachable;
+        const path: []u8 = try std.fmt.allocPrint(arena_allocator.allocator(), "{s}/shader_compile.bat", .{engine_path});
+
+        const realpath: []u8 = try std.fs.cwd().realpathAlloc(arena_allocator.allocator(), path);
 
         var pro = std.process.Child.init(&[_][]const u8{ realpath, engine_path }, arena_allocator.allocator());
-        _ = pro.spawnAndWait() catch unreachable;
+        _ = try pro.spawnAndWait();
     } else {
-        const path: []u8 = std.fmt.allocPrint(arena_allocator.allocator(), "{s}/shader_compile.sh", .{engine_path}) catch unreachable;
-        defer arena_allocator.allocator().free(path);
-        const realpath: []u8 = std.fs.cwd().realpathAlloc(arena_allocator.allocator(), path) catch unreachable;
-        defer arena_allocator.allocator().free(realpath);
+        const path: []u8 = try std.fmt.allocPrint(arena_allocator.allocator(), "{s}/shader_compile.sh", .{engine_path});
+
+        const realpath: []u8 = try std.fs.cwd().realpathAlloc(arena_allocator.allocator(), path);
 
         var pro = std.process.Child.init(&[_][]const u8{ realpath, engine_path }, arena_allocator.allocator());
-        _ = pro.spawnAndWait() catch unreachable;
+        _ = try pro.spawnAndWait();
     }
 
     const build_options = b.addOptions();
@@ -184,7 +185,7 @@ pub fn run(
 
         const build_options_module = build_options.createModule();
 
-        const xfit = b.addModule("xfit", .{ .root_source_file = get_lazypath(b, std.fmt.allocPrint(arena_allocator.allocator(), "{s}/xfit.zig", .{engine_path}) catch unreachable) });
+        const xfit = b.addModule("xfit", .{ .root_source_file = get_lazypath(b, try std.fmt.allocPrint(arena_allocator.allocator(), "{s}/xfit.zig", .{engine_path})) });
         xfit.addImport("build_options", build_options_module);
 
         if (option.PLATFORM == XfitPlatform.android) {
@@ -201,35 +202,23 @@ pub fn run(
             var contents = std.ArrayList(u8).init(arena_allocator.allocator());
             var writer = contents.writer();
             const plat = if (builtin.os.tag == .windows) "windows" else if (builtin.os.tag == .linux) "linux" else if (builtin.os.tag == .macos) "darwin" else @compileError("not support android host platform.");
-            writer.print("include_dir={s}\n", .{std.fmt.allocPrint(
-                arena_allocator.allocator(),
-                "{s}/toolchains/llvm/prebuilt/{s}-x86_64/sysroot/usr/include",
-                .{ user_setting.ANDROID_NDK_PATH, plat },
-            ) catch unreachable}) catch unreachable;
-            writer.print("sys_include_dir={s}\n", .{std.fmt.allocPrint(
-                arena_allocator.allocator(),
-                "{s}/toolchains/llvm/prebuilt/{s}-x86_64/sysroot/usr/include/{s}-linux-android",
-                .{ user_setting.ANDROID_NDK_PATH, plat, get_arch_text(targets[i].cpu_arch.?) },
-            ) catch unreachable}) catch unreachable;
-            writer.print("crt_dir={s}\n", .{std.fmt.allocPrint(
-                arena_allocator.allocator(),
-                "{s}/toolchains/llvm/prebuilt/{s}-x86_64/sysroot/usr/lib/{s}-linux-android/{d}",
-                .{ user_setting.ANDROID_NDK_PATH, plat, get_arch_text(targets[i].cpu_arch.?), user_setting.ANDROID_VER },
-            ) catch unreachable}) catch unreachable;
-            writer.writeAll("msvc_lib_dir=\n") catch unreachable;
-            writer.writeAll("kernel32_lib_dir=\n") catch unreachable;
-            writer.writeAll("gcc_dir=\n") catch unreachable;
+            try writer.print("include_dir={s}/toolchains/llvm/prebuilt/{s}-x86_64/sysroot/usr/include\n", .{ user_setting.ANDROID_NDK_PATH, plat });
+            try writer.print("sys_include_dir={s}/toolchains/llvm/prebuilt/{s}-x86_64/sysroot/usr/include/{s}-linux-android\n", .{ user_setting.ANDROID_NDK_PATH, plat, get_arch_text(targets[i].cpu_arch.?) });
+            try writer.print("crt_dir={s}/toolchains/llvm/prebuilt/{s}-x86_64/sysroot/usr/lib/{s}-linux-android/{d}\n", .{ user_setting.ANDROID_NDK_PATH, plat, get_arch_text(targets[i].cpu_arch.?), user_setting.ANDROID_VER });
+            try writer.writeAll("msvc_lib_dir=\n");
+            try writer.writeAll("kernel32_lib_dir=\n");
+            try writer.writeAll("gcc_dir=\n");
             const android_libc_step = b.addWriteFile("android-libc.conf", contents.items);
-            result.setLibCFile(android_libc_step.getDirectory().join(arena_allocator.allocator(), "android-libc.conf") catch unreachable);
+            result.setLibCFile(try android_libc_step.getDirectory().join(arena_allocator.allocator(), "android-libc.conf"));
             install_step.dependOn(&android_libc_step.step);
 
-            result.addLibraryPath(.{ .cwd_relative = std.fmt.allocPrint(
+            result.addLibraryPath(.{ .cwd_relative = try std.fmt.allocPrint(
                 arena_allocator.allocator(),
                 "{s}/toolchains/llvm/prebuilt/{s}-x86_64/sysroot/usr/lib/{s}-linux-android/{d}",
                 .{ user_setting.ANDROID_NDK_PATH, plat, get_arch_text(targets[i].cpu_arch.?), user_setting.ANDROID_VER },
-            ) catch unreachable });
+            ) });
 
-            // result.addLibraryPath(get_lazypath(b, std.fmt.allocPrint(arena_allocator.allocator(), "{s}/lib/android/{s}", .{ engine_path, get_arch_text(targets[i].cpu_arch.?) }) catch unreachable));
+            // result.addLibraryPath(try get_lazypath(b, std.fmt.allocPrint(arena_allocator.allocator(), "{s}/lib/android/{s}", .{ engine_path, get_arch_text(targets[i].cpu_arch.?) })));
 
             result.linkSystemLibrary("android");
             //result.linkSystemLibrary("vulkan");
@@ -239,7 +228,7 @@ pub fn run(
             result.linkSystemLibrary("log");
 
             for (lib_names) |n| {
-                result.addObjectFile(get_lazypath(b, std.fmt.allocPrint(arena_allocator.allocator(), "{s}/lib/android/{s}/{s}", .{ engine_path, get_arch_text(targets[i].cpu_arch.?), n }) catch unreachable));
+                result.addObjectFile(get_lazypath(b, try std.fmt.allocPrint(arena_allocator.allocator(), "{s}/lib/android/{s}/{s}", .{ engine_path, get_arch_text(targets[i].cpu_arch.?), n })));
             }
 
             if (option.callback != null) option.callback.?(b, result, target);
@@ -287,15 +276,15 @@ pub fn run(
             // result.linkSystemLibrary("Gdi32");
 
             for (lib_names) |n| {
-                result.addObjectFile(get_lazypath(b, std.fmt.allocPrint(arena_allocator.allocator(), "{s}/lib/windows/{s}/{s}", .{ engine_path, get_arch_text(target.result.cpu.arch), n }) catch unreachable));
+                result.addObjectFile(get_lazypath(b, try std.fmt.allocPrint(arena_allocator.allocator(), "{s}/lib/windows/{s}/{s}", .{ engine_path, get_arch_text(target.result.cpu.arch), n })));
             }
             if (target.result.cpu.arch == .aarch64) {
                 for (windows_aarch64_extra_lib_names) |n| {
-                    result.addObjectFile(get_lazypath(b, std.fmt.allocPrint(arena_allocator.allocator(), "{s}/lib/windows/{s}/{s}", .{ engine_path, get_arch_text(target.result.cpu.arch), n }) catch unreachable));
+                    result.addObjectFile(get_lazypath(b, try std.fmt.allocPrint(arena_allocator.allocator(), "{s}/lib/windows/{s}/{s}", .{ engine_path, get_arch_text(target.result.cpu.arch), n })));
                 }
             } else {
                 for (windows_extra_lib_names) |n| {
-                    result.addObjectFile(get_lazypath(b, std.fmt.allocPrint(arena_allocator.allocator(), "{s}/lib/windows/{s}/{s}", .{ engine_path, get_arch_text(target.result.cpu.arch), n }) catch unreachable));
+                    result.addObjectFile(get_lazypath(b, try std.fmt.allocPrint(arena_allocator.allocator(), "{s}/lib/windows/{s}/{s}", .{ engine_path, get_arch_text(target.result.cpu.arch), n })));
                 }
             }
 
@@ -340,10 +329,10 @@ pub fn run(
             }
 
             for (linux_lib_names) |n| {
-                result.addObjectFile(get_lazypath(b, std.fmt.allocPrint(arena_allocator.allocator(), "{s}/lib/linux/{s}/{s}", .{ engine_path, get_arch_text(target.result.cpu.arch), n }) catch unreachable));
+                result.addObjectFile(get_lazypath(b, try std.fmt.allocPrint(arena_allocator.allocator(), "{s}/lib/linux/{s}/{s}", .{ engine_path, get_arch_text(target.result.cpu.arch), n })));
             }
-            result.addCSourceFile(.{ .file = get_lazypath(b, std.fmt.allocPrint(arena_allocator.allocator(), "{s}/lib/linux/conio.c", .{engine_path}) catch unreachable) });
-            // result.addCSourceFile(.{ .file = get_lazypath(b, std.fmt.allocPrint(arena_allocator.allocator(), "{s}/lib/linux/xdg-shell-protocol.c", .{engine_path}) catch unreachable) });
+            result.addCSourceFile(.{ .file = get_lazypath(b, try std.fmt.allocPrint(arena_allocator.allocator(), "{s}/lib/linux/conio.c", .{engine_path})) });
+            // result.addCSourceFile(.{ .file = get_lazypath(b, try std.fmt.allocPrint(arena_allocator.allocator(), "{s}/lib/linux/xdg-shell-protocol.c", .{engine_path})) });
 
             if (option.callback != null) option.callback.?(b, result, target);
 
@@ -359,13 +348,13 @@ pub fn run(
         xfit.addImport("yaml", yaml.module("yaml"));
         xfit.addImport("xml", xml.module("xml"));
 
-        xfit.addIncludePath(get_lazypath(b, std.fmt.allocPrint(arena_allocator.allocator(), "{s}/include", .{engine_path}) catch unreachable));
-        xfit.addIncludePath(get_lazypath(b, std.fmt.allocPrint(arena_allocator.allocator(), "{s}/include/freetype", .{engine_path}) catch unreachable));
-        xfit.addIncludePath(get_lazypath(b, std.fmt.allocPrint(arena_allocator.allocator(), "{s}/include/opus", .{engine_path}) catch unreachable));
+        xfit.addIncludePath(get_lazypath(b, try std.fmt.allocPrint(arena_allocator.allocator(), "{s}/include", .{engine_path})));
+        xfit.addIncludePath(get_lazypath(b, try std.fmt.allocPrint(arena_allocator.allocator(), "{s}/include/freetype", .{engine_path})));
+        xfit.addIncludePath(get_lazypath(b, try std.fmt.allocPrint(arena_allocator.allocator(), "{s}/include/opus", .{engine_path})));
 
-        result.addIncludePath(get_lazypath(b, std.fmt.allocPrint(arena_allocator.allocator(), "{s}/include", .{engine_path}) catch unreachable));
-        result.addIncludePath(get_lazypath(b, std.fmt.allocPrint(arena_allocator.allocator(), "{s}/include/freetype", .{engine_path}) catch unreachable));
-        result.addIncludePath(get_lazypath(b, std.fmt.allocPrint(arena_allocator.allocator(), "{s}/include/opus", .{engine_path}) catch unreachable));
+        result.addIncludePath(get_lazypath(b, try std.fmt.allocPrint(arena_allocator.allocator(), "{s}/include", .{engine_path})));
+        result.addIncludePath(get_lazypath(b, try std.fmt.allocPrint(arena_allocator.allocator(), "{s}/include/freetype", .{engine_path})));
+        result.addIncludePath(get_lazypath(b, try std.fmt.allocPrint(arena_allocator.allocator(), "{s}/include/opus", .{engine_path})));
 
         if (option.PLATFORM != XfitPlatform.android) break;
     }
@@ -373,15 +362,15 @@ pub fn run(
     var cmd: *std.Build.Step.Run = undefined;
     if (builtin.os.tag == .windows) {
         if (option.PLATFORM == XfitPlatform.android) {
-            cmd = b.addSystemCommand(&.{ std.fmt.allocPrint(arena_allocator.allocator(), "{s}/compile.bat", .{engine_path}) catch unreachable, engine_path, b.install_path, "android", user_setting.ANDROID_PATH, std.fmt.comptimePrint("{d}", .{user_setting.ANDROID_VER}), user_setting.ANDROID_BUILD_TOOL_VER, option.ANDROID_KEYSTORE.?, b.build_root.path.?, get_arch_text(builtin.cpu.arch) });
+            cmd = b.addSystemCommand(&.{ try std.fmt.allocPrint(arena_allocator.allocator(), "{s}/compile.bat", .{engine_path}), engine_path, b.install_path, "android", user_setting.ANDROID_PATH, std.fmt.comptimePrint("{d}", .{user_setting.ANDROID_VER}), user_setting.ANDROID_BUILD_TOOL_VER, option.ANDROID_KEYSTORE.?, b.build_root.path.?, get_arch_text(builtin.cpu.arch) });
         } else {
-            cmd = b.addSystemCommand(&.{std.fmt.allocPrint(arena_allocator.allocator(), "{s}/compile.bat", .{engine_path}) catch unreachable});
+            cmd = b.addSystemCommand(&.{try std.fmt.allocPrint(arena_allocator.allocator(), "{s}/compile.bat", .{engine_path})});
         }
     } else {
         if (option.PLATFORM == XfitPlatform.android) {
-            cmd = b.addSystemCommand(&.{ std.fmt.allocPrint(arena_allocator.allocator(), "{s}/compile.sh", .{engine_path}) catch unreachable, engine_path, b.install_path, "android", user_setting.ANDROID_PATH, std.fmt.comptimePrint("{d}", .{user_setting.ANDROID_VER}), user_setting.ANDROID_BUILD_TOOL_VER, option.ANDROID_KEYSTORE.?, b.build_root.path.?, get_arch_text(builtin.cpu.arch) });
+            cmd = b.addSystemCommand(&.{ try std.fmt.allocPrint(arena_allocator.allocator(), "{s}/compile.sh", .{engine_path}), engine_path, b.install_path, "android", user_setting.ANDROID_PATH, std.fmt.comptimePrint("{d}", .{user_setting.ANDROID_VER}), user_setting.ANDROID_BUILD_TOOL_VER, option.ANDROID_KEYSTORE.?, b.build_root.path.?, get_arch_text(builtin.cpu.arch) });
         } else {
-            cmd = b.addSystemCommand(&.{std.fmt.allocPrint(arena_allocator.allocator(), "{s}/compile.sh", .{engine_path}) catch unreachable});
+            cmd = b.addSystemCommand(&.{try std.fmt.allocPrint(arena_allocator.allocator(), "{s}/compile.sh", .{engine_path})});
         }
     }
     cmd.step.dependOn(install_step);

@@ -15,6 +15,38 @@ fn _init_default_value_and_undefined(in_field: anytype) void {
     }
 }
 
+pub inline fn parse_value(comptime T: type, _str: []const u8) !T {
+    switch (@typeInfo(T)) {
+        .int => |info| {
+            if (info.signedness == .signed) {
+                return try std.fmt.parseInt(T, _str, 10);
+            } else {
+                return try std.fmt.parseUnsigned(T, _str, 10);
+            }
+        },
+        .float => {
+            return try std.fmt.parseFloat(T, _str);
+        },
+        .bool => {
+            const i = std.fmt.parseUnsigned(u32, _str, 10) catch {
+                if (std.mem.eql(u8, _str, "true")) {
+                    return true;
+                } else {
+                    return false;
+                }
+            };
+            return i != 0;
+        },
+        .pointer => |info| {
+            if (info.size == .Slice and info.child == u8) {
+                return _str;
+            }
+            @compileError("Unsupported pointer type");
+        },
+        else => @compileError("Unsupported type"),
+    }
+}
+
 pub fn init_default_value_and_undefined(T: type) T {
     if (@typeInfo(T) != .@"struct") {
         return undefined;

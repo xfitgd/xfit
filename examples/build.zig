@@ -32,7 +32,7 @@ fn callback(b: *std.Build, result: *std.Build.Step.Compile, target: std.Build.Re
     _ = target;
 }
 
-pub fn build(b: *std.Build) void {
+pub fn build(b: *std.Build) !void {
     const platform = b.option(xfit_build.XfitPlatform, "platform", "build platform") orelse PLATFORM;
     b.release_mode = .fast;
 
@@ -45,5 +45,5 @@ pub fn build(b: *std.Build) void {
         .is_console = EXAMPLE == .CONSOLE,
         .ANDROID_KEYSTORE = "debug.keystore",
     };
-    xfit_build.run(b, option);
+    try xfit_build.run(b, option);
 }

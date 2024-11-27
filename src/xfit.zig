@@ -34,6 +34,7 @@ pub const yaml = @import("yaml");
 pub const xml = @import("xml");
 pub const json = @import("json.zig");
 pub const gltf = @import("gltf");
+pub const svg = @import("svg.zig");
 
 test {
     std.testing.refAllDecls(gltf);
@@ -41,6 +42,7 @@ test {
     std.testing.refAllDecls(xml);
     std.testing.refAllDecls(math);
     std.testing.refAllDecls(geometry);
+    //std.testing.refAllDecls(svg);
 }
 
 //system engine only headers
