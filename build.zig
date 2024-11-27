@@ -75,14 +75,18 @@ pub fn build(b: *std.Build) !void {
 }
 
 pub const run_option = struct {
-    name: []const u8, //manefest의 android.app.lib_name 와 같게
+    ///manefest의 android.app.lib_name 와 같게
+    name: []const u8,
     root_source_file: std.Build.LazyPath,
     PLATFORM: XfitPlatform,
     OPTIMIZE: std.builtin.OptimizeMode,
     callback: ?*const fn (*std.Build, *std.Build.Step.Compile, std.Build.ResolvedTarget) void = null,
-    is_console: bool = false, //ignores for target mobile
+    ///ignores for target mobile
+    is_console: bool = false,
     ANDROID_KEYSTORE: ?[]const u8 = null,
     enable_log: bool = true,
+    ///omit frame pointer always true when debug
+    enable_trace: bool = true,
 };
 
 pub fn run(
@@ -198,6 +202,7 @@ pub fn run(
                 .root_source_file = option.root_source_file,
                 .optimize = option.OPTIMIZE,
                 .pic = true,
+                .omit_frame_pointer = if (option.enable_trace) true else null,
             });
             var contents = std.ArrayList(u8).init(arena_allocator.allocator());
             var writer = contents.writer();
@@ -263,6 +268,7 @@ pub fn run(
                 .root_source_file = option.root_source_file,
                 .optimize = option.OPTIMIZE,
                 .pic = true,
+                .omit_frame_pointer = if (option.enable_trace) true else null,
             });
             result.linkLibC();
 
@@ -318,6 +324,7 @@ pub fn run(
                 .root_source_file = option.root_source_file,
                 .optimize = option.OPTIMIZE,
                 .pic = true,
+                .omit_frame_pointer = if (option.enable_trace) true else null,
             });
 
             result.linkLibC();

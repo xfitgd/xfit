@@ -41,9 +41,9 @@ pub inline fn seekFromEnd(self: *Self, idx: i64) !void {
     try self.hFile.seekFromEnd(idx);
 }
 pub inline fn writeCurrentStackTrace(self: *Self) void {
-    const debug_info = std.debug.getSelfDebugInfo() catch unreachable; //재귀 호출 위험이 있어서 따로 에러 처리 안함.
+    const debug_info = std.debug.getSelfDebugInfo() catch @trap(); //재귀 호출 위험이 있어서 따로 에러 처리 안함.
 
-    std.debug.writeCurrentStackTrace(self.*.writer(), debug_info, std.io.tty.detectConfig(self.*.hFile), @returnAddress()) catch unreachable;
+    std.debug.writeCurrentStackTrace(self.*.writer(), debug_info, std.io.tty.detectConfig(self.*.hFile), @returnAddress()) catch @trap();
 }
 pub inline fn getPos(self: *Self) !u64 {
     return try self.hFile.getPos();

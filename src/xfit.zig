@@ -123,31 +123,32 @@ pub fn xfit_main(_allocator: std.mem.Allocator, _init_setting: *const init_setti
 pub inline fn herrm2(errtest: bool, msg: []const u8) void {
     if (!errtest) {
         print_error("ERR {s}\n", .{msg});
-        unreachable;
+        @trap(); // ! release mode 에서는 unreachable이 제대로 작동하지 않는다.
     }
 }
 pub inline fn herrm(msg: []const u8) void {
     print_error("ERR {s}\n", .{msg});
-    unreachable;
+    @trap(); // ! release mode 에서는 unreachable이 제대로 작동하지 않는다.
 }
 
 pub inline fn herr2(comptime fmt: []const u8, args: anytype) void {
     print_error("ERR " ++ fmt ++ "\n", args);
-    unreachable;
+    @trap(); // ! release mode 에서는 unreachable이 제대로 작동하지 않는다.
 }
 
 pub inline fn herr(errtest: bool, comptime fmt: []const u8, args: anytype) void {
     if (!errtest) {
         print_error("ERR " ++ fmt ++ "\n", args);
-        unreachable;
+        @trap(); // ! release mode 에서는 unreachable이 제대로 작동하지 않는다.
     }
 }
 
 pub inline fn herr3(funcion_name: []const u8, err: anyerror) void {
     print_error("ERR {s} {s}\n", .{ funcion_name, @errorName(err) });
-    unreachable;
+    @trap(); // ! release mode 에서는 unreachable이 제대로 작동하지 않는다.
 }
-//?print_error 와 이 함수를 호출하는 herr..함수들은 반드시 inline 으로 선언해야 함
+
+///!print_error 와 이 함수를 호출하는 herr..함수들은 반드시 inline 으로 선언해야 함
 pub inline fn print_error(comptime fmt: []const u8, args: anytype) void {
     @branchHint(.cold);
     const now_str = datetime.Datetime.now().formatHttp(std.heap.c_allocator) catch return;
@@ -162,7 +163,7 @@ pub inline fn print_error(comptime fmt: []const u8, args: anytype) void {
 
         var str2 = std.ArrayList(u8).init(std.heap.c_allocator);
         defer str2.deinit();
-        const error_trace: ?*std.builtin.StackTrace = @errorReturnTrace(); //? 얘 때문에 inline 으로 선언해야 함
+        const error_trace: ?*std.builtin.StackTrace = @errorReturnTrace(); // ! 얘 때문에 inline 으로 선언해야 함
         if (error_trace != null) {
             std.debug.writeStackTrace(error_trace.?.*, str2.writer(), debug_info, .no_color) catch {};
         } else {
