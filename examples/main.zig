@@ -108,8 +108,6 @@ pub fn xfit_init() !void {
         try luaT.lua_pcall(0, 0, 0);
     }
 
-    xfit.set_error_handling_func(error_func);
-
     objects = ArrayList(*graphics.iobject).init(allocator);
     vertices_mem_pool = MemoryPoolExtra(graphics.dummy_vertices, .{}).init(allocator);
     objects_mem_pool = MemoryPoolExtra(graphics.iobject, .{}).init(allocator);
@@ -432,5 +430,7 @@ pub fn main() !void {
     };
     gpa = std.heap.GeneralPurposeAllocator(.{}).init;
     allocator = gpa.allocator(); //must init in main
+
+    xfit.set_error_handling_func(error_func);
     xfit.xfit_main(allocator, &init_setting);
 }
