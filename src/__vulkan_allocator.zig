@@ -85,7 +85,7 @@ pub fn init_block_len() void {
         })) {
             supported_cache_local = true;
             xfit.write_log("XFIT SYSLOG : vulkan supported_cache_local\n");
-            if (main_heap_idx != __vulkan.mem_prop.memory_types[i].heap_index) { //SPECIAL_BLOCK 메모리 메인메모리가 아니라면(테스트 필요)
+            if (main_heap_idx != __vulkan.mem_prop.memory_types[i].heap_index) { //if SPECIAL_BLOCK is not main memory (need test)
                 SPECIAL_BLOCK_LEN /= @min(16, @max(1, (__vulkan.mem_prop.memory_heaps[main_heap_idx].size / __vulkan.mem_prop.memory_heaps[__vulkan.mem_prop.memory_types[i].heap_index].size)));
             }
         } else if (__vulkan.mem_prop.memory_types[i].property_flags.contains(.{
@@ -95,7 +95,7 @@ pub fn init_block_len() void {
         })) {
             supported_noncache_local = true;
             xfit.write_log("XFIT SYSLOG : vulkan supported_noncache_local\n");
-            if (main_heap_idx != __vulkan.mem_prop.memory_types[i].heap_index) { //SPECIAL_BLOCK 메모리 메인메모리가 아니라면(테스트 필요)
+            if (main_heap_idx != __vulkan.mem_prop.memory_types[i].heap_index) { //if SPECIAL_BLOCK is not main memory (need test)
                 SPECIAL_BLOCK_LEN /= @min(16, @max(1, (__vulkan.mem_prop.memory_heaps[main_heap_idx].size / __vulkan.mem_prop.memory_heaps[__vulkan.mem_prop.memory_types[i].heap_index].size)));
             }
         }
@@ -142,7 +142,7 @@ pub fn init() void {
 
     arena_allocator = std.heap.ArenaAllocator.init(__system.allocator);
 
-    // ! vk.VK_COMMAND_POOL_CREATE_TRANSIENT_BIT 쓰면 안드로이드 에서 팅김
+    // ! use vk.VK_COMMAND_POOL_CREATE_TRANSIENT_BIT, android will crash(?)
     const poolInfo: vk.CommandPoolCreateInfo = .{
         .flags = .{},
         .queue_family_index = __vulkan.graphicsFamilyIndex,
@@ -170,7 +170,7 @@ pub fn deinit() void {
     g_thread.join();
 
     for (buffer_ids.items) |value| {
-        value.*.deinit2(); // ! 따로 vulkan_res.deinit를 호출하지 않는다.
+        value.*.deinit2(); // ! don't call vulkan_res.deinit separately
     }
     buffers.deinit();
     buffer_ids.deinit();
@@ -316,7 +316,7 @@ const operation_node = union(enum) {
     __update_descriptor_sets: struct {
         sets: []descriptor_set,
     },
-    ///사용자가 꼭 호출 할 필요 없게
+    ///user doesn't need to call
     __register_descriptor_pool: struct {
         __size: []descriptor_pool_size,
     },
@@ -350,7 +350,7 @@ pub const res_union = union(enum) {
 
 pub const descriptor_set = struct {
     layout: vk.DescriptorSetLayout,
-    ///내부에서 생성됨 update_descriptor_sets 호출시
+    ///created inside update_descriptor_sets call
     __set: vk.DescriptorSet = .null_handle,
     size: []const descriptor_pool_size,
     bindings: []const c_uint,
@@ -449,7 +449,7 @@ fn execute_create_buffer(buf: *vulkan_res_node(.buffer), _data: ?[]const u8) voi
                 },
             });
         } else {
-            //위에서 __create_buffer 호출되면서 staging 버퍼가 추가되고 map_copy명령이 추가된다.
+            //above __create_buffer call, staging buffer is added and map_copy command is added.
             append_op_save(.{
                 .copy_buffer = .{
                     .src = last,
@@ -635,7 +635,7 @@ fn execute_create_texture(buf: *vulkan_res_node(.texture), _data: ?[]const u8) v
                 },
             });
         } else {
-            //위에서 __create_buffer 호출되면서 staging 버퍼가 추가되고 map_copy명령이 추가된다.
+            //above __create_buffer call, staging buffer is added and map_copy command is added.
             append_op_save(.{
                 .copy_buffer_to_image = .{
                     .src = last,
@@ -702,7 +702,7 @@ fn execute_update_descriptor_sets(sets: []descriptor_set) void {
 
         var buf_cnt: usize = 0;
         var img_cnt: usize = 0;
-        //v.res 배열이 v.size 구성에 맞아야 한다.
+        //v.res array must match v.size configuration.
         for (v.__res) |r| {
             if (r == .buf) {
                 buf_cnt += 1;
@@ -821,7 +821,7 @@ fn thread_func() void {
                 const tags = slice.items(.tags);
                 const data = slice.items(.data);
                 switch (tags[i]) {
-                    //create.. 과정에서 map_copy 명령이 추가될 수 있음
+                    //create.. execution, map_copy command can be added.
                     .create_buffer => execute_create_buffer(data[i].create_buffer.buf, data[i].create_buffer.data),
                     .create_texture => execute_create_texture(data[i].create_texture.buf, data[i].create_texture.data),
                     .__register_descriptor_pool => execute_register_descriptor_pool(data[i].__register_descriptor_pool.__size),
@@ -829,7 +829,7 @@ fn thread_func() void {
                         continue;
                     },
                 }
-                slice = op_save_queue.slice(); //execute 과정에서 element가 추가되면 메모리가 바뀔수도 있으므로
+                slice = op_save_queue.slice(); //if elements are added during execution, the memory may change
                 slice.set(i, .{ .void = {} });
             }
         }
@@ -907,7 +907,7 @@ fn thread_func() void {
             const data = slice.items(.data);
             while (i < op_save_queue.len) : (i += 1) {
                 switch (tags[i]) {
-                    //destroy.. 나중에
+                    //destroy.. call later
                     .destroy_buffer => execute_destroy_buffer(data[i].destroy_buffer.buf, data[i].destroy_buffer.callback, data[i].destroy_buffer.callback_data),
                     .destroy_image => execute_destroy_image(data[i].destroy_image.buf, data[i].destroy_image.callback, data[i].destroy_image.callback_data),
                     else => continue,
@@ -1098,7 +1098,7 @@ pub fn vulkan_res_node(_res_type: res_type) type {
         //     @memcpy(@as([*]u8, @ptrCast(data.?))[0..u8data.len], u8data);
         //     self.*.pvulkan_buffer.?.*.unmap();
         // }
-        ///copy_update와 달리 _data는 임시변수이면 안됩니다.
+        ///! unlike copy_update, _data cannot be a temporary variable.
         pub fn map_update(self: *vulkan_res_node_Self, _data: anytype) void {
             const u8data = mem.obj_to_u8arrC(_data);
             self.*.map_copy(u8data);
@@ -1154,12 +1154,12 @@ const vulkan_res = struct {
     cur: *DoublyLinkedList(node).Node = undefined,
     mem: vk.DeviceMemory,
     info: vk.MemoryAllocateInfo,
-    single: bool = false, //single이 true면 무조건 디바이스 메모리에
+    single: bool = false, //single is true, always device memory
     cached: bool = false,
     pool: MemoryPoolExtra(DoublyLinkedList(node).Node, .{}) = undefined,
     list: DoublyLinkedList(node) = undefined,
 
-    ///! 따로 vulkan_res.deinit2를 호출하지 않는다.
+    ///! don't call vulkan_res.deinit2 separately
     fn deinit2(self: *vulkan_res) void {
         __vulkan.load_instance_and_device();
         __vulkan.vkd.?.freeMemory(self.*.mem, null);
@@ -1187,7 +1187,7 @@ const vulkan_res = struct {
                 r.size = math.ceil_up(r.size, nonCoherentAtomSize);
                 start = @min(start, r.offset);
                 end = @max(end, r.offset + r.size);
-                //range가 겹치면 합칩니다.
+                //when range overlaps, merge them.
                 for (ranges[0..off_idx]) |*t| {
                     if (t.offset < r.offset + r.size and t.offset + t.size > r.offset) {
                         const end_ = @max(r.offset + r.size, t.offset + t.size);
@@ -1195,7 +1195,7 @@ const vulkan_res = struct {
                         t.size = end_ - t.offset;
                         for (ranges[0..off_idx]) |*t2| {
                             if (t.offset != t2.offset) {
-                                if (t2.offset < t.offset + t.size and t2.offset + t2.size > t.offset) { //양쪽에서 겹치는 경우
+                                if (t2.offset < t.offset + t.size and t2.offset + t2.size > t.offset) { //both sides overlap
                                     const end_2 = @max(t2.offset + t2.size, t.offset + t.size);
                                     t.offset = @min(t2.offset, t.offset);
                                     t.size = end_2 - t.offset;
@@ -1270,7 +1270,7 @@ const vulkan_res = struct {
         _mem.* = __vulkan.vkd.?.allocateMemory(_info, null) catch return false;
         return true;
     }
-    /// ! 따로 vulkan_res.init를 호출하지 않는다.
+    /// ! don't call vulkan_res.init separately
     fn init(_cell_size: usize, _len: usize, type_filter: u32, _prop: vk.MemoryPropertyFlags) ?vulkan_res {
         var res = vulkan_res{
             .cell_size = _cell_size,
@@ -1391,7 +1391,7 @@ const vulkan_res = struct {
         cur.*.data.size = _cell_count;
         return res;
     }
-    ///bind_buffer에서 반환된 _res를 사용.
+    /// use _res returned from bind_buffer
     fn unbind_res(self: *vulkan_res, _buf: anytype, _res: *res_range) void {
         if (self.*.single) {
             switch (@TypeOf(_buf)) {
@@ -1519,7 +1519,7 @@ fn create_allocator_and_bind(_res: anytype, _prop: vk.MemoryPropertyFlags, _out_
             res.?.* = R.?;
         }
 
-        _out_idx.* = res.?.*.bind_any(_res, cnt) catch unreachable orelse unreachable; //발생할수 없는 오류
+        _out_idx.* = res.?.*.bind_any(_res, cnt) catch unreachable orelse unreachable; //Error that should not occur
         buffer_ids.append(res.?) catch |err| {
             xfit.print_error("ERR {s} __vulkan_allocator.create_allocator_and_bind.self.*.buffer_ids.append\n", .{@errorName(err)});
             unreachable;
@@ -1547,7 +1547,7 @@ fn create_allocator_and_bind_single(_res: anytype) *vulkan_res {
 
     res.?.* = vulkan_res.init_single(max_size, mem_require.memory_type_bits);
 
-    _ = res.?.*.bind_any(_res, 1) catch unreachable; //발생할수 없는 오류
+    _ = res.?.*.bind_any(_res, 1) catch unreachable; //Error that should not occur
     buffer_ids.append(res.?) catch |err| {
         xfit.herr3("__vulkan_allocator.create_allocator_and_bind.buffer_ids.append", err);
     };

@@ -314,7 +314,7 @@ fn key_down(_key: input.key) void {
                 //     img.*._image.transform.model = matrix.scaling(2, 2, 1.0).multiply(&matrix.translation(0, 0, if (image_front) 0.7 else 0.3));
                 //     image_front = !image_front;
                 //     img.*._image.transform.copy_update();
-                // } 이제 shape와 image의 정렬을 위해서는 renderCommand를 여러개 만들어 따로 렌더링해야 합니다.
+                // } now, to align shape and image, need to make multiple renderCommand.
             },
         }
     }
@@ -331,7 +331,7 @@ var update_mutex: std.Thread.Mutex = .{};
 var dx: f32 = 0;
 var shape_alpha: f32 = 0.0;
 
-//다른 스레드에서 테스트 xfit_update에서 해도됨.
+//other thread test, can use in xfit_update.
 fn move_callback() !bool {
     if (xfit.exiting()) return false;
 
@@ -426,7 +426,7 @@ pub fn main() !void {
         .window_height = 480,
         .use_console = true,
         //.vSync = .none,
-        //.maxframe = 62, +2는 대충 오차 보정 값
+        //.maxframe = 62, +2 is rough error correction value
     };
     gpa = std.heap.GeneralPurposeAllocator(.{}).init;
     allocator = gpa.allocator(); //must init in main

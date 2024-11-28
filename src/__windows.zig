@@ -48,7 +48,7 @@ const xbox_guid = win32.GUID{
 
 var render_thread_id: DWORD = undefined;
 var render_thread_sem: std.Thread.Semaphore = .{};
-///X를 직접 눌러 껏을땐 false exit 호출시 true
+///false when manually press X to turn off, true when exit is called
 var manual_window_destroyed: bool = false;
 
 pub fn vulkan_windows_start(vkSurface: *__vulkan.vk.SurfaceKHR) void {
@@ -336,7 +336,7 @@ pub fn set_window_mode2(pos: math.point(i32), size: math.point(u32), state: wind
 }
 
 pub fn set_window_title() void {
-    //?window.set_window_title 참고
+    //?see window.set_window_title
     if (FALSE == win32.SetWindowTextA(hWnd, __system.title)) {
         xfit.print_error("WARN set_window_title.SetWindowTextA Failed Code : {d}\n", .{win32.GetLastError()});
     }
@@ -426,8 +426,8 @@ pub fn nanosleep(ns: u64) void {
     _ = win32.CloseHandle(timer);
 }
 
-//TODO IME 입력 이벤트는 에디트 박스 구현할때 같이 하기
-//TODO 터치 이벤트
+//TODO IME input event, implement with edit box
+//TODO touch event
 fn WindowProc(hwnd: HWND, uMsg: u32, wParam: win32.WPARAM, lParam: win32.LPARAM) callconv(WINAPI) win32.LRESULT {
     const S = struct {
         var caps: win32.HIDP_CAPS = undefined;
@@ -467,7 +467,7 @@ fn WindowProc(hwnd: HWND, uMsg: u32, wParam: win32.WPARAM, lParam: win32.LPARAM)
         },
         win32.WM_KEYDOWN => {
             if (wParam < __system.KEY_SIZE) {
-                //다른 스레드에서 __system.keys[keyv]를 수정하지 않고 읽기만하니 weak로도 충분하다.
+                //other threads do not modify __system.keys[keyv] so cmpxchgWeak is enough.
                 if (__system.keys[wParam].cmpxchgWeak(false, true, .monotonic, .monotonic) == null) {
                     //xfit.print_debug("input key_down {d}", .{wParam});
                     system.a_fn_call(__system.key_down_func, .{@as(input.key, @enumFromInt(wParam))}) catch {};
@@ -713,7 +713,7 @@ fn WindowProc(hwnd: HWND, uMsg: u32, wParam: win32.WPARAM, lParam: win32.LPARAM)
             @atomicStore(f64, @as(*f64, @ptrCast(&__system.cursor_pos)), @bitCast(mm), .monotonic);
             system.a_fn_call(__system.mouse_move_func, .{mm}) catch {};
         },
-        // MOUSEMOVE 메시지에서 TrackMouseEvent를 호출하면 호출되는 메시지
+        //when TrackMouseEvent is called in MOUSEMOVE message, WM_MOUSELEAVE message is called
         win32.WM_MOUSELEAVE => {
             __system.mouse_out.store(true, std.builtin.AtomicOrder.monotonic);
             system.a_fn_call(__system.mouse_leave_func, .{}) catch {};

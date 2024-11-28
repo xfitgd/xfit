@@ -187,10 +187,10 @@ pub fn loop() void {
         var _delta_time = n.since(S.now);
 
         if (maxframe > 0) {
-            const maxf: u64 = @intFromFloat((1.0 * (1.0 / maxframe)) * 1000000000); //1 / (maxframe / 1); 나눗셈을 한번 줄임
+            const maxf: u64 = @intFromFloat((1.0 * (1.0 / maxframe)) * 1000000000); //1 / (maxframe / 1); reduce division once
             if (maxf > _delta_time) {
                 if (ispause) {
-                    xfit.sleep(maxf - _delta_time); //대기상태라 정확도가 적어도 괜찮다.
+                    xfit.sleep(maxf - _delta_time); //wait state, accuracy is enough.
                 } else {
                     xfit.sleep_ex(maxf - _delta_time);
                 }

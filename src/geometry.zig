@@ -101,6 +101,7 @@ pub inline fn point_line_side(p: point, l0: point, l1: point) f32 {
     return (l1[0] - l0[0]) * (p[1] - l0[1]) - (p[0] - l0[0]) * (l1[1] - l0[1]);
 }
 ///https://bowbowbow.tistory.com/24
+/// check point in polygon
 pub fn point_in_polygon(p: point, pts: []const point) bool {
     var i: usize = 0;
     //crosses는 점p와 오른쪽 반직선과 다각형과의 교점의 개수
@@ -132,7 +133,7 @@ pub fn center_point_in_polygon(pts: []const point) point {
     return p;
 }
 pub fn line_in_polygon(a: point, b: point, pts: []const point, check_inside_line: bool) bool {
-    if (check_inside_line and point_in_polygon(a, pts)) return true; //반드시 점 ab가 다각형 내에 모두 있어야 선 ab와 다각형 선분이 교차하지 않는다. 따라서 b는 확인할 필요 없다.
+    if (check_inside_line and point_in_polygon(a, pts)) return true; //Points a, b must all be inside the polygon so that line a, b and polygon line segments do not intersect, so b does not need to be checked.
     var i: usize = 0;
     var result: point = undefined;
     while (i < pts.len - 1) : (i += 1) {
@@ -355,7 +356,7 @@ pub const polygon = struct {
             }
         }
         _inout.*.vertices = try allocator.realloc(_inout.*.vertices, _inout.*.vertices.len + vertice_len + curve_vertice_len);
-        //인덱스 갯수는 대충 최대값
+        //index count is about max value
         _inout.*.indices = try allocator.realloc(_inout.*.indices, _inout.*.vertices.len * 3);
         vertice_len = 0;
         count = 0;
@@ -478,7 +479,7 @@ pub const line = struct {
         return try __compute_curve(self, self.start, self.control0, self.control1, self.end, out_vertices, out_indices, in_out_vertice_len, in_out_indices_len, -1);
     }
 
-    /// TODO 테스트 해보면서 개선 필요 https://github.com/azer89/GPU_Curve_Rendering/blob/master/QtTestShader/CurveRenderer.cpp
+    /// TODO need test and improvement https://github.com/azer89/GPU_Curve_Rendering/blob/master/QtTestShader/CurveRenderer.cpp
     fn __compute_curve(self: *Self, _start: point, _control0: point, _control1: point, _end: point, out_vertices: anytype, out_indices: anytype, in_out_vertice_len: *usize, in_out_indices_len: *usize, repeat: i32) line_error!void {
         var d1: f64 = undefined;
         var d2: f64 = undefined;
@@ -808,7 +809,7 @@ pub const line = struct {
         out_d3.* = 3 * a3;
 
         const D = (3 * (out_d2.* * out_d2.*) - 4 * out_d3.* * out_d1.*);
-        const discr = out_d1.* * out_d1.* * D; //어떤 타입의 곡선인지 판별하는 값
+        const discr = out_d1.* * out_d1.* * D; //check type of curve, Discriminant
 
         if (math.compare(_start, _control0) and math.compare(_control0, _control1) and math.compare(_control1, _end)) {
             return line_error.is_point_not_line;

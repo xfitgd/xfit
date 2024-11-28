@@ -175,9 +175,9 @@ pub fn notify() void {
 pub fn text_notify(text: []const u8) void {
     _ = text;
     if (xfit.platform == .windows) {
-        //TODO 윈도우즈 텍스트 알림 구현
+        //TODO implement windows text notification
     } else if (xfit.platform == .android) {
-        //TODO 안드로이드 텍스트 알림 구현
+        //TODO implement android text notification
     } else {
         @compileError("not support platform");
     }

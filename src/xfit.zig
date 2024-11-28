@@ -67,6 +67,8 @@ pub const __android_entry = if (platform == .android) __android.android.ANativeA
 pub fn xfit_main(_allocator: std.mem.Allocator, _init_setting: *const init_setting) void {
     __system.init(_allocator, _init_setting);
 
+    //vulkan_start, root.xfit_init() are called in a separate work thread (rendering there)
+
     if (platform == .windows) {
         __windows.system_windows_start();
 
@@ -80,7 +82,6 @@ pub fn xfit_main(_allocator: std.mem.Allocator, _init_setting: *const init_setti
             };
         } else {
             __windows.windows_start();
-            //vulkan_start, root.xfit_init()는 별도의 작업 스레드에서 호출(거기서 렌더링)
 
             __windows.windows_loop();
         }
@@ -123,32 +124,32 @@ pub fn xfit_main(_allocator: std.mem.Allocator, _init_setting: *const init_setti
 pub inline fn herrm2(errtest: bool, msg: []const u8) void {
     if (!errtest) {
         print_error("ERR {s}\n", .{msg});
-        @trap(); // ! release mode 에서는 unreachable이 제대로 작동하지 않는다.
+        @trap(); // ! unreachable is not working when release mode
     }
 }
 pub inline fn herrm(msg: []const u8) void {
     print_error("ERR {s}\n", .{msg});
-    @trap(); // ! release mode 에서는 unreachable이 제대로 작동하지 않는다.
+    @trap(); // ! unreachable is not working when release mode
 }
 
 pub inline fn herr2(comptime fmt: []const u8, args: anytype) void {
     print_error("ERR " ++ fmt ++ "\n", args);
-    @trap(); // ! release mode 에서는 unreachable이 제대로 작동하지 않는다.
+    @trap(); // ! unreachable is not working when release mode
 }
 
 pub inline fn herr(errtest: bool, comptime fmt: []const u8, args: anytype) void {
     if (!errtest) {
         print_error("ERR " ++ fmt ++ "\n", args);
-        @trap(); // ! release mode 에서는 unreachable이 제대로 작동하지 않는다.
+        @trap(); // ! unreachable is not working when release mode
     }
 }
 
 pub inline fn herr3(funcion_name: []const u8, err: anyerror) void {
     print_error("ERR {s} {s}\n", .{ funcion_name, @errorName(err) });
-    @trap(); // ! release mode 에서는 unreachable이 제대로 작동하지 않는다.
+    @trap(); // ! unreachable is not working when release mode
 }
 
-///!print_error 와 이 함수를 호출하는 herr..함수들은 반드시 inline 으로 선언해야 함
+///!print_error and herr.. functions that call this function must be declared inline
 pub inline fn print_error(comptime fmt: []const u8, args: anytype) void {
     @branchHint(.cold);
     const now_str = datetime.Datetime.now().formatHttp(std.heap.c_allocator) catch return;
@@ -163,7 +164,7 @@ pub inline fn print_error(comptime fmt: []const u8, args: anytype) void {
 
         var str2 = std.ArrayList(u8).init(std.heap.c_allocator);
         defer str2.deinit();
-        const error_trace: ?*std.builtin.StackTrace = @errorReturnTrace(); // ! 얘 때문에 inline 으로 선언해야 함
+        const error_trace: ?*std.builtin.StackTrace = @errorReturnTrace(); // ! because of this, it must be declared inline
         if (error_trace != null) {
             std.debug.writeStackTrace(error_trace.?.*, str2.writer(), debug_info, .no_color) catch {};
         } else {
@@ -409,13 +410,11 @@ pub const init_setting = struct {
     cursor: ?[]const u8 = null,
     //*
 
-    ///nanosec 단위 1프레임당 1sec = 1000000000 nanosec
     maxframe: f64 = 0,
     refleshrate: u32 = 0,
     vSync: vSync_mode = .double,
 };
 
-///nanosec 1 / 1000000000 sec
 pub inline fn get_maxframe() f64 {
     if (@sizeOf(usize) == 4) @compileError("32bit not support");
     //     const native_endian = @import("builtin").target.cpu.arch.endian();
@@ -429,9 +428,8 @@ pub inline fn get_maxframe() f64 {
     // ! } Not Use
     return @atomicLoad(f64, &__system.init_set.maxframe, std.builtin.AtomicOrder.monotonic);
 }
-//nanosec 1 / 1000000000 sec
-pub inline fn set_maxframe_64(_maxframe: u64) void {
-    @atomicStore(u64, &__system.init_set.maxframe, _maxframe, .monotonic);
+pub inline fn set_maxframe(_maxframe: f64) void {
+    @atomicStore(f64, &__system.init_set.maxframe, _maxframe, .monotonic);
 }
 
 //_int * 1000000000 + _dec

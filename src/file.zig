@@ -41,7 +41,7 @@ pub inline fn seekFromEnd(self: *Self, idx: i64) !void {
     try self.hFile.seekFromEnd(idx);
 }
 pub inline fn writeCurrentStackTrace(self: *Self) void {
-    const debug_info = std.debug.getSelfDebugInfo() catch @trap(); //재귀 호출 위험이 있어서 따로 에러 처리 안함.
+    const debug_info = std.debug.getSelfDebugInfo() catch @trap(); //recursive call is dangerous, so no error handling
 
     std.debug.writeCurrentStackTrace(self.*.writer(), debug_info, std.io.tty.detectConfig(self.*.hFile), @returnAddress()) catch @trap();
 }

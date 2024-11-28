@@ -262,7 +262,7 @@ pub fn vertices(comptime vertexT: type) type {
                 .use_gcpu_mem = use_gcpu_mem,
             }, mem.u8arrC(self.*.array.?));
         }
-        ///write_flag가 cpu일때만 호출
+        ///!call when write_flag is cpu
         pub fn copy_update(self: *Self) void {
             self.*.node.copy_update(self.*.array.?.ptr);
         }
@@ -326,13 +326,13 @@ pub fn indices_(comptime _type: index_type) type {
             }, mem.u8arrC(self.*.array.?));
         }
 
-        ///write_flag가 cpu일때만 호출
+        ///!call when write_flag is cpu
         pub fn copy_update(self: *Self) void {
             self.*.node.copy_update(self.*.array.?.ptr);
         }
     };
 }
-//? uniform 속성 개체는 모두 크기가 작아서 use_gcpu_mem true 이다 기본으로
+//? uniform object is all small, so use_gcpu_mem is true by default
 pub const projection = struct {
     const Self = @This();
     proj: matrix = undefined,
@@ -402,7 +402,7 @@ pub const projection = struct {
             .use = _flag,
         }, mem.obj_to_u8arrC(&mat));
     }
-    ///write_flag가 cpu일때만 호출
+    ///!call when write_flag is cpu
     pub fn copy_update(self: *Self) void {
         const mat = if (xfit.is_mobile) self.*.proj.multiply(&__vulkan.rotate_mat) else self.*.proj;
         self.*.__uniform.copy_update(&mat);
@@ -414,7 +414,7 @@ pub const camera = struct {
     __uniform: vulkan_res_node(.buffer) = .{},
     __check_alloc: mem.check_alloc = .{},
 
-    /// w좌표는 신경 x, 시스템 초기화 후 호출
+    /// w coordinate no need to care, call after system init
     pub fn init(eyepos: vector, focuspos: vector, updir: vector) Self {
         var res = Self{ .view = math.matrix_lookAtLh(f32, eyepos, focuspos, updir) };
         res.__check_alloc.init(__system.allocator);
@@ -431,7 +431,7 @@ pub const camera = struct {
             .use = .cpu,
         }, mem.obj_to_u8arrC(&self.*.view));
     }
-    ///write_flag가 cpu일때만 호출
+    ///!call when write_flag is cpu
     pub fn copy_update(self: *Self) void {
         self.*.__uniform.copy_update(&self.*.view);
     }
@@ -446,7 +446,7 @@ pub const color_transform = struct {
         return &__vulkan.no_color_tran;
     }
 
-    /// w좌표는 신경 x, 시스템 초기화 후 호출
+    /// w coordinate no need to care, call after system init
     pub fn init() Self {
         const res = Self{ .color_mat = math.matrix_identity(f32) };
         return res;
@@ -463,23 +463,23 @@ pub const color_transform = struct {
             .use = _flag,
         }, mem.obj_to_u8arrC(&self.*.color_mat));
     }
-    ///write_flag가 cpu일때만 호출
+    ///!call when write_flag is cpu
     pub fn copy_update(self: *Self) void {
         self.*.__check_alloc.check_inited();
         self.*.__uniform.copy_update(&self.*.color_mat);
     }
 };
 
-//transform는 object와 한몸이라 따로 check_alloc 필요없음
+//transform is same as object, so no need to check_alloc separately
 pub const transform = struct {
     const Self = @This();
 
     parent_type: iobject_type,
 
     model: matrix = math.matrix_identity(f32),
-    ///이 값 자체가 변경되면 iobject.update_uniforms 필요
+    ///if this value itself changes, iobject.update_uniforms is needed
     camera: *camera = undefined,
-    ///이 값 자체가 변경되면 iobject.update_uniforms 필요
+    ///if this value itself changes, iobject.update_uniforms is needed
     projection: *projection = undefined,
     __model_uniform: vulkan_res_node(.buffer) = .{},
 
@@ -504,7 +504,7 @@ pub const transform = struct {
             .use = .cpu,
         }, mem.obj_to_u8arrC(&self.*.model));
     }
-    ///write_flag가 readwrite_cpu일때만 호출
+    ///!call when write_flag is readwrite_cpu
     pub fn copy_update(self: *Self) void {
         self.*.__check_init.check_inited();
         self.*.__model_uniform.copy_update(&self.*.model);
@@ -581,7 +581,7 @@ pub inline fn get_default_nearest_sampler() vk.Sampler {
 pub const texture_array = struct {
     const Self = @This();
     __image: vulkan_res_node(.texture) = .{},
-    ///1차원 배열에 순차적으로 이미지 프레임 데이터들을 배치
+    ///arrange image frame data in a one-dimensional array sequentially
     pixels: ?[]u8 = undefined,
     sampler: vk.Sampler,
     __set: descriptor_set,
@@ -639,7 +639,7 @@ pub const texture_array = struct {
 pub const tile_texture_array = struct {
     const Self = @This();
     __image: vulkan_res_node(.texture) = .{},
-    ///1차원 배열에 순차적으로 이미지 프레임 데이터들을 배치
+    ///arrange image frame data in a one-dimensional array sequentially
     alloc_pixels: []u8 = undefined,
     sampler: vk.Sampler,
     __set: descriptor_set,
@@ -674,7 +674,7 @@ pub const tile_texture_array = struct {
     pub fn __build(self: *Self, tile_width: u32, tile_height: u32, tile_count: u32, _width: u32, pixels: []const u8, inout_alloc_pixels: []u8, comptime use_gcpu_mem: bool) void {
         self.__check_init.init();
         self.alloc_pixels = inout_alloc_pixels;
-        //tilemap pixel 형식 데이터를 tile image 들이 연속적으로 배치된 형식 데이터로 변환한다.
+        //convert tilemap pixel data format to tile image data format arranged sequentially
         var x: u32 = undefined;
         var y: u32 = 0;
         var h: u32 = undefined;
@@ -785,7 +785,7 @@ pub const shape_source = struct {
         self.*.indices.deinit_for_alloc();
         self.*.__uniform.clean(callback, self);
     }
-    ///write_flag가 cpu일때만 호출
+    ///!call when write_flag is cpu
     pub fn copy_color_update(self: *shape_source) void {
         self.*.__uniform.copy_update(&self.*.color);
     }
@@ -960,11 +960,11 @@ pub const image = struct {
         return self;
     }
 };
-///회전 했을때 고려안함, img scale은 기본(이미지 크기) 비율일때 기준
+///!not consider rotation, img scale is based on default (image size) ratio
 pub fn pixel_perfect_point(img: anytype, _p: point, _canvas_w: f32, _canvas_h: f32, center: center_pt_pos) point {
     const width = @as(f32, @floatFromInt(window.window_width()));
     const height = @as(f32, @floatFromInt(window.window_height()));
-    if (width / height > _canvas_w / _canvas_h) { //1배 비율이 아니면 적용할수 없다.
+    if (width / height > _canvas_w / _canvas_h) { //not 1:1 ratio, can't apply
         if (_canvas_h != height) return _p;
     } else {
         if (_canvas_w != width) return _p;

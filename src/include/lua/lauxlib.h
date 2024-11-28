@@ -269,7 +269,7 @@ extern size_t lua_writestring(const void* ptr, size_t size);
 //          (fprintf(stderr, (s), (p)), fflush(stderr))
 // #endif
 
-//원본 lua_writestringerror 구현이 죄다 %s 하나라 이렇게 설정합니다.
+//원본 lua_writestringerror 구현이 죄다 %s 하나라 이렇게 설정합니다. setting this function because original lua_writestringerror implementation is all single %s.
 extern void lua_writestringerror(const char *fmt, const char *str);
 
 

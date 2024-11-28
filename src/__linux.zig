@@ -387,7 +387,7 @@ pub fn linux_start() void {
     _ = c.XMoveWindow(display, wnd, __system.init_set.window_x, __system.init_set.window_y);
     _ = c.XFlush(display);
 
-    __system.save_prev_window_state(); //최초 값 초기화
+    __system.save_prev_window_state(); //initial value
 
     //left %ld right %ld top %ld bottom %ld
     //xfit.print_log("{d},{d},{d},{d}\n", .{ window_extent[0], window_extent[1], window_extent[2], window_extent[3] });
@@ -546,7 +546,7 @@ pub fn linux_loop() void {
                 } else if (keyv >= 0xff00) {
                     keyv = keyv - 0xff00 + 0xff;
                 }
-                //다른 스레드에서 __system.keys[keyv]를 수정하지 않고 읽기만하니 weak로도 충분하다.
+                //other threads doesn't modify __system.keys[keyv] so cmpxchgWeak is enough.
                 if (__system.keys[keyv].cmpxchgWeak(false, true, .monotonic, .monotonic) == null) {
                     system.a_fn_call(__system.key_down_func, .{key}) catch {};
                 }

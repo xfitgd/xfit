@@ -1128,11 +1128,11 @@ pub const WriteDescriptorSet = extern struct {
     dst_array_element: u32,
     descriptor_count: u32,
     descriptor_type: DescriptorType,
-    ///! ?[*]const DescriptorImageInfo 이여야 함 기존 코드에서 수정
+    ///! ?[*]const DescriptorImageInfo 이여야 함 기존 코드에서 수정 must be ?[*]const DescriptorImageInfo, modify from existing code
     p_image_info: ?[*]const DescriptorImageInfo,
-    ///! ?[*]const DescriptorBufferInfo 이여야 함 기존 코드에서 수정
+    ///! ?[*]const DescriptorBufferInfo 이여야 함 기존 코드에서 수정 must be ?[*]const DescriptorBufferInfo, modify from existing code
     p_buffer_info: ?[*]const DescriptorBufferInfo,
-    ///! ?[*]const BufferView 이여야 함 기존 코드에서 수정
+    ///! ?[*]const BufferView 이여야 함 기존 코드에서 수정 must be ?[*]const BufferView, modify from existing code
     p_texel_buffer_view: ?[*]const BufferView,
 };
 pub const CopyDescriptorSet = extern struct {

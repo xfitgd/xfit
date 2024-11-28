@@ -3,7 +3,11 @@
 //? 확인할 항목 이름과 비교, 같으면 true로 만듬. ->
 //? 비트 필드에 해당하는 실제 값 찾기->
 //? true에 해당하는 실제 값 설정
-
+//? bit fields + check field names
+//? if false when traversing bit fields
+//? compare with check field names, if same, set true
+//? find actual value corresponding to true bit field
+//? set actual value
 //! Union and nested struct not supported
 
 const std = @import("std");
@@ -183,7 +187,7 @@ fn parse_node(scanner: *Scanner, allocator: std.mem.Allocator, string: []const u
         if (typeinfo.pointer.size != .Slice) @compileError("Unsupported pointer size");
         if (!out_bits.* and std.mem.eql(u8, field_name[0..field_name.len], string)) {
             out_bits.* = true;
-            node.* = try parse_array(typeinfo.pointer.child, allocator, scanner); //여기서 값을 설정함.
+            node.* = try parse_array(typeinfo.pointer.child, allocator, scanner); //set value here
             return true;
         }
         return false;
@@ -191,17 +195,17 @@ fn parse_node(scanner: *Scanner, allocator: std.mem.Allocator, string: []const u
         if (!out_bits.* and std.mem.eql(u8, field_name[0..field_name.len], string)) {
             out_bits.* = true;
         } else {
-            return false; //이미 설정됬거나 이름이 안맞으면 나감.
+            return false; //already set or name doesn't match, exit
         }
     } else {
         if (!out_bits.* and std.mem.eql(u8, field_name[0..field_name.len], string)) {
             out_bits.* = true;
-            node.* = try parse_object(@TypeOf(node.*), allocator, scanner); //여기서 값을 설정함.
+            node.* = try parse_object(@TypeOf(node.*), allocator, scanner); //set value here
             return true;
         }
         return false;
     }
-    //위에서 필드 이름과 비교 했으므로 여기선 오류가 나지 않는 이상 값을 설정해야한다.
+    //above compared field name, so if no error, value must be set
     switch (typeinfo) {
         .optional => |info| {
             node.* = undefined;

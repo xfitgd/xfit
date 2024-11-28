@@ -75,7 +75,7 @@ pub fn build(b: *std.Build) !void {
 }
 
 pub const run_option = struct {
-    ///manefest의 android.app.lib_name 와 같게
+    ///same as manifest's android.app.lib_name
     name: []const u8,
     root_source_file: std.Build.LazyPath,
     PLATFORM: XfitPlatform,
@@ -144,7 +144,7 @@ pub fn run(
         "libwebpdemux.a",
         "libfreetype.a",
         "libogg.a",
-        "libopus.a", //-fno-stack-protector 옵션으로 빌드 필요
+        "libopus.a", //required -fno-stack-protector option
         "libopusfile.a",
         "libvorbis.a",
         "libvorbisenc.a",

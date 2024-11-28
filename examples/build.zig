@@ -3,7 +3,7 @@ const std = @import("std");
 const xfit_build = @import("xfit_build");
 
 //* User Setting
-//크로스 플랫폼 빌드시 zig build -Dtarget=aarch64-windows(linux)
+//when cross platform build : zig build -Dtarget=aarch64-windows(linux)
 //x86_64-windows(linux)
 // android platform need AndroidManifest.xml, keystore, (assets, res) folder in user project folder
 const PLATFORM = xfit_build.XfitPlatform.linux;
@@ -26,7 +26,7 @@ const EXAMPLES = enum(usize) {
 };
 
 fn callback(b: *std.Build, result: *std.Build.Step.Compile, target: std.Build.ResolvedTarget) void {
-    //TODO 여기에 사용자 지정 라이브러리 등을 추가합니다.
+    //TODO add user custom library and etc.. here.
     _ = b;
     _ = result;
     _ = target;

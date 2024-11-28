@@ -64,7 +64,7 @@ pub const pipeline_set = struct {
 pub var shape_color_2d_pipeline_set: pipeline_set = .{};
 pub var pixel_shape_color_2d_pipeline_set: pipeline_set = .{};
 //pub var color_2d_pipeline_set: pipeline_set = .{};
-///tex_2d_pipeline_set의 descriptorSetLayout2는 animate_tex_2d_pipeline_set의 그것과 공유
+///tex_2d_pipeline_set's descriptorSetLayout2 shares with animate_tex_2d_pipeline_set
 pub var tex_2d_pipeline_set: pipeline_set = .{};
 pub var quad_shape_2d_pipeline_set: pipeline_set = .{};
 pub var pixel_quad_shape_2d_pipeline_set: pipeline_set = .{};
@@ -608,7 +608,7 @@ fn create_pipelines() void {
         .depth_write_enable = vk.TRUE,
         .depth_bounds_test_enable = vk.FALSE,
         .depth_compare_op = vk.CompareOp.less_or_equal,
-        .front = quad_stencilOp, //값 의미 없음
+        .front = quad_stencilOp, //no meaning value
         .back = quad_stencilOp,
         .max_depth_bounds = 0,
         .min_depth_bounds = 0,
@@ -2035,7 +2035,7 @@ pub fn set_fullscreen_ex() void {
     }
 }
 
-///rect는 Y가 작을수록 위
+///rect Y is smaller, higher
 // pub fn copy_buffer_to_image2(src_buf: vk.Buffer, dst_img: vk.Image, rect: math.recti, depth: c_uint) void {
 //     if (rect.left >= rect.right or rect.top >= rect.bottom) xfit.herrm("copy_buffer_to_image2 invaild rect");
 //     const buf = begin_single_time_commands();

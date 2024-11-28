@@ -11,16 +11,14 @@ inline fn loop(wait_nanosec: u64, comptime function: anytype, args: anytype) boo
 
 fn callback_(comptime function: anytype, args: anytype) bool {
     const res = @typeInfo(@typeInfo(@TypeOf(function)).@"fn".return_type.?);
-    if (res == .error_union) { // ? 표준 라이브러리 Thread.zig에서 가져온 코드
+    if (res == .error_union) { // ? code from standard library Thread.zig
         if (res.error_union.payload == bool) {
             return @call(.auto, function, args) catch |err| {
-                xfit.print_error("ERR : {s}\n", .{@errorName(err)});
-                unreachable;
+                xfit.herr3("timer_callback callback_", err);
             };
         } else {
             _ = @call(.auto, function, args) catch |err| {
-                xfit.print_error("ERR : {s}\n", .{@errorName(err)});
-                unreachable;
+                xfit.herr3("timer_callback callback_", err);
             };
         }
     } else if (res == .bool) {

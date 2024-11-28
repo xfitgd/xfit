@@ -554,7 +554,7 @@ pub const matrix_rotation2D_inverse = matrix_rotationZ_inverse;
 pub fn matrix_scaling_inverse(comptime float_T: type, x: float_T, y: float_T, z: float_T) matrix_(float_T) {
     return matrix_translation(1 / x, 1 / y, 1 / z);
 }
-///Vulkan 으로 테스트 완료
+///Vulkan test completed
 pub fn matrix_perspectiveFovLhVulkan(comptime float_T: type, fovy: float_T, aspect: float_T, near: float_T, far: float_T) matrix_error!matrix_(float_T) {
     var res = try matrix_perspectiveFovLh(fovy, aspect, near, far);
     res[1][1] *= -1;
@@ -666,7 +666,7 @@ pub fn matrix_orthographicRh(comptime float_T: type, w: float_T, h: float_T, nea
         .{ 0, 0, r * near, 1 },
     };
 }
-///w좌표는 신경 x
+///w coordinate no need to care
 pub fn matrix_lookToLh(comptime float_T: type, eyepos_vector: vector_(float_T), eyedir_vector: vector_(float_T), updir_vector: vector_(float_T)) matrix_(float_T) {
     const az = normalize(eyedir_vector);
     const ax = normalize(cross3(updir_vector, az));
@@ -678,15 +678,15 @@ pub fn matrix_lookToLh(comptime float_T: type, eyepos_vector: vector_(float_T), 
         .{ -dot3(ax, eyepos_vector), -dot3(ay, eyepos_vector), -dot3(az, eyepos_vector), 1 },
     };
 }
-///w좌표는 신경 x
+///w coordinate no need to care
 pub fn matrix_lookToRh(comptime float_T: type, eyepos_vector: vector_(float_T), eyedir_vector: vector_(float_T), updir_vector: vector_(float_T)) matrix_(float_T) {
     return matrix_lookToLh(float_T, eyepos_vector, -eyedir_vector, updir_vector);
 }
-///Vulkan 으로 테스트 완료, w좌표는 신경 x
+///Vulkan test completed, w coordinate no need to care
 pub fn matrix_lookAtLh(comptime float_T: type, eyepos_vector: vector_(float_T), focuspos_vector: vector_(float_T), updir_vector: vector_(float_T)) matrix_(float_T) {
     return matrix_lookToLh(float_T, eyepos_vector, focuspos_vector - eyepos_vector, updir_vector);
 }
-///w좌표는 신경 x
+///w coordinate no need to care
 pub fn matrix_lookAtRh(comptime float_T: type, eyepos_vector: vector_(float_T), focuspos_vector: vector_(float_T), updir_vector: vector_(float_T)) matrix_(float_T) {
     return matrix_lookToLh(float_T, eyepos_vector, eyepos_vector - focuspos_vector, updir_vector);
 }

@@ -1,15 +1,18 @@
-# Xfit : Zig 게임 엔진 프로젝트
+# Xfit : Zig Game Engine Project
 
-자세한 설명은 Wiki 탭을 참고하세요.
+For more information, please refer to the Wiki tab.
 
-### [설치 방법 - Installation](https://github.com/xfitgd/xfit/wiki/%EC%84%A4%EC%B9%98-%EB%B0%A9%EB%B2%95-%E2%80%90-installation)
+##
 
-### 사용 방법 - coming soon
+### [Installation](https://github.com/xfitgd/xfit/wiki/Installation)
 
-### 구현 내용 - coming soon
+### Usage - coming soon
 
-### 레퍼런스 - Reference
-> xfit 프로젝트를 빌드하면 오프라인 문서 파일이 생성됩니다.(또는 zig build docs) 각 함수, 속성들 설명(주석)은 천천히 추가하겠습니다.
+### Implemented Content - coming soon
+
+### Reference
+
+> When you build the xfit project, an offline document file is generated.(can use zig build docs) I will gradually add descriptions(comments) for each function and property.
 
 ## using libraries
 

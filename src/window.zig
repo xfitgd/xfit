@@ -156,7 +156,7 @@ pub fn set_window_mode2(pos: math.point(i32), size: math.point(u32), state: syst
     if (xfit.platform == .windows) {
         __windows.set_window_mode2(pos, size, state, state, _can_maximize, _can_minimize, _can_resizewindow);
     } else if (xfit.platform == .linux) {
-        //TODO _can_maximize, _can_minimize 나중에 지원?
+        //TODO _can_maximize, _can_minimize will be supported later(?)
         __linux.set_window_mode2(pos, size, state, state, _can_maximize, _can_minimize, _can_resizewindow);
     } else {
         return;

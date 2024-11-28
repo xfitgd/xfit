@@ -475,7 +475,6 @@ fn engine_handle_cmd(_cmd: AppEvent) void {
         AppEvent.APP_CMD_INIT_WINDOW => {
             if (app.window != null) {
                 if (!app.inited) {
-                    //세로일 경우 원래대로?
                     root.main() catch |e| {
                         xfit.herr3("root.main", e);
                     };
@@ -746,7 +745,7 @@ fn engine_handle_input(_event: ?*android.AInputEvent) i32 {
                 if (handle_input_buttons(_event, keycode, true)) return 1;
             }
             if (keycode < __system.KEY_SIZE) {
-                //다른 스레드에서 __system.keys[keyv]를 수정하지 않고 읽기만하니 weak로도 충분하다.
+                //other threads doesn't modify __system.keys[keyv] so cmpxchgWeak is enough.
                 if (__system.keys[keycode].cmpxchgWeak(false, true, .monotonic, .monotonic) == null) {
                     //xfit.print_debug("input key_down {d}", .{keycode});
                     system.a_fn_call(__system.key_down_func, .{@as(input.key, @enumFromInt(keycode))}) catch {};
@@ -773,7 +772,7 @@ fn engine_handle_input(_event: ?*android.AInputEvent) i32 {
             if (keycode < __system.KEY_SIZE) {
                 const cnt = android.AKeyEvent_getRepeatCount(_event);
                 var i: i32 = 0;
-                while (i < cnt) : (i += 1) { //TODO 검증 필요
+                while (i < cnt) : (i += 1) { //TODO need verify
                     //xfit.print_debug("input key_multiple({d}) {d}", .{ i, keycode });
                     system.a_fn_call(__system.key_down_func, .{@as(input.key, @enumFromInt(keycode))}) catch {};
                     system.a_fn_call(__system.key_up_func, .{@as(input.key, @enumFromInt(keycode))}) catch {};

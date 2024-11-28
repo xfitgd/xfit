@@ -104,7 +104,7 @@ pub fn init(_MAX_DEVICES: u32, _guid: *const raw_input.GUID, _change_fn: raw_inp
 
         const detail = std.heap.c_allocator.alignedAlloc(u8, 4, size) catch xfit.herrm("rawinput init detail alloc");
         const detailA: win32.PSP_DEVICE_INTERFACE_DETAIL_DATA_A = @ptrCast(detail.ptr);
-        detailA.*.cbSize = @sizeOf(win32.SP_DEVICE_INTERFACE_DETAIL_DATA_A); // ! size변수가 아니다!
+        detailA.*.cbSize = @sizeOf(win32.SP_DEVICE_INTERFACE_DETAIL_DATA_A); // ! not size variable!
 
         var data: win32.SP_DEVINFO_DATA = .{};
         if (win32.SetupDiGetDeviceInterfaceDetailA(dev, &idata, detailA, size, &size, &data) == win32.FALSE) {
@@ -134,7 +134,7 @@ pub fn init(_MAX_DEVICES: u32, _guid: *const raw_input.GUID, _change_fn: raw_inp
 pub fn disconnect(self: *Self, path: []const u8) u32 {
     var i: u32 = 0;
     while (i < self.*.devices.len) : (i += 1) {
-        //대문자 소문자 상관없이 비교 std.ascii.eqlIgnoreCase
+        //Compare case-insensitive std.ascii.eqlIgnoreCase 대문자 소문자 상관없이 비교
         if (self.*.devices[i].handle != null and self.*.devices[i].path.len == path.len and std.ascii.eqlIgnoreCase(path, self.*.devices[i].path)) {
             self.*.change_fn(i, false, self.*.user_data);
             destroy_device(&self.*.devices[i]);

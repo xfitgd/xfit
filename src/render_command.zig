@@ -85,7 +85,8 @@ pub fn deinit(self: *Self) void {
     __system.allocator.destroy(self);
 }
 
-///render_command안의 scene(구성)이 바뀔때 마다 호출(scene 내의 iobject 내부 리소스 값이 바뀔경우는 해당없음)
+///call when scene(composition) in render_command changes
+///no need to call when iobject internal resource values change
 pub fn refresh(self: *Self) void {
     for (&self.*.__refesh) |*v| {
         @atomicStore(bool, v, true, .monotonic);
