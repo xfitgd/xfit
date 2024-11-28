@@ -8,7 +8,7 @@ For more information, please refer to the Wiki tab.
 
 ### Usage - coming soon
 
-### Implemented Content - coming soon
+### Implementation Description - coming soon
 
 ### Reference
 
