@@ -6,8 +6,5 @@
             .path = "..",
         },
     },
-    .paths = .{
-        "build.zig",
-        "build.zig.zon",
-    },
+    .paths = .{""},
 }

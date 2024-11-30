@@ -65,7 +65,7 @@ pub const take_indices = take_vertices;
 
 pub const write_flag = __vulkan_allocator.res_usage;
 
-pub const shape_color_vertex_2d = extern struct {
+pub const shape_vertex_2d = extern struct {
     pos: point align(1),
     uvw: [3]f32 align(1),
 };
@@ -213,18 +213,11 @@ pub fn vertices(comptime vertexT: type) type {
     return struct {
         const Self = @This();
 
-        array: ?[]vertexT = null,
         node: vulkan_res_node(.buffer) = .{},
-
-        allocator: std.mem.Allocator = undefined,
         __check_init: mem.check_init = .{},
 
         pub fn init() Self {
             const self: Self = .{};
-            return self;
-        }
-        pub fn init_for_alloc(__allocator: std.mem.Allocator) Self {
-            const self: Self = .{ .allocator = __allocator };
             return self;
         }
         pub inline fn deinit(self: *Self) void {
@@ -235,36 +228,27 @@ pub fn vertices(comptime vertexT: type) type {
             self.*.__check_init.deinit();
             self.*.node.clean(callback, self);
         }
-        pub inline fn deinit_for_alloc(self: *Self) void {
-            deinit(self);
-            self.allocator.free(self.array.?);
+        pub inline fn build_gcpu(self: *Self, _array: []vertexT, _flag: write_flag) geometry.shapes_error!void {
+            try self.*.__build(_array, _flag, true);
         }
-        pub inline fn deinit_for_alloc_callback(self: *Self, callback: ?*const fn (caller: *anyopaque) void) void {
-            deinit_callback(self, callback);
-            self.allocator.free(self.array.?);
+        pub inline fn build(self: *Self, _array: []vertexT, _flag: write_flag) geometry.shapes_error!void {
+            try self.*.__build(_array, _flag, false);
         }
-        pub inline fn build_gcpu(self: *Self, _flag: write_flag) geometry.polygon_error!void {
-            try self.*.__build(_flag, true);
-        }
-        pub inline fn build(self: *Self, _flag: write_flag) geometry.polygon_error!void {
-            try self.*.__build(_flag, false);
-        }
-        pub fn __build(self: *Self, _flag: write_flag, comptime use_gcpu_mem: bool) geometry.polygon_error!void {
+        pub fn __build(self: *Self, _array: []vertexT, _flag: write_flag, comptime use_gcpu_mem: bool) geometry.shapes_error!void {
             self.*.__check_init.init();
-            if (self.*.array == null or self.*.array.?.len == 0) {
-                xfit.print_error("WARN vertice array 0 or null\n", .{});
+            if (_array.len == 0) {
                 return error.is_not_polygon;
             }
-            self.*.node.create_buffer(.{
-                .len = @intCast(self.*.array.?.len * @sizeOf(vertexT)),
+            self.*.node.create_buffer_copy(.{
+                .len = @intCast(_array.len * @sizeOf(vertexT)),
                 .typ = .vertex,
                 .use = _flag,
                 .use_gcpu_mem = use_gcpu_mem,
-            }, mem.u8arrC(self.*.array.?));
+            }, mem.u8arrC(_array));
         }
         ///!call when write_flag is cpu
-        pub fn copy_update(self: *Self) void {
-            self.*.node.copy_update(self.*.array.?.ptr);
+        pub fn copy_update(self: *Self, _array: []vertexT) void {
+            self.*.node.copy_update(_array.ptr);
         }
     };
 }
@@ -279,19 +263,11 @@ pub fn indices_(comptime _type: index_type) type {
 
         node: vulkan_res_node(.buffer) = .{},
         idx_type: index_type = undefined,
-        array: ?[]idxT = null,
-        allocator: std.mem.Allocator = undefined,
         __check_init: mem.check_init = .{},
 
         pub fn init() Self {
             var self: Self = .{};
             self.idx_type = _type;
-            return self;
-        }
-        pub fn init_for_alloc(__allocator: std.mem.Allocator) Self {
-            var self: Self = .{};
-            self.idx_type = _type;
-            self.allocator = __allocator;
             return self;
         }
         pub inline fn deinit(self: *Self) void {
@@ -302,33 +278,25 @@ pub fn indices_(comptime _type: index_type) type {
             self.*.__check_init.deinit();
             self.*.node.clean(callback, self);
         }
-        pub inline fn deinit_for_alloc(self: *Self) void {
-            deinit(self);
-            self.allocator.free(self.array.?);
+        pub inline fn build_gcpu(self: *Self, _array: []idxT, _flag: write_flag) void {
+            self.*.__build(_array, _flag, true);
         }
-        pub inline fn deinit_for_alloc_callback(self: *Self, callback: ?*const fn (caller: *anyopaque) void) void {
-            deinit_callback(self, callback);
-            self.allocator.free(self.array.?);
+        pub inline fn build(self: *Self, _array: []idxT, _flag: write_flag) void {
+            self.*.__build(_array, _flag, false);
         }
-        pub inline fn build_gcpu(self: *Self, _flag: write_flag) void {
-            self.*.__build(_flag, true);
-        }
-        pub inline fn build(self: *Self, _flag: write_flag) void {
-            self.*.__build(_flag, false);
-        }
-        pub fn __build(self: *Self, _flag: write_flag, comptime use_gcpu_mem: bool) void {
+        pub fn __build(self: *Self, _array: []idxT, _flag: write_flag, comptime use_gcpu_mem: bool) void {
             self.*.__check_init.init();
-            self.*.node.create_buffer(.{
-                .len = @intCast(self.*.array.?.len * @sizeOf(idxT)),
+            self.*.node.create_buffer_copy(.{
+                .len = @intCast(_array.len * @sizeOf(idxT)),
                 .typ = .index,
                 .use = _flag,
                 .use_gcpu_mem = use_gcpu_mem,
-            }, mem.u8arrC(self.*.array.?));
+            }, mem.u8arrC(_array));
         }
 
         ///!call when write_flag is cpu
-        pub fn copy_update(self: *Self) void {
-            self.*.node.copy_update(self.*.array.?.ptr);
+        pub fn copy_update(self: *Self, _array: []idxT) void {
+            self.*.node.copy_update(_array.ptr);
         }
     };
 }
@@ -720,7 +688,7 @@ pub const shape = shape_(true);
 pub const pixel_shape = shape_(false);
 
 pub const shape_source = struct {
-    vertices: vertices(shape_color_vertex_2d),
+    vertices: vertices(shape_vertex_2d),
     indices: indices32,
     color: vector = .{ 1, 1, 1, 1 },
     __uniform: vulkan_res_node(.buffer) = .{},
@@ -728,7 +696,7 @@ pub const shape_source = struct {
 
     pub fn init() shape_source {
         return .{
-            .vertices = vertices(shape_color_vertex_2d).init(),
+            .vertices = vertices(shape_vertex_2d).init(),
             .indices = indices32.init(),
             .__set = .{
                 .bindings = single_pool_binding[0..1],
@@ -737,21 +705,10 @@ pub const shape_source = struct {
             },
         };
     }
-    pub fn init_for_alloc(__allocator: std.mem.Allocator) shape_source {
-        return .{
-            .vertices = vertices(shape_color_vertex_2d).init_for_alloc(__allocator),
-            .indices = indices32.init_for_alloc(__allocator),
-            .__set = .{
-                .bindings = single_pool_binding[0..1],
-                .size = single_uniform_pool_sizes[0..1],
-                .layout = __vulkan.quad_shape_2d_pipeline_set.descriptorSetLayout,
-            },
-        };
-    }
-    pub fn build(self: *shape_source, _flag: write_flag, _color_flag: write_flag) void {
-        if (self.*.vertices.array == null or self.*.vertices.array.?.len == 0) return;
-        self.*.vertices.build(_flag) catch return;
-        self.*.indices.build(_flag);
+    pub fn build(self: *shape_source, _vertex_array: []shape_vertex_2d, _index_array: []u32, _flag: write_flag, _color_flag: write_flag) void {
+        if (_vertex_array.len < 4 or _index_array.len < 6) return;
+        self.*.vertices.build(_vertex_array, _flag) catch return;
+        self.*.indices.build(_index_array, _flag);
 
         self.*.__uniform.create_buffer(.{
             .len = @sizeOf(vector),
@@ -774,16 +731,6 @@ pub const shape_source = struct {
         self.*.vertices.deinit();
         self.*.indices.deinit();
         self.*.__uniform.clean(null, {});
-    }
-    pub fn deinit_for_alloc(self: *shape_source) void {
-        self.*.vertices.deinit_for_alloc();
-        self.*.indices.deinit_for_alloc();
-        self.*.__uniform.clean(null, {});
-    }
-    pub fn deinit_for_alloc_callback(self: *shape_source, callback: ?*const fn (caller: *anyopaque) void) void {
-        self.*.vertices.deinit_for_alloc();
-        self.*.indices.deinit_for_alloc();
-        self.*.__uniform.clean(callback, self);
     }
     ///!call when write_flag is cpu
     pub fn copy_color_update(self: *shape_source) void {

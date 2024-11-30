@@ -22,7 +22,7 @@ pub const font_error = error{
 } || std.mem.Allocator.Error;
 
 pub const char_data = struct {
-    raw_p: ?geometry.raw_polygon = null,
+    raw_p: ?geometry.raw_shapes = null,
     advance: point,
     allocator: std.mem.Allocator,
 };
@@ -67,8 +67,7 @@ pub fn deinit(self: *Self) void {
     var it = self.*.__char_array.valueIterator();
     while (it.next()) |v| {
         if (v.*.raw_p != null) {
-            v.*.allocator.free(v.*.raw_p.?.vertices);
-            v.*.allocator.free(v.*.raw_p.?.indices);
+            v.*.raw_p.?.deinit();
         }
     }
     self.*.__char_array.deinit();
@@ -98,18 +97,14 @@ fn load_glyph(self: *Self, _char: u21) u21 {
     return _char;
 }
 
-fn init_shape_src(out_shape_src: *graphics.shape_source, allocator: std.mem.Allocator) !void {
-    if (out_shape_src.vertices.array != null) allocator.free(out_shape_src.*.vertices.array.?);
-    if (out_shape_src.indices.array != null) allocator.free(out_shape_src.*.indices.array.?);
-    out_shape_src.*.vertices.array = try allocator.alloc(graphics.shape_color_vertex_2d, 0);
-    out_shape_src.*.indices.array = try allocator.alloc(u32, 0);
-}
-
 pub const render_option = struct {
     scale: point = .{ 1, 1 },
     _offset: point = .{ 0, 0 },
     pivot: point = .{ 0, 0 },
     area: ?point = null,
+    color: ?vector = null,
+    flag: graphics.write_flag = .gpu,
+    color_flag: graphics.write_flag = .cpu,
 };
 pub const range = struct {
     font: *Self,
@@ -126,15 +121,22 @@ pub fn set_font_size(self: *Self, pt: f32) void {
     self.*.scale = scale_default / pt;
 }
 
-///alloc return []graphics.shape_source and each element vertices.array.? indices.array.?
+///!need to free return value
 pub fn render_string2(_str: []const u8, _render_option: render_option2, allocator: std.mem.Allocator) ![]graphics.shape_source {
     var srclist = std.ArrayListAligned(graphics.shape_source, null).init(allocator);
     errdefer {
         for (srclist.items) |*s| {
-            s.*.deinit_for_alloc();
+            s.*.deinit();
         }
         srclist.deinit();
     }
+    var vertex_array: []graphics.shape_vertex_2d = try allocator.alloc(graphics.shape_vertex_2d, 0);
+    var index_array: []u32 = try allocator.alloc(u32, 0);
+    defer {
+        allocator.free(vertex_array);
+        allocator.free(index_array);
+    }
+
     var i: usize = 0;
     var option = _render_option.option;
     for (_render_option.ranges) |v| {
@@ -149,26 +151,30 @@ pub fn render_string2(_str: []const u8, _render_option: render_option2, allocato
             }
         }
         if (!same) {
-            try srclist.append(graphics.shape_source.init_for_alloc(allocator));
+            if (srclist.items.len > 0) {
+                srclist.items[srclist.items.len - 1].build(vertex_array, index_array, option.flag, option.color_flag);
+                vertex_array = try allocator.realloc(vertex_array, 0);
+                index_array = try allocator.realloc(index_array, 0);
+            }
+            try srclist.append(graphics.shape_source.init());
             srclist.items[srclist.items.len - 1].color = v.color;
 
             src = &srclist.items[srclist.items.len - 1];
         }
+
         if (v.len == 0 or i + v.len >= _str.len) {
-            _ = try v.font.*.render_string(_str[i..], option, src, allocator);
+            _ = try v.font.*._render_string(_str[i..], option, &vertex_array, &index_array, allocator);
+            src.build(vertex_array, index_array, option.flag, option.color_flag);
             break;
         } else {
-            option._offset = try v.font.*.render_string(_str[i..(i + v.len)], option, src, allocator);
+            option._offset = try v.font.*._render_string(_str[i..(i + v.len)], option, &vertex_array, &index_array, allocator);
             i += v.len;
         }
     }
     return try srclist.toOwnedSlice();
 }
 
-///alloc out_shape_src.*.vertices.array.? and out_shape_src.*.indices.array.?
-pub fn render_string(self: *Self, _str: []const u8, _render_option: render_option, out_shape_src: *graphics.shape_source, allocator: std.mem.Allocator) !point {
-    try init_shape_src(out_shape_src, allocator);
-    const start_ = out_shape_src.*.vertices.array.?.len;
+fn _render_string(self: *Self, _str: []const u8, _render_option: render_option, _vertex_array: *[]graphics.shape_vertex_2d, _index_array: *[]u32, allocator: std.mem.Allocator) !point {
     var maxP: point = .{ std.math.floatMin(f32), std.math.floatMin(f32) };
     var minP: point = .{ std.math.floatMax(f32), std.math.floatMax(f32) };
 
@@ -183,18 +189,30 @@ pub fn render_string(self: *Self, _str: []const u8, _render_option: render_optio
             continue;
         }
         minP = @min(minP, offset);
-        try _render_char(self, codepoint, out_shape_src, &offset, _render_option.area, _render_option.scale, allocator);
+        try _render_char(self, codepoint, _vertex_array, _index_array, &offset, _render_option.area, _render_option.scale, allocator);
         maxP = @max(maxP, point{ offset[0], offset[1] + @as(f32, @floatFromInt(self.*.__face.*.size.*.metrics.height)) / (64.0 * self.*.scale) });
     }
-    var i: usize = start_;
+    var i: usize = 0;
     const size: point = (if (_render_option.area != null) _render_option.area.? else (maxP - minP)) * point{ 1, 1 };
-    while (i < out_shape_src.*.vertices.array.?.len) : (i += 1) {
-        out_shape_src.*.vertices.array.?[i].pos -= _render_option.pivot * size * _render_option.scale;
+    while (i < _vertex_array.*.len) : (i += 1) {
+        _vertex_array.*[i].pos -= _render_option.pivot * size * _render_option.scale;
     }
     return offset * _render_option.scale;
 }
 
-fn _render_char(self: *Self, char: u21, out_shape_src: *graphics.shape_source, offset: *point, area: ?math.point, scale: point, allocator: std.mem.Allocator) !void {
+pub fn render_string(self: *Self, _str: []const u8, _render_option: render_option, allocator: std.mem.Allocator, in_out_shape_src: *graphics.shape_source) !void {
+    var vertex_array: []graphics.shape_vertex_2d = try allocator.alloc(graphics.shape_vertex_2d, 0);
+    var index_array: []u32 = try allocator.alloc(u32, 0);
+    defer {
+        allocator.free(vertex_array);
+        allocator.free(index_array);
+    }
+    _ = try _render_string(self, _str, _render_option, &vertex_array, &index_array, allocator);
+    in_out_shape_src.*.color = _render_option.color orelse vector{ 0, 0, 0, 1 };
+    in_out_shape_src.*.build(vertex_array, index_array, _render_option.flag, _render_option.color_flag);
+}
+
+fn _render_char(self: *Self, char: u21, _vertex_array: *[]graphics.shape_vertex_2d, _index_array: *[]u32, offset: *point, area: ?math.point, scale: point, allocator: std.mem.Allocator) !void {
     var char_d: ?*char_data = self.*.__char_array.getPtr(char);
 
     if (char_d != null) {} else blk: {
@@ -205,25 +223,14 @@ fn _render_char(self: *Self, char: u21, out_shape_src: *graphics.shape_source, o
 
         var char_d2: char_data = undefined;
 
-        var poly: geometry.polygon = .{ .lines = try allocator.alloc([]geometry.line, self.*.__face.*.glyph.*.outline.n_contours) };
+        var poly: geometry.shapes = .{ .nodes = try allocator.alloc(geometry.shapes.shape_node, 1) };
         defer {
-            for (poly.lines) |v| {
-                allocator.free(v);
+            for (poly.nodes) |v| {
+                allocator.free(v.lines.?);
             }
-            allocator.free(poly.lines);
+            allocator.free(poly.nodes);
         }
-
-        // if (xfit.dbg) {
-        //     var d: usize = 0;
-        //     while (d < self.__face.*.glyph.*.outline.n_points) : (d += 1) {
-        //         xfit.print_debug("[{d}] {d},{d} tag {d}", .{
-        //             d,
-        //             @as(f32, @floatFromInt(self.*.__face.*.glyph.*.outline.points[d].x)) / (64.0 * self.*.scale),
-        //             @as(f32, @floatFromInt(self.*.__face.*.glyph.*.outline.points[d].y)) / (64.0 * self.*.scale),
-        //             self.*.__face.*.glyph.*.outline.tags[d],
-        //         });
-        //     }
-        // }
+        poly.nodes[0].lines.? = try allocator.alloc(geometry.line, self.*.__face.*.glyph.*.outline.n_points);
 
         const funcs: freetype.FT_Outline_Funcs = .{
             .line_to = line_to,
@@ -235,7 +242,6 @@ fn _render_char(self: *Self, char: u21, out_shape_src: *graphics.shape_source, o
         var data: font_user_data = .{
             .pen = .{ 0, 0 },
             .polygon = &poly,
-            .idx = 0,
             .idx2 = 0,
             .allocator = allocator,
             .len = self.*.__face.*.glyph.*.outline.n_points,
@@ -252,21 +258,19 @@ fn _render_char(self: *Self, char: u21, out_shape_src: *graphics.shape_source, o
         if (data.len == 0) {
             char_d2.raw_p = null;
         } else {
-            poly.lines[data.idx - 1] = try allocator.realloc(poly.lines[data.idx - 1], data.idx2);
+            poly.nodes[0].lines.? = try allocator.realloc(poly.nodes[0].lines.?, data.idx2);
+            poly.nodes[0].stroke_lines = null;
+            poly.nodes[0].color = null;
+            poly.nodes[0].thickness = 0;
 
-            char_d2.raw_p = .{
-                .vertices = try allocator.alloc(graphics.shape_color_vertex_2d, 0),
-                .indices = try allocator.alloc(u32, 0),
-            };
-            try poly.compute_polygon(allocator, &char_d2.raw_p.?);
+            char_d2.raw_p = try poly.compute_polygon(allocator);
         }
         char_d2.advance[0] = @as(f32, @floatFromInt(self.*.__face.*.glyph.*.advance.x)) / (64.0 * self.*.scale);
         char_d2.advance[1] = @as(f32, @floatFromInt(self.*.__face.*.glyph.*.advance.y)) / (64.0 * self.*.scale);
 
         char_d2.allocator = allocator;
         self.*.__char_array.put(res, char_d2) catch |e| {
-            allocator.free(char_d2.raw_p.?.vertices);
-            allocator.free(char_d2.raw_p.?.indices);
+            char_d2.raw_p.?.deinit();
             return e;
         };
         char_d = &char_d2;
@@ -277,20 +281,20 @@ fn _render_char(self: *Self, char: u21, out_shape_src: *graphics.shape_source, o
         if (offset.*[1] <= -area.?[1]) return;
     }
     if (char_d.?.raw_p == null) {} else {
-        const len = out_shape_src.*.vertices.array.?.len;
-        out_shape_src.*.vertices.array.? = try allocator.realloc(out_shape_src.*.vertices.array.?, len + char_d.?.raw_p.?.vertices.len);
-        @memcpy(out_shape_src.*.vertices.array.?[len..], char_d.?.raw_p.?.vertices);
+        const len = _vertex_array.len;
+        _vertex_array.* = try allocator.realloc(_vertex_array.*, len + char_d.?.raw_p.?.vertices[0].len);
+        @memcpy(_vertex_array.*[len..], char_d.?.raw_p.?.vertices[0]);
         var i: usize = len;
-        while (i < out_shape_src.*.vertices.array.?.len) : (i += 1) {
-            out_shape_src.*.vertices.array.?[i].pos += offset.*;
-            out_shape_src.*.vertices.array.?[i].pos *= scale;
+        while (i < _vertex_array.*.len) : (i += 1) {
+            _vertex_array.*[i].pos += offset.*;
+            _vertex_array.*[i].pos *= scale;
         }
-        const ilen = out_shape_src.*.indices.array.?.len;
-        out_shape_src.*.indices.array = try allocator.realloc(out_shape_src.*.indices.array.?, ilen + char_d.?.raw_p.?.indices.len);
-        @memcpy(out_shape_src.*.indices.array.?[ilen..], char_d.?.raw_p.?.indices);
+        const ilen = _index_array.len;
+        _index_array.* = try allocator.realloc(_index_array.*, ilen + char_d.?.raw_p.?.indices[0].len);
+        @memcpy(_index_array.*[ilen..], char_d.?.raw_p.?.indices[0]);
         i = ilen;
-        while (i < out_shape_src.*.indices.array.?.len) : (i += 1) {
-            out_shape_src.*.indices.array.?[i] += @intCast(len);
+        while (i < _index_array.*.len) : (i += 1) {
+            _index_array.*[i] += @intCast(len);
         }
     }
     offset.*[0] += char_d.?.*.advance[0];
@@ -299,8 +303,7 @@ fn _render_char(self: *Self, char: u21, out_shape_src: *graphics.shape_source, o
 
 const font_user_data = struct {
     pen: point,
-    polygon: *geometry.polygon,
-    idx: u32,
+    polygon: *geometry.shapes,
     idx2: u32,
     len: u32,
     scale: f32,
@@ -314,7 +317,7 @@ fn line_to(vec: [*c]const freetype.FT_Vector, user: ?*anyopaque) callconv(.C) c_
         @as(f32, @floatFromInt(vec.*.y)) / (64.0 * data.*.scale),
     };
 
-    data.*.polygon.*.lines[data.*.idx - 1][data.*.idx2] = geometry.line.line_init(
+    data.*.polygon.*.nodes[0].lines.?[data.*.idx2] = geometry.line.line_init(
         data.*.pen,
         end,
     );
@@ -334,7 +337,7 @@ fn conic_to(vec: [*c]const freetype.FT_Vector, vec2: [*c]const freetype.FT_Vecto
         @as(f32, @floatFromInt(vec2.*.y)) / (64.0 * data.*.scale),
     };
 
-    data.*.polygon.*.lines[data.*.idx - 1][data.*.idx2] = geometry.line.quadratic_init(
+    data.*.polygon.*.nodes[0].lines.?[data.*.idx2] = geometry.line.quadratic_init(
         data.*.pen,
         control0,
         end,
@@ -359,7 +362,7 @@ fn cubic_to(vec: [*c]const freetype.FT_Vector, vec2: [*c]const freetype.FT_Vecto
         @as(f32, @floatFromInt(vec3.*.y)) / (64.0 * data.*.scale),
     };
 
-    data.*.polygon.*.lines[data.*.idx - 1][data.*.idx2] = .{
+    data.*.polygon.*.nodes[0].lines.?[data.*.idx2] = .{
         .start = data.*.pen,
         .control0 = control0,
         .control1 = control1,
@@ -377,11 +380,5 @@ fn move_to(vec: [*c]const freetype.FT_Vector, user: ?*anyopaque) callconv(.C) c_
         @as(f32, @floatFromInt(vec.*.x)) / (64.0 * data.*.scale),
         @as(f32, @floatFromInt(vec.*.y)) / (64.0 * data.*.scale),
     };
-    data.*.idx += 1;
-    data.*.polygon.*.lines[data.*.idx - 1] = data.*.allocator.alloc(geometry.line, data.*.len) catch return -1;
-    if (data.*.idx2 > 0) {
-        data.*.polygon.*.lines[data.*.idx - 2] = data.*.allocator.realloc(data.*.polygon.*.lines[data.*.idx - 2], data.*.idx2) catch return -1;
-    }
-    data.*.idx2 = 0;
     return 0;
 }

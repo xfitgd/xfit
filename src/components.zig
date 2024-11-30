@@ -7,6 +7,8 @@ const __system = @import("__system.zig");
 const iobject = graphics.iobject;
 const transform = graphics.transform;
 const shape_source = graphics.shape_source;
+const shape_node = geometry.shapes.shape_node;
+const shapes = geometry.shapes;
 
 const __vulkan = @import("__vulkan.zig");
 const vk = __vulkan.vk;
@@ -49,11 +51,6 @@ pub const button_source = struct {
     pub fn init() button_source {
         return .{
             .src = shape_source.init(),
-        };
-    }
-    pub fn init_for_alloc(__allocator: std.mem.Allocator) button_source {
-        return .{
-            .src = shape_source.init_for_alloc(__allocator),
         };
     }
 };
@@ -182,8 +179,8 @@ pub fn button_(_msaa: bool) type {
             }
         }
         pub fn make_square_button(_out: []*button_source, scale: point, thickness: f32, _allocator: std.mem.Allocator) !void {
-            _out[0].* = button_source.init_for_alloc(_allocator);
-            _out[1].* = button_source.init_for_alloc(_allocator);
+            _out[0].* = button_source.init();
+            _out[1].* = button_source.init();
             _out[0].*.down_color = .{ 0.5, 0.5, 0.5, 0.8 };
             _out[0].*.over_color = .{ 0.5, 0.7, 0.7, 1 };
             _out[0].*.src.color = .{ 0.7, 0.7, 0.7, 1 };
@@ -200,29 +197,19 @@ pub fn button_(_msaa: bool) type {
                 geometry.line.line_init(.{ -scale[0] / 2, -scale[1] / 2 }, .{ -scale[0] / 2, scale[1] / 2 }),
             };
 
-            var rl = [1][]geometry.line{rect_line[0..rect_line.len]};
-            var rect_poly: geometry.polygon = .{
-                .tickness = thickness,
-                .lines = rl[0..1],
+            var rl = [1]shape_node{.{
+                .lines = rect_line[0..rect_line.len],
+                .stroke_lines = rect_line[0..rect_line.len],
+                .thickness = thickness,
+            }};
+            var rect_poly: shapes = .{
+                .nodes = rl[0..1],
             };
-            var raw_polygon_outline = geometry.raw_polygon{
-                .vertices = try _allocator.alloc(graphics.shape_color_vertex_2d, 0),
-                .indices = try _allocator.alloc(u32, 0),
-            };
-            var raw_polygon = geometry.raw_polygon{
-                .vertices = try _allocator.alloc(graphics.shape_color_vertex_2d, 0),
-                .indices = try _allocator.alloc(u32, 0),
-            };
-            try rect_poly.compute_outline(_allocator, &raw_polygon_outline);
-            try rect_poly.compute_polygon(_allocator, &raw_polygon);
+            var raw_polygon = try rect_poly.compute_polygon(_allocator);
+            defer raw_polygon.deinit();
 
-            _out[0].*.src.vertices.array = raw_polygon.vertices;
-            _out[0].*.src.indices.array = raw_polygon.indices;
-            _out[0].*.src.build(.gpu, .cpu);
-
-            _out[1].*.src.vertices.array = raw_polygon_outline.vertices;
-            _out[1].*.src.indices.array = raw_polygon_outline.indices;
-            _out[1].*.src.build(.gpu, .cpu);
+            _out[0].*.src.build(raw_polygon.vertices[0], raw_polygon.indices[0], .gpu, .cpu);
+            _out[1].*.src.build(raw_polygon.vertices[1], raw_polygon.indices[1], .gpu, .cpu);
         }
         pub fn update(self: *Self) void {
             for (self.*.srcs) |v| {

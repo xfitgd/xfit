@@ -26,6 +26,7 @@ var yaml: *std.Build.Dependency = undefined;
 var xml: *std.Build.Dependency = undefined;
 var gltf: *std.Build.Dependency = undefined;
 var unit_tests: *std.Build.Step.Compile = undefined;
+var standard_target: std.Build.ResolvedTarget = undefined;
 
 ///? const src_path = b.dependency("xfit_build", .{}).*.path(".").getPath(b);
 pub fn build(b: *std.Build) !void {
@@ -33,12 +34,14 @@ pub fn build(b: *std.Build) !void {
     xml = b.dependency("xml", .{});
     gltf = b.dependency("zgltf", .{});
 
-    const target = b.standardTargetOptions(.{});
+    standard_target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
+
+    _ = b.addModule("xfit", .{ .root_source_file = b.path("src/xfit.zig") });
 
     unit_tests = b.addTest(.{
         .root_source_file = b.path("src/xfit.zig"),
-        .target = target,
+        .target = standard_target,
         .optimize = optimize,
     });
     unit_tests.root_module.addImport("yaml", yaml.module("yaml"));
@@ -58,7 +61,7 @@ pub fn build(b: *std.Build) !void {
     const xfit_docs = b.addStaticLibrary(.{
         .name = "xfit",
         .root_source_file = b.path("src/xfit.zig"),
-        .target = target,
+        .target = standard_target,
         .optimize = optimize,
     });
 
@@ -96,7 +99,8 @@ pub fn run(
     var arena_allocator = std.heap.ArenaAllocator.init(b.allocator);
     defer arena_allocator.deinit();
 
-    const src_path = b.dependency("xfit_build", .{}).*.path(".").getPath(b);
+    const bb = b.dependency("xfit_build", .{});
+    const src_path = bb.path(".").getPath(b);
     const engine_path = try std.fmt.allocPrint(arena_allocator.allocator(), "{s}/src", .{src_path});
 
     if (builtin.os.tag == .windows) {
@@ -183,14 +187,14 @@ pub fn run(
         "libXrandr.so",
     };
 
+    const build_options_module = build_options.createModule();
+
+    const xfit = bb.module("xfit");
+    xfit.addImport("build_options", build_options_module);
+    
     var i: usize = 0;
     while (i < targets.len) : (i += 1) {
         var result: *std.Build.Step.Compile = undefined;
-
-        const build_options_module = build_options.createModule();
-
-        const xfit = b.addModule("xfit", .{ .root_source_file = get_lazypath(b, try std.fmt.allocPrint(arena_allocator.allocator(), "{s}/xfit.zig", .{engine_path})) });
-        xfit.addImport("build_options", build_options_module);
 
         if (option.PLATFORM == XfitPlatform.android) {
             if (option.is_console) @panic("mobile do not support console");
@@ -384,7 +388,7 @@ pub fn run(
 
     b.default_step.dependOn(&cmd.step);
 
-    const run_unit_tests = b.addRunArtifact(unit_tests);
+    const run_unit_tests2 = b.addRunArtifact(unit_tests);
     const test_step = b.step("test", "Run unit tests");
-    test_step.dependOn(&run_unit_tests.step);
+    test_step.dependOn(&run_unit_tests2.step);
 }

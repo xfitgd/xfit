@@ -124,12 +124,11 @@ pub fn xfit_init() !void {
     img = try objects_mem_pool.create();
     anim_img = try objects_mem_pool.create();
 
-    shape_src2 = graphics.shape_source.init_for_alloc(allocator);
-    shape_src2.color = .{ 1, 0, 1, 1 };
+    shape_src2 = graphics.shape_source.init();
 
     //graphics.set_render_clear_color(.{ 1, 1, 1, 0 });
 
-    rect_button_text_src = components.button_source.init_for_alloc(allocator);
+    rect_button_text_src = components.button_source.init();
 
     try components.button.make_square_button(rect_button_srcs[0..2], .{ 200, 100 }, 2, allocator);
 
@@ -182,16 +181,9 @@ pub fn xfit_init() !void {
     text_shape.* = .{ ._shape = graphics.shape.init(&shape_src[0]) };
     // var t1 = std.time.Timer.start() catch unreachable;
     // xfit.print("{d}", .{t1.lap()});
-    _ = try font0.render_string("CONTINUE계속", .{}, &shape_src2, allocator);
+    try font0.render_string("CONTINUE계속", .{ .color = .{ 1, 0, 1, 1 } }, allocator, &shape_src2);
 
-    _ = try font0.render_string("버튼", .{ .pivot = .{ 0.5, 0.3 }, .scale = .{ 4.5, 4.5 } }, &rect_button_text_src.src, allocator);
-
-    for (shape_src) |*src| {
-        src.*.build(.gpu, .cpu);
-    }
-    shape_src2.build(.gpu, .cpu);
-    rect_button_text_src.src.color = .{ 0, 0, 0, 1 };
-    rect_button_text_src.src.build(.gpu, .cpu);
+    try font0.render_string("버튼", .{ .pivot = .{ 0.5, 0.3 }, .scale = .{ 4.5, 4.5 }, .color = .{ 0, 0, 0, 1 } }, allocator, &rect_button_text_src.src);
 
     rect_button.* = .{ ._button = components.button.init(rect_button_srcs[0..3], .{ .rect = math.rect.calc_with_canvas(button_area_rect, CANVAS_W, CANVAS_H) }) };
     rect_button.*._button.transform.camera = &g_camera;
@@ -374,13 +366,13 @@ pub fn xfit_destroy() !void {
     move_callback_thread.join();
 
     for (shape_src) |*src| {
-        src.*.deinit_for_alloc();
+        src.*.deinit();
     }
     allocator.free(text_shape.*._shape.extra_src.?);
-    shape_src2.deinit_for_alloc();
-    rect_button_src.src.deinit_for_alloc();
-    rect_button_src2.src.deinit_for_alloc();
-    rect_button_text_src.src.deinit_for_alloc();
+    shape_src2.deinit();
+    rect_button_src.src.deinit();
+    rect_button_src2.src.deinit();
+    rect_button_text_src.src.deinit();
 
     allocator.free(image_src.pixels.?);
     allocator.free(anim_image_src.pixels.?);

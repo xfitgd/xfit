@@ -1,3 +1,4 @@
+///! incomplete
 const std = @import("std");
 const xml = @import("xfit.zig").xml;
 const meta = @import("meta.zig");
@@ -9,6 +10,7 @@ const ArrayList = std.ArrayList;
 
 const point = math.point;
 const vector = math.vector;
+const shapes = geometry.shapes;
 
 pub const SVG = struct {
     width: ?u32 = null,
@@ -68,6 +70,10 @@ pub const POLYLINE = struct {
 pub const POLYGON = struct {
     points: ?[]point = null,
     _0: FILL_AND_STROKE = .{},
+};
+
+pub const SVG_ERROR = error{
+    NOT_INITIALIZED,
 };
 
 arena_allocator: ?std.heap.ArenaAllocator = null,
@@ -181,6 +187,18 @@ pub fn parse(allocator: std.mem.Allocator, _svg_data: []const u8) !Self {
     self.polygon = polygon.items;
     self.line = line.items;
     return self; //?arraylists will not be deallocated when you leave this function.
+}
+
+pub fn calculate_polygon(self: Self) !shapes {
+    if (self.arena_allocator == null) {
+        return SVG_ERROR.NOT_INITIALIZED;
+    }
+    // var shps = shapes{
+    //     .lines = undefined,
+    //     .colors = undefined,
+    //     .tickness = undefined,
+    // };
+    //_ = shps;
 }
 
 test "parse" {

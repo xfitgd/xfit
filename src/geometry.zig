@@ -28,7 +28,7 @@ pub const line_error = error{
     out_of_idx,
 } || std.mem.Allocator.Error;
 
-pub const polygon_error = error{
+pub const shapes_error = error{
     is_not_polygon,
     invaild_polygon_line_counts,
     cant_polygon_match_holes,
@@ -172,10 +172,14 @@ pub const compute_option = struct {
     mat: math.matrix,
 };
 
-pub const polygon = struct {
-    lines: [][]line,
-    colors: ?[]vector = null,
-    tickness: f32 = 3,
+pub const shapes = struct {
+    pub const shape_node = struct {
+        lines: ?[]line = null,
+        stroke_lines: ?[]line = null,
+        color: ?vector = null,
+        thickness: f32 = 0,
+    };
+    nodes: []shape_node,
 
     ///https://stackoverflow.com/a/73061541
     fn extend_point(prev: point, cur: point, next: point, tickness: f32, ccw: f32) point {
@@ -198,214 +202,175 @@ pub const polygon = struct {
         return point{ cur[0] + bislen * bisn[0], cur[1] + bislen * bisn[1] };
     }
 
-    ///raw_polygon elements need alloc
-    pub fn compute_outline(self: polygon, allocator: std.mem.Allocator, _inout: *raw_polygon) polygon_error!void {
-        const lines_ = try allocator.alloc([]line, self.lines.len * 2);
-        defer allocator.free(lines_);
-        var i: usize = 0;
-        while (i < self.lines.len) : (i += 1) {
-            lines_[i * 2] = allocator.alloc(line, self.lines[i].len) catch |e| {
-                var j: usize = 0;
-                while (j < i * 2) : (j += 1) {
-                    allocator.free(lines_[j]);
-                }
-                return e;
-            };
-            lines_[i * 2 + 1] = allocator.alloc(line, self.lines[i].len) catch |e| {
-                var j: usize = 0;
-                while (j < i * 2 + 1) : (j += 1) {
-                    allocator.free(lines_[j]);
-                }
-                return e;
-            };
-            var j: usize = 0;
-            const ccw: f32 = if (math.cross2(self.lines[i][0].start, if (self.lines[i][0].curve_type == .line) self.lines[i][0].end else self.lines[i][0].control0) > 0) -1 else 1;
-
-            while (j < self.lines[i].len) : (j += 1) {
-                const next = (j + 1) % self.lines[i].len;
-                const prev = if (j == 0) self.lines[i].len - 1 else (j - 1);
-
-                if (self.lines[i][j].curve_type == .line) {
-                    lines_[i * 2][j].start = extend_point(
-                        if (self.lines[i][prev].curve_type == .line) self.lines[i][prev].start else self.lines[i][prev].control1,
-                        self.lines[i][j].start,
-                        self.lines[i][j].end,
-                        self.tickness,
-                        ccw,
-                    );
-                    lines_[i * 2][j].end = extend_point(
-                        self.lines[i][j].start,
-                        self.lines[i][j].end,
-                        if (self.lines[i][next].curve_type == .line) self.lines[i][next].end else self.lines[i][next].control0,
-                        self.tickness,
-                        ccw,
-                    );
-                    lines_[i * 2 + 1][j].start = extend_point(
-                        if (self.lines[i][prev].curve_type == .line) self.lines[i][prev].start else self.lines[i][prev].control1,
-                        self.lines[i][j].start,
-                        self.lines[i][j].end,
-                        -self.tickness,
-                        ccw,
-                    );
-                    lines_[i * 2 + 1][j].end = extend_point(
-                        self.lines[i][j].start,
-                        self.lines[i][j].end,
-                        if (self.lines[i][next].curve_type == .line) self.lines[i][next].end else self.lines[i][next].control0,
-                        -self.tickness,
-                        ccw,
-                    );
-                    lines_[i * 2][j].curve_type = .line;
-                    lines_[i * 2 + 1][j].curve_type = .line;
-                } else {
-                    lines_[i * 2][j].start = extend_point(
-                        if (self.lines[i][prev].curve_type == .line) self.lines[i][prev].start else self.lines[i][prev].control1,
-                        self.lines[i][j].start,
-                        self.lines[i][j].control0,
-                        self.tickness,
-                        ccw,
-                    );
-                    lines_[i * 2][j].control0 = extend_point(
-                        self.lines[i][j].start,
-                        self.lines[i][j].control0,
-                        self.lines[i][j].control1,
-                        self.tickness,
-                        ccw,
-                    );
-                    lines_[i * 2][j].control1 = extend_point(
-                        self.lines[i][j].control0,
-                        self.lines[i][j].control1,
-                        self.lines[i][j].end,
-                        self.tickness,
-                        ccw,
-                    );
-                    lines_[i * 2][j].end = extend_point(
-                        self.lines[i][j].control1,
-                        self.lines[i][j].end,
-                        if (self.lines[i][next].curve_type == .line) self.lines[i][next].end else self.lines[i][next].control0,
-                        self.tickness,
-                        ccw,
-                    );
-                    lines_[i * 2 + 1][j].start = extend_point(
-                        if (self.lines[i][prev].curve_type == .line) self.lines[i][prev].start else self.lines[i][prev].control1,
-                        self.lines[i][j].start,
-                        self.lines[i][j].control0,
-                        -self.tickness,
-                        ccw,
-                    );
-                    lines_[i * 2 + 1][j].control0 = extend_point(
-                        self.lines[i][j].start,
-                        self.lines[i][j].control0,
-                        self.lines[i][j].control1,
-                        -self.tickness,
-                        ccw,
-                    );
-                    lines_[i * 2 + 1][j].control1 = extend_point(
-                        self.lines[i][j].control0,
-                        self.lines[i][j].control1,
-                        self.lines[i][j].end,
-                        -self.tickness,
-                        ccw,
-                    );
-                    lines_[i * 2 + 1][j].end = extend_point(
-                        self.lines[i][j].control1,
-                        self.lines[i][j].end,
-                        if (self.lines[i][next].curve_type == .line) self.lines[i][next].end else self.lines[i][next].control0,
-                        -self.tickness,
-                        ccw,
-                    );
-                    lines_[i * 2][j].curve_type = self.lines[i][j].curve_type;
-                    lines_[i * 2 + 1][j].curve_type = self.lines[i][j].curve_type;
-                }
-            }
-        }
-        defer {
-            for (lines_) |l| allocator.free(l);
-        }
-
-        try _compute_polygon(self, allocator, _inout, lines_);
-    }
-
-    pub fn apply_option(self: polygon, option: compute_option, _out_lines: [][]line) polygon_error!void {
-        if (_out_lines.len != self.lines.len) return polygon_error.invaild_line;
+    pub fn apply_option(self: shapes, option: compute_option, _out_lines: [][]line) shapes_error!void {
+        if (_out_lines.len != self.lines.len) return shapes_error.invaild_line;
 
         for (_out_lines, self.lines) |v, l| {
-            if (v.len != l.len) return polygon_error.invaild_line;
+            if (v.len != l.len) return shapes_error.invaild_line;
             for (v, l) |*v2, l2| {
                 v2.* = l2.mul_mat(option.mat);
             }
         }
     }
 
-    fn _compute_polygon(self: polygon, allocator: std.mem.Allocator, _inout: *raw_polygon, _lines: [][]line) polygon_error!void {
-        var i: usize = 0;
-        var count: usize = 0;
-        var curve_vertice_len: usize = 0;
-        var vertice_len: usize = 0;
-        var indices_len: usize = 0;
-        _ = self;
+    fn _compute_polygon_sub(_out: *raw_shapes, _lines: []line, _vertices_list: *ArrayList([]graphics.shape_vertex_2d), _indices_list: *ArrayList([]u32)) shapes_error!void {
+        var vertices_sub_list: ArrayList(graphics.shape_vertex_2d) = ArrayList(graphics.shape_vertex_2d).init(_out.*.allocator.?.allocator());
+        var indices_sub_list: ArrayList(u32) = ArrayList(u32).init(_out.*.allocator.?.allocator());
+        var vertex_len: u32 = 0;
+        var first_vertex_idx: u32 = 0;
 
-        while (count < _lines.len) : (count += 1) {
-            if (_lines[count].len < 3) return polygon_error.is_not_polygon;
-            i = 0;
-            vertice_len += 1;
-            while (i < _lines[count].len) : (i += 1) {
-                if (_lines[count][i].curve_type != .line) {
-                    curve_vertice_len += 8;
-                }
-                vertice_len += 1;
+        while (vertex_len < _lines.len) {
+            const start_vertex = _lines[first_vertex_idx].start;
+            for (_lines[first_vertex_idx..]) |l| {
+                vertex_len += 1;
+                if (math.compare(l.end, start_vertex)) break;
             }
-        }
-        _inout.*.vertices = try allocator.realloc(_inout.*.vertices, _inout.*.vertices.len + vertice_len + curve_vertice_len);
-        //index count is about max value
-        _inout.*.indices = try allocator.realloc(_inout.*.indices, _inout.*.vertices.len * 3);
-        vertice_len = 0;
-        count = 0;
-        while (count < _lines.len) : (count += 1) {}
+            if (vertex_len == _lines.len and !math.compare(start_vertex, _lines[vertex_len - 1].end)) {
+                return shapes_error.invaild_line;
+            }
+            var i: u32 = first_vertex_idx;
 
-        count = 0;
-        while (count < _lines.len) : (count += 1) {
-            i = 0;
-            const first_vertex = vertice_len;
-            _inout.*.vertices[first_vertex].pos = .{ std.math.floatMax(f32), std.math.floatMin(f32) };
-            _inout.*.vertices[first_vertex].uvw = .{ 1, 0, 0 };
-            vertice_len += 1;
-            while (i < _lines[count].len) : (i += 1) {
-                _inout.*.vertices[vertice_len].pos = _lines[count][i].start;
-                vertice_len += 1;
-            }
-            i = first_vertex + 1;
+            try vertices_sub_list.append(.{ .pos = .{ std.math.floatMax(f32), std.math.floatMin(f32) }, .uvw = .{ 1, 0, 0 } });
+            const first_vertex = &vertices_sub_list.items[vertices_sub_list.items.len - 1];
+            const first_vertex_idx2: u32 = @intCast(vertices_sub_list.items.len - 1); // we need first {std.math.floatMax(f32), std.math.floatMin(f32) } point, so save idx2 separate
+
             var maxX: f32 = std.math.floatMin(f32);
             var minY: f32 = std.math.floatMax(f32);
-            while (i < vertice_len) : (i += 1) {
-                if (_inout.*.vertices[first_vertex].pos[0] > _inout.*.vertices[i].pos[0]) _inout.*.vertices[first_vertex].pos[0] = _inout.*.vertices[i].pos[0];
-                if (_inout.*.vertices[first_vertex].pos[1] < _inout.*.vertices[i].pos[1]) _inout.*.vertices[first_vertex].pos[1] = _inout.*.vertices[i].pos[1];
-                if (maxX < _inout.*.vertices[i].pos[0]) maxX = _inout.*.vertices[i].pos[0];
-                if (minY > _inout.*.vertices[i].pos[1]) minY = _inout.*.vertices[i].pos[1];
+            while (i < vertex_len) : (i += 1) {
+                try vertices_sub_list.append(.{ .pos = _lines[i].start, .uvw = .{ 1, 0, 0 } });
+                const last_vertex = &vertices_sub_list.items[vertices_sub_list.items.len - 1];
+                if (first_vertex.*.pos[0] > last_vertex.*.pos[0]) first_vertex.*.pos[0] = last_vertex.*.pos[0];
+                if (first_vertex.*.pos[1] < last_vertex.*.pos[1]) first_vertex.*.pos[1] = last_vertex.*.pos[1];
+                if (maxX < last_vertex.*.pos[0]) maxX = last_vertex.*.pos[0];
+                if (minY > last_vertex.*.pos[1]) minY = last_vertex.*.pos[1];
 
-                _inout.*.vertices[i].uvw = .{ 1, 0, 0 };
+                try indices_sub_list.append(first_vertex_idx2);
+                try indices_sub_list.append(@intCast(vertices_sub_list.items.len - 1));
+                try indices_sub_list.append(if (i < vertex_len - 1) @intCast(vertices_sub_list.items.len - 1 + 1) else first_vertex_idx2 + 1);
+            }
+            first_vertex.*.pos[0] -= (maxX - first_vertex.*.pos[0]) / 2;
+            first_vertex.*.pos[1] += (first_vertex.*.pos[1] - minY) / 2;
 
-                _inout.*.indices[indices_len] = @intCast(first_vertex);
-                _inout.*.indices[indices_len + 1] = @intCast(i);
-                _inout.*.indices[indices_len + 2] = if (i < vertice_len - 1) @intCast(i + 1) else @intCast(first_vertex + 1);
-                indices_len += 3;
+            for (_lines[first_vertex_idx..]) |*l| {
+                try l.*.compute_curve(&vertices_sub_list, &indices_sub_list);
             }
-            _inout.*.vertices[first_vertex].pos[0] -= (maxX - _inout.*.vertices[first_vertex].pos[0]) / 2;
-            _inout.*.vertices[first_vertex].pos[1] += (_inout.*.vertices[first_vertex].pos[1] - minY) / 2;
+            first_vertex_idx = i;
         }
-        count = 0;
-        while (count < _lines.len) : (count += 1) {
-            i = 0;
-            while (i < _lines[count].len) : (i += 1) {
-                try _lines[count][i].compute_curve(_inout.*.vertices, _inout.*.indices, &vertice_len, &indices_len);
-            }
-        }
-        _inout.*.vertices = try allocator.realloc(_inout.*.vertices, vertice_len);
-        _inout.*.indices = try allocator.realloc(_inout.*.indices, indices_len);
+        try _vertices_list.*.append(vertices_sub_list.items);
+        try _indices_list.*.append(indices_sub_list.items);
     }
 
-    ///raw_polygon elements need alloc
-    pub fn compute_polygon(self: polygon, allocator: std.mem.Allocator, _inout: *raw_polygon) polygon_error!void {
-        try _compute_polygon(self, allocator, _inout, self.lines);
+    fn _compute_polygon_sub_outline(_out: *raw_shapes, _lines: []line, _vertices_list: *ArrayList([]graphics.shape_vertex_2d), _indices_list: *ArrayList([]u32), thickness: f32) shapes_error!void {
+        var vertices_sub_list: ArrayList(graphics.shape_vertex_2d) = ArrayList(graphics.shape_vertex_2d).init(_out.*.allocator.?.allocator());
+        var indices_sub_list: ArrayList(u32) = ArrayList(u32).init(_out.*.allocator.?.allocator());
+
+        for (&[_]f32{ thickness, -thickness }) |t| {
+            var vertex_len: u32 = 0;
+            var first_vertex_idx: u32 = 0;
+            while (vertex_len < _lines.len) {
+                const start_vertex = _lines[first_vertex_idx].start;
+                for (_lines[first_vertex_idx..]) |l| {
+                    vertex_len += 1;
+                    if (math.compare(l.end, start_vertex)) break;
+                }
+                if (vertex_len == _lines.len and !math.compare(start_vertex, _lines[vertex_len - 1].end)) {
+                    return shapes_error.invaild_line;
+                }
+                var i: u32 = first_vertex_idx;
+                const ccw: f32 = if (math.cross2(_lines[first_vertex_idx].start, if (_lines[first_vertex_idx].curve_type == .line) _lines[first_vertex_idx].end else _lines[first_vertex_idx].control0) > 0) -1 else 1;
+
+                try vertices_sub_list.append(.{ .pos = .{ std.math.floatMax(f32), std.math.floatMin(f32) }, .uvw = .{ 1, 0, 0 } });
+                const first_vertex = &vertices_sub_list.items[vertices_sub_list.items.len - 1];
+                const first_vertex_idx2: u32 = @intCast(vertices_sub_list.items.len - 1); // we need first {std.math.floatMax(f32), std.math.floatMin(f32) } point, so save idx2 separate
+
+                var maxX: f32 = std.math.floatMin(f32);
+                var minY: f32 = std.math.floatMax(f32);
+                while (i < vertex_len) : (i += 1) {
+                    const next = if (i + 1 < vertex_len) i + 1 else first_vertex_idx;
+                    const prev = if (i == first_vertex_idx) vertex_len - 1 else (i - 1);
+
+                    if (_lines[i].curve_type == .line) { //if type is line, no need to change _lines value
+                        try vertices_sub_list.append(.{ .pos = extend_point(
+                            if (_lines[prev].curve_type == .line) _lines[prev].start else _lines[prev].control1,
+                            _lines[i].start,
+                            _lines[i].end,
+                            t,
+                            ccw,
+                        ), .uvw = .{ 1, 0, 0 } });
+                    } else {
+                        _lines[i].start = extend_point(
+                            if (_lines[prev].curve_type == .line) _lines[prev].start else _lines[prev].control1,
+                            _lines[i].start,
+                            _lines[i].control0,
+                            t,
+                            ccw,
+                        );
+                        try vertices_sub_list.append(.{ .pos = _lines[i].start, .uvw = .{ 1, 0, 0 } });
+
+                        _lines[i].control0 = extend_point(
+                            _lines[i].start,
+                            _lines[i].control0,
+                            _lines[i].control1,
+                            t,
+                            ccw,
+                        );
+                        _lines[i].control1 = extend_point(
+                            _lines[i].control0,
+                            _lines[i].control1,
+                            _lines[i].end,
+                            t,
+                            ccw,
+                        );
+                        _lines[i].end = extend_point(
+                            _lines[i].control1,
+                            _lines[i].end,
+                            if (_lines[next].curve_type == .line) _lines[next].end else _lines[next].control0,
+                            t,
+                            ccw,
+                        );
+                    }
+                    const last_vertex = &vertices_sub_list.items[vertices_sub_list.items.len - 1];
+                    if (first_vertex.*.pos[0] > last_vertex.*.pos[0]) first_vertex.*.pos[0] = last_vertex.*.pos[0];
+                    if (first_vertex.*.pos[1] < last_vertex.*.pos[1]) first_vertex.*.pos[1] = last_vertex.*.pos[1];
+                    if (maxX < last_vertex.*.pos[0]) maxX = last_vertex.*.pos[0];
+                    if (minY > last_vertex.*.pos[1]) minY = last_vertex.*.pos[1];
+
+                    try indices_sub_list.append(first_vertex_idx2);
+                    try indices_sub_list.append(@intCast(vertices_sub_list.items.len - 1));
+                    try indices_sub_list.append(if (i < vertex_len - 1) @intCast(vertices_sub_list.items.len - 1 + 1) else first_vertex_idx2 + 1);
+                }
+                first_vertex.*.pos[0] -= (maxX - first_vertex.*.pos[0]) / 2;
+                first_vertex.*.pos[1] += (first_vertex.*.pos[1] - minY) / 2;
+
+                for (_lines[first_vertex_idx..]) |*l| {
+                    try l.*.compute_curve(&vertices_sub_list, &indices_sub_list);
+                }
+                first_vertex_idx = i;
+            }
+        }
+        try _vertices_list.*.append(vertices_sub_list.items);
+        try _indices_list.*.append(indices_sub_list.items);
+    }
+
+    pub fn compute_polygon(self: *shapes, allocator: std.mem.Allocator) shapes_error!raw_shapes {
+        var count: usize = 0;
+        var _out = raw_shapes{ .allocator = std.heap.ArenaAllocator.init(allocator) };
+        var vertices_list: ArrayList([]graphics.shape_vertex_2d) = ArrayList([]graphics.shape_vertex_2d).init(_out.allocator.?.allocator());
+        var indices_list: ArrayList([]u32) = ArrayList([]u32).init(_out.allocator.?.allocator());
+        errdefer _out.deinit();
+
+        count = 0;
+        while (count < self.*.nodes.len) : (count += 1) {
+            if (self.*.nodes[count].lines != null and self.*.nodes[count].lines.?.len >= 3) {
+                try _compute_polygon_sub(&_out, self.*.nodes[count].lines.?, &vertices_list, &indices_list);
+            }
+            if (self.*.nodes[count].stroke_lines != null and self.*.nodes[count].stroke_lines.?.len >= 3) {
+                try _compute_polygon_sub_outline(&_out, self.*.nodes[count].stroke_lines.?, &vertices_list, &indices_list, self.*.nodes[count].thickness);
+            }
+        }
+        _out.vertices = vertices_list.items;
+        _out.indices = indices_list.items;
+        return _out;
     }
 };
 
@@ -475,12 +440,12 @@ pub const line = struct {
     }
 
     /// out_vertices type is []shape_vertex_type, out_indices type is []idx_type
-    pub fn compute_curve(self: *Self, out_vertices: anytype, out_indices: anytype, in_out_vertice_len: *usize, in_out_indices_len: *usize) line_error!void {
-        return try __compute_curve(self, self.start, self.control0, self.control1, self.end, out_vertices, out_indices, in_out_vertice_len, in_out_indices_len, -1);
+    pub fn compute_curve(self: *Self, out_vertices: anytype, out_indices: anytype) line_error!void {
+        return try __compute_curve(self, self.start, self.control0, self.control1, self.end, out_vertices, out_indices, -1);
     }
 
     /// TODO need test and improvement https://github.com/azer89/GPU_Curve_Rendering/blob/master/QtTestShader/CurveRenderer.cpp
-    fn __compute_curve(self: *Self, _start: point, _control0: point, _control1: point, _end: point, out_vertices: anytype, out_indices: anytype, in_out_vertice_len: *usize, in_out_indices_len: *usize, repeat: i32) line_error!void {
+    fn __compute_curve(self: *Self, _start: point, _control0: point, _control1: point, _end: point, out_vertices: *ArrayList(graphics.shape_vertex_2d), out_indices: *ArrayList(u32), repeat: i32) line_error!void {
         var d1: f64 = undefined;
         var d2: f64 = undefined;
         var d3: f64 = undefined;
@@ -635,23 +600,16 @@ pub const line = struct {
             const x0123 = (x123 - x012) * subdiv + x012;
             const y0123 = (y123 - y012) * subdiv + y012;
 
-            out_vertices[in_out_vertice_len.*].pos = _start;
-            out_vertices[in_out_vertice_len.* + 1].pos = .{ x0123, y0123 };
-            out_vertices[in_out_vertice_len.* + 2].pos = _end;
+            try out_indices.*.append(@intCast(out_vertices.*.items.len));
+            try out_indices.*.append(@intCast(out_vertices.*.items.len + 1));
+            try out_indices.*.append(@intCast(out_vertices.*.items.len + 2));
 
-            out_vertices[in_out_vertice_len.*].uvw = .{ 1, 0, 0 };
-            out_vertices[in_out_vertice_len.* + 1].uvw = .{ 1, 0, 0 };
-            out_vertices[in_out_vertice_len.* + 2].uvw = .{ 1, 0, 0 };
+            try out_vertices.*.append(.{ .pos = _start, .uvw = .{ 1, 0, 0 } });
+            try out_vertices.*.append(.{ .pos = .{ x0123, y0123 }, .uvw = .{ 1, 0, 0 } });
+            try out_vertices.*.append(.{ .pos = _end, .uvw = .{ 1, 0, 0 } });
 
-            out_indices[in_out_indices_len.*] = @intCast(in_out_vertice_len.*);
-            out_indices[in_out_indices_len.* + 1] = @intCast(in_out_vertice_len.* + 1);
-            out_indices[in_out_indices_len.* + 2] = @intCast(in_out_vertice_len.* + 2);
-
-            in_out_vertice_len.* += 3;
-            in_out_indices_len.* += 3;
-
-            _ = try __compute_curve(self, _start, .{ x01, y01 }, .{ x012, y012 }, .{ x0123, y0123 }, out_vertices, out_indices, in_out_vertice_len, in_out_indices_len, if (artifact == 1) 0 else 1);
-            _ = try __compute_curve(self, .{ x0123, y0123 }, .{ x123, y123 }, .{ x23, y23 }, _end, out_vertices, out_indices, in_out_vertice_len, in_out_indices_len, if (artifact == 1) 1 else 0);
+            _ = try __compute_curve(self, _start, .{ x01, y01 }, .{ x012, y012 }, .{ x0123, y0123 }, out_vertices, out_indices, if (artifact == 1) 0 else 1);
+            _ = try __compute_curve(self, .{ x0123, y0123 }, .{ x123, y123 }, .{ x23, y23 }, _end, out_vertices, out_indices, if (artifact == 1) 1 else 0);
 
             return;
         }
@@ -667,23 +625,19 @@ pub const line = struct {
             mat[3][0] *= -1;
             mat[3][1] *= -1;
         }
-        out_vertices[in_out_vertice_len.*].pos = _start;
-        out_vertices[in_out_vertice_len.* + 1].pos = _control0;
-        out_vertices[in_out_vertice_len.* + 2].pos = _control1;
-        out_vertices[in_out_vertice_len.* + 3].pos = _end;
-
-        out_vertices[in_out_vertice_len.*].uvw = .{ mat[0][0], mat[0][1], mat[0][2] };
-        out_vertices[in_out_vertice_len.* + 1].uvw = .{ mat[1][0], mat[1][1], mat[1][2] };
-        out_vertices[in_out_vertice_len.* + 2].uvw = .{ mat[2][0], mat[2][1], mat[2][2] };
-        out_vertices[in_out_vertice_len.* + 3].uvw = .{ mat[3][0], mat[3][1], mat[3][2] };
+        const vertex_len = out_vertices.*.items.len;
+        try out_vertices.*.append(.{ .pos = _start, .uvw = .{ mat[0][0], mat[0][1], mat[0][2] } });
+        try out_vertices.*.append(.{ .pos = _control0, .uvw = .{ mat[1][0], mat[1][1], mat[1][2] } });
+        try out_vertices.*.append(.{ .pos = _control1, .uvw = .{ mat[2][0], mat[2][1], mat[2][2] } });
+        try out_vertices.*.append(.{ .pos = _end, .uvw = .{ mat[3][0], mat[3][1], mat[3][2] } });
 
         {
             var i: u32 = 0;
             while (i < 4) : (i += 1) {
                 var j: u32 = i + 1;
                 while (j < 4) : (j += 1) {
-                    if (math.compare(out_vertices[in_out_vertice_len.* + i].pos, out_vertices[in_out_vertice_len.* + j].pos)) {
-                        var indices: [3]usize = .{ in_out_vertice_len.*, in_out_vertice_len.*, in_out_vertice_len.* };
+                    if (math.compare(out_vertices.*.items[vertex_len + i].pos, out_vertices.*.items[vertex_len + j].pos)) {
+                        var indices: [3]usize = .{ vertex_len, vertex_len, vertex_len };
                         var index: u32 = 0;
                         var k: u32 = 0;
                         while (k < 4) : (k += 1) {
@@ -692,11 +646,9 @@ pub const line = struct {
                                 index += 1;
                             }
                         }
-                        out_indices[in_out_indices_len.*] = @intCast(indices[0]);
-                        out_indices[in_out_indices_len.* + 1] = @intCast(indices[1]);
-                        out_indices[in_out_indices_len.* + 2] = @intCast(indices[2]);
-                        in_out_vertice_len.* += 4;
-                        in_out_indices_len.* += 3;
+                        try out_indices.*.append(@intCast(indices[0]));
+                        try out_indices.*.append(@intCast(indices[1]));
+                        try out_indices.*.append(@intCast(indices[2]));
                         return;
                     }
                 }
@@ -705,7 +657,7 @@ pub const line = struct {
         {
             var i: usize = 0;
             while (i < 4) : (i += 1) {
-                var indices: [3]usize = .{ in_out_vertice_len.*, in_out_vertice_len.*, in_out_vertice_len.* };
+                var indices: [3]usize = .{ vertex_len, vertex_len, vertex_len };
                 var index: usize = 0;
                 var j: usize = 0;
                 while (j < 4) : (j += 1) {
@@ -714,15 +666,13 @@ pub const line = struct {
                         index += 1;
                     }
                 }
-                if (point_in_triangle(out_vertices[in_out_vertice_len.* + i].pos, out_vertices[indices[0]].pos, out_vertices[indices[1]].pos, out_vertices[indices[2]].pos)) {
+                if (point_in_triangle(out_vertices.*.items[vertex_len + i].pos, out_vertices.*.items[indices[0]].pos, out_vertices.*.items[indices[1]].pos, out_vertices.*.items[indices[2]].pos)) {
                     var k: usize = 0;
                     while (k < 3) : (k += 1) {
-                        out_indices[in_out_indices_len.*] = @intCast(indices[k]);
-                        out_indices[in_out_indices_len.* + 1] = @intCast(indices[(k + 1) % 3]);
-                        out_indices[in_out_indices_len.* + 2] = @intCast(in_out_vertice_len.* + i);
-                        in_out_indices_len.* += 3;
+                        try out_indices.*.append(@intCast(indices[k]));
+                        try out_indices.*.append(@intCast(indices[(k + 1) % 3]));
+                        try out_indices.*.append(@intCast(vertex_len + i));
                     }
-                    in_out_vertice_len.* += 4;
                     return;
                 }
             }
@@ -730,55 +680,52 @@ pub const line = struct {
 
         if (lines_intersect(_start, _control1, _control0, _end, null)) {
             if (math.length_pow(_control1, _start) < math.length_pow(_end, _control0)) {
-                out_indices[in_out_indices_len.*] = @intCast(in_out_vertice_len.*);
-                out_indices[in_out_indices_len.* + 1] = @intCast(in_out_vertice_len.* + 1);
-                out_indices[in_out_indices_len.* + 2] = @intCast(in_out_vertice_len.* + 2);
-                out_indices[in_out_indices_len.* + 3] = @intCast(in_out_vertice_len.*);
-                out_indices[in_out_indices_len.* + 4] = @intCast(in_out_vertice_len.* + 2);
-                out_indices[in_out_indices_len.* + 5] = @intCast(in_out_vertice_len.* + 3);
+                try out_indices.*.append(@intCast(vertex_len));
+                try out_indices.*.append(@intCast(vertex_len + 1));
+                try out_indices.*.append(@intCast(vertex_len + 2));
+                try out_indices.*.append(@intCast(vertex_len));
+                try out_indices.*.append(@intCast(vertex_len + 2));
+                try out_indices.*.append(@intCast(vertex_len + 3));
             } else {
-                out_indices[in_out_indices_len.*] = @intCast(in_out_vertice_len.*);
-                out_indices[in_out_indices_len.* + 1] = @intCast(in_out_vertice_len.* + 1);
-                out_indices[in_out_indices_len.* + 2] = @intCast(in_out_vertice_len.* + 3);
-                out_indices[in_out_indices_len.* + 3] = @intCast(in_out_vertice_len.* + 1);
-                out_indices[in_out_indices_len.* + 4] = @intCast(in_out_vertice_len.* + 2);
-                out_indices[in_out_indices_len.* + 5] = @intCast(in_out_vertice_len.* + 3);
+                try out_indices.*.append(@intCast(vertex_len));
+                try out_indices.*.append(@intCast(vertex_len + 1));
+                try out_indices.*.append(@intCast(vertex_len + 3));
+                try out_indices.*.append(@intCast(vertex_len + 1));
+                try out_indices.*.append(@intCast(vertex_len + 2));
+                try out_indices.*.append(@intCast(vertex_len + 3));
             }
         } else if (lines_intersect(_start, _end, _control0, _control1, null)) {
             if (math.length_pow(_end, _start) < math.length_pow(_control1, _control0)) {
-                out_indices[in_out_indices_len.*] = @intCast(in_out_vertice_len.*);
-                out_indices[in_out_indices_len.* + 1] = @intCast(in_out_vertice_len.* + 1);
-                out_indices[in_out_indices_len.* + 2] = @intCast(in_out_vertice_len.* + 3);
-                out_indices[in_out_indices_len.* + 3] = @intCast(in_out_vertice_len.*);
-                out_indices[in_out_indices_len.* + 4] = @intCast(in_out_vertice_len.* + 3);
-                out_indices[in_out_indices_len.* + 5] = @intCast(in_out_vertice_len.* + 2);
+                try out_indices.*.append(@intCast(vertex_len));
+                try out_indices.*.append(@intCast(vertex_len + 1));
+                try out_indices.*.append(@intCast(vertex_len + 3));
+                try out_indices.*.append(@intCast(vertex_len));
+                try out_indices.*.append(@intCast(vertex_len + 3));
+                try out_indices.*.append(@intCast(vertex_len + 2));
             } else {
-                out_indices[in_out_indices_len.*] = @intCast(in_out_vertice_len.*);
-                out_indices[in_out_indices_len.* + 1] = @intCast(in_out_vertice_len.* + 1);
-                out_indices[in_out_indices_len.* + 2] = @intCast(in_out_vertice_len.* + 2);
-                out_indices[in_out_indices_len.* + 3] = @intCast(in_out_vertice_len.* + 2);
-                out_indices[in_out_indices_len.* + 4] = @intCast(in_out_vertice_len.* + 1);
-                out_indices[in_out_indices_len.* + 5] = @intCast(in_out_vertice_len.* + 3);
+                try out_indices.*.append(@intCast(vertex_len));
+                try out_indices.*.append(@intCast(vertex_len + 1));
+                try out_indices.*.append(@intCast(vertex_len + 2));
+                try out_indices.*.append(@intCast(vertex_len + 2));
+                try out_indices.*.append(@intCast(vertex_len + 1));
+                try out_indices.*.append(@intCast(vertex_len + 3));
             }
         } else {
             if (math.length_pow(_control0, _start) < math.length_pow(_end, _control1)) {
-                out_indices[in_out_indices_len.*] = @intCast(in_out_vertice_len.*);
-                out_indices[in_out_indices_len.* + 1] = @intCast(in_out_vertice_len.* + 2);
-                out_indices[in_out_indices_len.* + 2] = @intCast(in_out_vertice_len.* + 1);
-                out_indices[in_out_indices_len.* + 3] = @intCast(in_out_vertice_len.*);
-                out_indices[in_out_indices_len.* + 4] = @intCast(in_out_vertice_len.* + 1);
-                out_indices[in_out_indices_len.* + 5] = @intCast(in_out_vertice_len.* + 3);
+                try out_indices.*.append(@intCast(vertex_len));
+                try out_indices.*.append(@intCast(vertex_len + 2));
+                try out_indices.*.append(@intCast(vertex_len + 1));
+                try out_indices.*.append(@intCast(vertex_len + 1));
+                try out_indices.*.append(@intCast(vertex_len + 3));
             } else {
-                out_indices[in_out_indices_len.*] = @intCast(in_out_vertice_len.*);
-                out_indices[in_out_indices_len.* + 1] = @intCast(in_out_vertice_len.* + 2);
-                out_indices[in_out_indices_len.* + 2] = @intCast(in_out_vertice_len.* + 3);
-                out_indices[in_out_indices_len.* + 3] = @intCast(in_out_vertice_len.* + 3);
-                out_indices[in_out_indices_len.* + 4] = @intCast(in_out_vertice_len.* + 2);
-                out_indices[in_out_indices_len.* + 5] = @intCast(in_out_vertice_len.* + 1);
+                try out_indices.*.append(@intCast(vertex_len));
+                try out_indices.*.append(@intCast(vertex_len + 2));
+                try out_indices.*.append(@intCast(vertex_len + 3));
+                try out_indices.*.append(@intCast(vertex_len + 3));
+                try out_indices.*.append(@intCast(vertex_len + 2));
+                try out_indices.*.append(@intCast(vertex_len + 1));
             }
         }
-        in_out_indices_len.* += 6;
-        in_out_vertice_len.* += 4;
     }
     pub fn get_curve_type(self: Self) line_error!curve_TYPE {
         var d1: f64 = undefined;
@@ -831,7 +778,12 @@ pub const line = struct {
     }
 };
 
-pub const raw_polygon = struct {
-    vertices: []graphics.shape_color_vertex_2d,
-    indices: []u32,
+pub const raw_shapes = struct {
+    vertices: [][]graphics.shape_vertex_2d = undefined,
+    indices: [][]u32 = undefined,
+    allocator: ?std.heap.ArenaAllocator = null,
+    pub fn deinit(self: *raw_shapes) void {
+        if (self.allocator == null) return;
+        self.allocator.?.deinit();
+    }
 };
