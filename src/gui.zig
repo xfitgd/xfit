@@ -109,7 +109,7 @@ pub const icomponent = struct {
         }
     }
 
-    pub inline fn size(self: icomponent) void {
+    pub fn size(self: icomponent) void {
         init(self);
         switch (self.obj.*) {
             inline else => |*case| {

@@ -15,6 +15,10 @@ fn _init_default_value_and_undefined(in_field: anytype) void {
     }
 }
 
+pub inline fn is_slice(comptime T: type) bool {
+    return @typeInfo(T) == .pointer and @typeInfo(T).pointer.size == .Slice;
+}
+
 pub inline fn parse_value(comptime T: type, _str: []const u8) !T {
     switch (@typeInfo(T)) {
         .int => |info| {

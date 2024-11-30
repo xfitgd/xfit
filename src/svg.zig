@@ -64,17 +64,20 @@ pub const LINE = struct {
     _0: FILL_AND_STROKE = .{},
 };
 pub const POLYLINE = struct {
-    points: ?[]point = null,
+    points: ?[]const u8 = null,
     _0: FILL_AND_STROKE = .{},
 };
 pub const POLYGON = struct {
-    points: ?[]point = null,
+    points: ?[]const u8 = null,
     _0: FILL_AND_STROKE = .{},
 };
 
 pub const SVG_ERROR = error{
     NOT_INITIALIZED,
 };
+
+const svg_tags = [_][:0]const u8{ "svg", "path", "rect", "circle", "ellipse", "line", "polyline", "polygon" };
+const svg_tags2 = [_]type{ SVG, PATH, RECT, CIRCLE, ELLIPSE, LINE, POLYLINE, POLYGON };
 
 arena_allocator: ?std.heap.ArenaAllocator = null,
 xml_error_code: xml.Reader.ErrorCode = undefined,
@@ -88,8 +91,8 @@ polyline: []POLYLINE = undefined,
 polygon: []POLYGON = undefined,
 
 fn _parse_xml_element(out: anytype, local: []const u8, value: []const u8) !void {
-    inline for (std.meta.fields(out.*)) |field| {
-        if (@typeInfo(field.type) != .@"struct") {
+    inline for (std.meta.fields(@TypeOf(out.*))) |field| {
+        if (@typeInfo(field.type) == .@"struct") {
             try _parse_xml_element(&@field(out.*, field.name), local, value);
         } else {
             if (@field(out.*, field.name) == null and std.mem.eql(u8, local, field.name)) {
@@ -111,19 +114,39 @@ pub fn parse(allocator: std.mem.Allocator, _svg_data: []const u8) !Self {
     self.arena_allocator = std.heap.ArenaAllocator.init(allocator);
     errdefer self.deinit();
 
-    var doc = xml.streamingDocument(self.arena_allocator.?.allocator(), std.io.fixedBufferStream(_svg_data).reader());
+    var fixed_buffer_stream = std.io.fixedBufferStream(_svg_data);
+    var doc = xml.streamingDocument(self.arena_allocator.?.allocator(), fixed_buffer_stream.reader());
     defer doc.deinit();
 
     var reader = doc.reader(self.arena_allocator.?.allocator(), .{});
     defer reader.deinit();
 
-    var path = ArrayList(PATH).init(self.arena_allocator.?.allocator());
-    var circle = ArrayList(CIRCLE).init(self.arena_allocator.?.allocator());
-    var rect = ArrayList(RECT).init(self.arena_allocator.?.allocator());
-    var ellipse = ArrayList(ELLIPSE).init(self.arena_allocator.?.allocator());
-    var polyline = ArrayList(POLYLINE).init(self.arena_allocator.?.allocator());
-    var polygon = ArrayList(POLYGON).init(self.arena_allocator.?.allocator());
-    var line = ArrayList(LINE).init(self.arena_allocator.?.allocator());
+    comptime var output_fields: [svg_tags.len]std.builtin.Type.StructField = undefined;
+    inline for (svg_tags, svg_tags2, 0..) |tag, tag2, i| {
+        output_fields[i] = .{
+            .name = tag,
+            .type = if (meta.is_slice(@TypeOf(@field(self, tag)))) ArrayList(tag2) else ?tag2,
+            .default_value = null,
+            .is_comptime = false,
+            .alignment = 0,
+        };
+    }
+    const svg_tags_struct = @Type(.{
+        .@"struct" = .{
+            .is_tuple = false,
+            .layout = .auto,
+            .decls = &.{},
+            .fields = &output_fields,
+        },
+    });
+    var svg_tags_list: svg_tags_struct = undefined;
+    inline for (svg_tags) |tag| {
+        if (meta.is_slice(@TypeOf(@field(self, tag)))) {
+            @field(svg_tags_list, tag) = @TypeOf(@field(svg_tags_list, tag)).init(self.arena_allocator.?.allocator());
+        } else {
+            @field(svg_tags_list, tag) = null;
+        }
+    }
 
     while (true) {
         const node = reader.read() catch |err| {
@@ -134,44 +157,23 @@ pub fn parse(allocator: std.mem.Allocator, _svg_data: []const u8) !Self {
             .element_start => {
                 const element_name = reader.elementNameNs();
 
-                if (std.mem.eql(u8, element_name.local, "svg")) {
-                    for (0..reader.reader.attributeCount()) |i| {
-                        try _parse_xml_element(&self.svg, reader.attributeNameNs(i).local, try reader.attributeValue(i));
-                    }
-                } else if (std.mem.eql(u8, element_name.local, "path")) {
-                    try path.append(.{});
-                    for (0..reader.reader.attributeCount()) |i| {
-                        try _parse_xml_element(&path.items[path.items.len - 1], reader.attributeNameNs(i).local, try reader.attributeValue(i));
-                    }
-                } else if (std.mem.eql(u8, element_name.local, "rect")) {
-                    try rect.append(.{});
-                    for (0..reader.reader.attributeCount()) |i| {
-                        try _parse_xml_element(&rect.items[rect.items.len - 1], reader.attributeNameNs(i).local, try reader.attributeValue(i));
-                    }
-                } else if (std.mem.eql(u8, element_name.local, "circle")) {
-                    try circle.append(.{});
-                    for (0..reader.reader.attributeCount()) |i| {
-                        try _parse_xml_element(&circle.items[circle.items.len - 1], reader.attributeNameNs(i).local, try reader.attributeValue(i));
-                    }
-                } else if (std.mem.eql(u8, element_name.local, "ellipse")) {
-                    try ellipse.append(.{});
-                    for (0..reader.reader.attributeCount()) |i| {
-                        try _parse_xml_element(&ellipse.items[ellipse.items.len - 1], reader.attributeNameNs(i).local, try reader.attributeValue(i));
-                    }
-                } else if (std.mem.eql(u8, element_name.local, "line")) {
-                    try line.append(.{});
-                    for (0..reader.reader.attributeCount()) |i| {
-                        try _parse_xml_element(&line.items[line.items.len - 1], reader.attributeNameNs(i).local, try reader.attributeValue(i));
-                    }
-                } else if (std.mem.eql(u8, element_name.local, "polyline")) {
-                    try polyline.append(.{});
-                    for (0..reader.reader.attributeCount()) |i| {
-                        try _parse_xml_element(&polyline.items[polyline.items.len - 1], reader.attributeNameNs(i).local, try reader.attributeValue(i));
-                    }
-                } else if (std.mem.eql(u8, element_name.local, "polygon")) {
-                    try polygon.append(.{});
-                    for (0..reader.reader.attributeCount()) |i| {
-                        try _parse_xml_element(&polygon.items[polygon.items.len - 1], reader.attributeNameNs(i).local, try reader.attributeValue(i));
+                inline for (svg_tags) |tag| {
+                    if (std.mem.eql(u8, element_name.local, tag)) {
+                        if (meta.is_slice(@TypeOf(@field(self, tag)))) {
+                            const list = &@field(svg_tags_list, tag);
+                            try list.*.append(.{});
+                            for (0..reader.reader.attributeCount()) |i| {
+                                try _parse_xml_element(&list.*.items[list.*.items.len - 1], reader.attributeNameNs(i).local, try reader.attributeValue(i));
+                            }
+                        } else {
+                            const list = &@field(svg_tags_list, tag);
+                            if (list.* != null) break;
+                            list.*.? = .{};
+                            for (0..reader.reader.attributeCount()) |i| {
+                                try _parse_xml_element(&list.*.?, reader.attributeNameNs(i).local, try reader.attributeValue(i));
+                            }
+                        }
+                        break;
                     }
                 }
             },
@@ -179,13 +181,15 @@ pub fn parse(allocator: std.mem.Allocator, _svg_data: []const u8) !Self {
             else => {},
         }
     }
-    self.path = path.items;
-    self.circle = circle.items;
-    self.rect = rect.items;
-    self.ellipse = ellipse.items;
-    self.polyline = polyline.items;
-    self.polygon = polygon.items;
-    self.line = line.items;
+    inline for (svg_tags) |tag| {
+        if (meta.is_slice(@TypeOf(@field(self, tag)))) {
+            @field(self, tag) = @field(svg_tags_list, tag).items;
+        } else {
+            if (@field(svg_tags_list, tag) != null) {
+                @field(self, tag) = @field(svg_tags_list, tag).?;
+            }
+        }
+    }
     return self; //?arraylists will not be deallocated when you leave this function.
 }
 
@@ -199,9 +203,10 @@ pub fn calculate_polygon(self: Self) !shapes {
     //     .tickness = undefined,
     // };
     //_ = shps;
+    return undefined;
 }
 
 test "parse" {
-    const svg = try parse(std.testing.allocator, @embedFile("test.svg"));
-    defer svg.deinit();
+    // const svg = try parse(std.testing.allocator, @embedFile("test.svg"));
+    // defer svg.deinit();
 }

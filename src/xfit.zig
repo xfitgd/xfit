@@ -42,7 +42,7 @@ test {
     std.testing.refAllDecls(xml);
     std.testing.refAllDecls(math);
     std.testing.refAllDecls(geometry);
-    //std.testing.refAllDecls(svg);
+    std.testing.refAllDecls(svg);
 }
 
 //system engine only headers
