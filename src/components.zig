@@ -196,11 +196,13 @@ pub fn button_(_msaa: bool) type {
                 geometry.line.line_init(.{ scale[0] / 2, -scale[1] / 2 }, .{ -scale[0] / 2, -scale[1] / 2 }),
                 geometry.line.line_init(.{ -scale[0] / 2, -scale[1] / 2 }, .{ -scale[0] / 2, scale[1] / 2 }),
             };
+            var rect_npoly: [1]u32 = .{rect_line.len};
 
             var rl = [1]shape_node{.{
                 .lines = rect_line[0..rect_line.len],
-                .stroke_lines = rect_line[0..rect_line.len],
                 .thickness = thickness,
+                .stroke_color = .{ 0, 0, 0, 1 },
+                .n_polygons = rect_npoly[0..rect_npoly.len],
             }};
             var rect_poly: shapes = .{
                 .nodes = rl[0..1],

@@ -226,11 +226,13 @@ fn _render_char(self: *Self, char: u21, _vertex_array: *[]graphics.shape_vertex_
         var poly: geometry.shapes = .{ .nodes = try allocator.alloc(geometry.shapes.shape_node, 1) };
         defer {
             for (poly.nodes) |v| {
-                allocator.free(v.lines.?);
+                allocator.free(v.lines);
+                allocator.free(v.n_polygons);
             }
             allocator.free(poly.nodes);
         }
-        poly.nodes[0].lines.? = try allocator.alloc(geometry.line, self.*.__face.*.glyph.*.outline.n_points);
+        poly.nodes[0].lines = try allocator.alloc(geometry.line, self.*.__face.*.glyph.*.outline.n_points);
+        poly.nodes[0].n_polygons = try allocator.alloc(u32, self.*.__face.*.glyph.*.outline.n_points);
 
         const funcs: freetype.FT_Outline_Funcs = .{
             .line_to = line_to,
@@ -243,8 +245,9 @@ fn _render_char(self: *Self, char: u21, _vertex_array: *[]graphics.shape_vertex_
             .pen = .{ 0, 0 },
             .polygon = &poly,
             .idx2 = 0,
+            .npoly = 0,
+            .npoly_len = 0,
             .allocator = allocator,
-            .len = self.*.__face.*.glyph.*.outline.n_points,
             .scale = self.*.scale,
         };
 
@@ -255,12 +258,17 @@ fn _render_char(self: *Self, char: u21, _vertex_array: *[]graphics.shape_vertex_
         if (freetype.FT_Outline_Decompose(&self.*.__face.*.glyph.*.outline, &funcs, &data) != freetype.FT_Err_Ok) {
             return font_error.OutOfMemory;
         }
-        if (data.len == 0) {
+        if (data.idx2 == 0) {
             char_d2.raw_p = null;
         } else {
-            poly.nodes[0].lines.? = try allocator.realloc(poly.nodes[0].lines.?, data.idx2);
-            poly.nodes[0].stroke_lines = null;
-            poly.nodes[0].color = null;
+            if (data.npoly > 0) {
+                data.polygon.*.nodes[0].n_polygons[data.npoly_len] = data.npoly;
+                data.npoly_len += 1;
+            }
+            poly.nodes[0].lines = try allocator.realloc(poly.nodes[0].lines, data.idx2);
+            poly.nodes[0].n_polygons = try allocator.realloc(poly.nodes[0].n_polygons, data.npoly_len);
+            poly.nodes[0].color = .{ 0, 0, 0, 1 };
+            poly.nodes[0].stroke_color = null;
             poly.nodes[0].thickness = 0;
 
             char_d2.raw_p = try poly.compute_polygon(allocator);
@@ -305,7 +313,8 @@ const font_user_data = struct {
     pen: point,
     polygon: *geometry.shapes,
     idx2: u32,
-    len: u32,
+    npoly_len: u32,
+    npoly: u32,
     scale: f32,
     allocator: std.mem.Allocator,
 };
@@ -317,13 +326,14 @@ fn line_to(vec: [*c]const freetype.FT_Vector, user: ?*anyopaque) callconv(.C) c_
         @as(f32, @floatFromInt(vec.*.y)) / (64.0 * data.*.scale),
     };
 
-    data.*.polygon.*.nodes[0].lines.?[data.*.idx2] = geometry.line.line_init(
+    data.*.polygon.*.nodes[0].lines[data.*.idx2] = geometry.line.line_init(
         data.*.pen,
         end,
     );
     data.*.pen = end;
 
     data.*.idx2 += 1;
+    data.*.npoly += 1;
     return 0;
 }
 fn conic_to(vec: [*c]const freetype.FT_Vector, vec2: [*c]const freetype.FT_Vector, user: ?*anyopaque) callconv(.C) c_int {
@@ -337,7 +347,7 @@ fn conic_to(vec: [*c]const freetype.FT_Vector, vec2: [*c]const freetype.FT_Vecto
         @as(f32, @floatFromInt(vec2.*.y)) / (64.0 * data.*.scale),
     };
 
-    data.*.polygon.*.nodes[0].lines.?[data.*.idx2] = geometry.line.quadratic_init(
+    data.*.polygon.*.nodes[0].lines[data.*.idx2] = geometry.line.quadratic_init(
         data.*.pen,
         control0,
         end,
@@ -345,6 +355,7 @@ fn conic_to(vec: [*c]const freetype.FT_Vector, vec2: [*c]const freetype.FT_Vecto
     data.*.pen = end;
 
     data.*.idx2 += 1;
+    data.*.npoly += 1;
     return 0;
 }
 fn cubic_to(vec: [*c]const freetype.FT_Vector, vec2: [*c]const freetype.FT_Vector, vec3: [*c]const freetype.FT_Vector, user: ?*anyopaque) callconv(.C) c_int {
@@ -362,7 +373,7 @@ fn cubic_to(vec: [*c]const freetype.FT_Vector, vec2: [*c]const freetype.FT_Vecto
         @as(f32, @floatFromInt(vec3.*.y)) / (64.0 * data.*.scale),
     };
 
-    data.*.polygon.*.nodes[0].lines.?[data.*.idx2] = .{
+    data.*.polygon.*.nodes[0].lines[data.*.idx2] = .{
         .start = data.*.pen,
         .control0 = control0,
         .control1 = control1,
@@ -371,6 +382,7 @@ fn cubic_to(vec: [*c]const freetype.FT_Vector, vec2: [*c]const freetype.FT_Vecto
     data.*.pen = end;
 
     data.*.idx2 += 1;
+    data.*.npoly += 1;
     return 0;
 }
 fn move_to(vec: [*c]const freetype.FT_Vector, user: ?*anyopaque) callconv(.C) c_int {
@@ -380,5 +392,10 @@ fn move_to(vec: [*c]const freetype.FT_Vector, user: ?*anyopaque) callconv(.C) c_
         @as(f32, @floatFromInt(vec.*.x)) / (64.0 * data.*.scale),
         @as(f32, @floatFromInt(vec.*.y)) / (64.0 * data.*.scale),
     };
+    if (data.*.npoly > 0) {
+        data.*.polygon.*.nodes[0].n_polygons[data.*.npoly_len] = data.*.npoly;
+        data.*.npoly_len += 1;
+        data.*.npoly = 0;
+    }
     return 0;
 }

@@ -24,6 +24,7 @@ const mem = xfit.mem;
 const graphics = xfit.graphics;
 const render_command = xfit.render_command;
 const geometry = xfit.geometry;
+const svg = xfit.svg;
 
 const ArrayList = std.ArrayList;
 const MemoryPoolExtra = std.heap.MemoryPoolExtra;
@@ -51,6 +52,7 @@ var rect_button_srcs = [3]*components.button_source{ &rect_button_src, &rect_but
 var button_area_rect = math.rect{ .left = -100, .right = 100, .top = 50, .bottom = -50 };
 
 var shape_src: []graphics.shape_source = undefined;
+var github_shape_src: graphics.shape_source = undefined;
 var shape_src2: graphics.shape_source = undefined;
 var image_src: graphics.texture = undefined;
 var anim_image_src: graphics.texture_array = undefined;
@@ -86,6 +88,9 @@ var move_callback_thread: std.Thread = undefined;
 
 var text_shape: *graphics.iobject = undefined;
 var rect_button: *graphics.iobject = undefined;
+
+var github_shape: *graphics.iobject = undefined;
+
 var img: *graphics.iobject = undefined;
 var anim_img: *graphics.iobject = undefined;
 
@@ -123,6 +128,7 @@ pub fn xfit_init() !void {
     rect_button = try objects_mem_pool.create();
     img = try objects_mem_pool.create();
     anim_img = try objects_mem_pool.create();
+    github_shape = try objects_mem_pool.create();
 
     shape_src2 = graphics.shape_source.init();
 
@@ -222,10 +228,33 @@ pub fn xfit_init() !void {
     anim_img.*._anim_image.transform.model = math.matrix_translation(f32, 300, -200, 0);
     anim_img.*.build();
 
+    const svg_data = file_.read_file("github-mark-white.svg", allocator) catch |e| xfit.herr3("github-mark-white.svg read_file", e);
+    defer allocator.free(svg_data);
+    var svg_parser: svg = try svg.init_parse(allocator, svg_data);
+    defer svg_parser.deinit();
+
+    var svg_datas = try svg_parser.calculate_shapes(allocator);
+    defer svg_datas[1].deinit();
+
+    var github_shape_raw = try svg_datas[0].compute_polygon(allocator);
+    defer github_shape_raw.deinit();
+    github_shape_src = graphics.shape_source.init();
+    github_shape_src.build(github_shape_raw.vertices[0], github_shape_raw.indices[0], .gpu, .cpu);
+
+    github_shape.* = .{ ._shape = graphics.shape.init(&github_shape_src) };
+    github_shape.*._shape.transform.camera = &g_camera;
+    github_shape.*._shape.transform.projection = &g_proj;
+    github_shape.*._shape.transform.model = math.matrix_multiply(
+        math.matrix_scaling(f32, 2, 2, 1),
+        math.matrix_translation(f32, -450, 0, 0),
+    );
+    github_shape.*.build();
+
     try objects.append(img);
     try objects.append(text_shape);
     try objects.append(anim_img);
     try objects.append(rect_button);
+    try objects.append(github_shape);
 
     g_rect_button = &rect_button.*._button;
 
@@ -373,6 +402,7 @@ pub fn xfit_destroy() !void {
     rect_button_src.src.deinit();
     rect_button_src2.src.deinit();
     rect_button_text_src.src.deinit();
+    github_shape_src.deinit();
 
     allocator.free(image_src.pixels.?);
     allocator.free(anim_image_src.pixels.?);

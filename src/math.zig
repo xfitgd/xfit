@@ -378,10 +378,10 @@ pub fn compare(n: anytype, i: anytype) bool {
     }
 }
 
-pub fn compare_n(n: anytype, i: anytype) bool {
+pub fn compare_n(n: anytype, i: anytype, tolerance: anytype) bool {
     switch (@typeInfo(@TypeOf(n, i))) {
         .float, .comptime_float => {
-            return std.math.approxEqAbs(@TypeOf(n, i), n, i, std.math.floatEps(f32));
+            return std.math.approxEqAbs(@TypeOf(n, i), n, i, tolerance);
         },
         .int, .comptime_int => {
             return n == i;
@@ -389,14 +389,14 @@ pub fn compare_n(n: anytype, i: anytype) bool {
         .array => {
             comptime var e = 0;
             inline while (e < n.len) : (e += 1) {
-                if (!compare_n(n[e], i[e])) return false;
+                if (!compare_n(n[e], i[e], tolerance)) return false;
             }
             return true;
         },
         .vector => {
             comptime var e = 0;
             inline while (e < @typeInfo(@TypeOf(n, i)).vector.len) : (e += 1) {
-                if (!compare_n(n[e], i[e])) return false;
+                if (!compare_n(n[e], i[e], tolerance)) return false;
             }
             return true;
         },
@@ -565,9 +565,9 @@ pub fn matrix_perspectiveFovLh(comptime float_T: type, fovy: float_T, aspect: fl
     const cfov = std.math.cos(0.5 * fovy);
 
     if (!(near > 0.0 and far > 0.0 and far > near)) return matrix_error.invaild_near_far;
-    if (compare_n(sfov, 0)) return matrix_error.sfov_0;
-    if (compare_n((far - near), 0)) return matrix_error.far_near_0;
-    if (compare_n(aspect, 0)) return matrix_error.aspect_0;
+    if (compare_n(sfov, 0, std.math.floatEps(f32))) return matrix_error.sfov_0;
+    if (compare_n((far - near), 0, std.math.floatEps(f32))) return matrix_error.far_near_0;
+    if (compare_n(aspect, 0, std.math.floatEps(f32))) return matrix_error.aspect_0;
     // assert(!approxEqAbs(f32, scfov[0], 0.0, 0.001));
     // assert(!approxEqAbs(f32, far, near, 0.001));
     // assert(!approxEqAbs(f32, aspect, 0.0, 0.01));
@@ -587,9 +587,9 @@ pub fn matrix_perspectiveFovRh(comptime float_T: type, fovy: float_T, aspect: fl
     const cfov = std.math.cos(0.5 * fovy);
 
     if (!(near > 0.0 and far > 0.0 and far > near)) return matrix_error.invaild_near_far;
-    if (compare_n(sfov, 0)) return matrix_error.sfov_0;
-    if (compare_n((near - far), 0)) return matrix_error.near_far_0;
-    if (compare_n(aspect, 0)) return matrix_error.aspect_0;
+    if (compare_n(sfov, 0, std.math.floatEps(f32))) return matrix_error.sfov_0;
+    if (compare_n((near - far), 0, std.math.floatEps(f32))) return matrix_error.near_far_0;
+    if (compare_n(aspect, 0, std.math.floatEps(f32))) return matrix_error.aspect_0;
     // assert(!approxEqAbs(f32, scfov[0], 0.0, 0.001));
     // assert(!approxEqAbs(f32, far, near, 0.001));
     // assert(!approxEqAbs(f32, aspect, 0.0, 0.01));
@@ -610,9 +610,9 @@ pub fn matrix_perspectiveFovRhGL(comptime float_T: type, fovy: float_T, aspect: 
     const cfov = @cos(0.5 * fovy);
 
     if (!(near > 0.0 and far > 0.0 and far > near)) return matrix_error.invaild_near_far;
-    if (compare_n(sfov, 0)) return matrix_error.sfov_0;
-    if (compare_n((near - far), 0)) return matrix_error.near_far_0;
-    if (compare_n(aspect, 0)) return matrix_error.aspect_0;
+    if (compare_n(sfov, 0, std.math.floatEps(f32))) return matrix_error.sfov_0;
+    if (compare_n((near - far), 0, std.math.floatEps(f32))) return matrix_error.near_far_0;
+    if (compare_n(aspect, 0, std.math.floatEps(f32))) return matrix_error.aspect_0;
     // assert(!approxEqAbs(f32, scfov[0], 0.0, 0.001));
     // assert(!approxEqAbs(f32, far, near, 0.001));
     // assert(!approxEqAbs(f32, aspect, 0.0, 0.01));
@@ -637,9 +637,9 @@ pub fn matrix_orthographicLh(comptime float_T: type, w: float_T, h: float_T, nea
     // assert(!approxEqAbs(f32, w, 0.0, 0.001));
     // assert(!approxEqAbs(f32, h, 0.0, 0.001));
     // assert(!approxEqAbs(f32, far, near, 0.001));
-    if (compare_n((far - near), 0)) return matrix_error.far_near_0;
-    if (compare_n(w, 0)) return matrix_error.w_0;
-    if (compare_n(h, 0)) return matrix_error.h_0;
+    if (compare_n((far - near), 0, std.math.floatEps(f32))) return matrix_error.far_near_0;
+    if (compare_n(w, 0, std.math.floatEps(f32))) return matrix_error.w_0;
+    if (compare_n(h, 0, std.math.floatEps(f32))) return matrix_error.h_0;
 
     const r = 1 / (far - near);
     return .{
@@ -654,9 +654,9 @@ pub fn matrix_orthographicRh(comptime float_T: type, w: float_T, h: float_T, nea
     // assert(!approxEqAbs(f32, w, 0.0, 0.001));
     // assert(!approxEqAbs(f32, h, 0.0, 0.001));
     // assert(!approxEqAbs(f32, far, near, 0.001));
-    if (compare_n((near - far), 0)) return matrix_error.near_far_0;
-    if (compare_n(w, 0)) return matrix_error.w_0;
-    if (compare_n(h, 0)) return matrix_error.h_0;
+    if (compare_n((near - far), 0, std.math.floatEps(f32))) return matrix_error.near_far_0;
+    if (compare_n(w, 0, std.math.floatEps(f32))) return matrix_error.w_0;
+    if (compare_n(h, 0, std.math.floatEps(f32))) return matrix_error.h_0;
 
     const r = 1 / (near - far);
     return .{
@@ -728,10 +728,10 @@ pub fn matrix_mul_vector(_matrix: anytype, _target_vector: anytype) vector_(@Typ
 pub inline fn matrix_div_vector(_matrix: anytype, _target_vector: anytype) !vector_(@TypeOf(_matrix[0][0])) {
     return matrix_mul_vector(try matrix_inverse(_matrix), _target_vector);
 }
-pub inline fn matrix_mul_point(_matrix: anytype, pt: anytype) !point_(@TypeOf(_matrix[0][0])) {
+pub inline fn matrix_mul_point(_matrix: anytype, pt: point_(@TypeOf(_matrix[0][0]))) !point_(@TypeOf(_matrix[0][0])) {
     const xx = point{ _matrix[0][0], _matrix[0][1] };
     const yy = point{ _matrix[1][0], _matrix[1][1] };
-    return .{ dot3(pt, xx) + _matrix[0][3], dot3(pt, yy) + _matrix[1][3] };
+    return .{ dot3(pt, xx) + _matrix[3][0], dot3(pt, yy) + _matrix[3][1] };
 }
 pub inline fn matrix_div_point(_matrix: anytype, pt: anytype) !point_(@TypeOf(_matrix[0][0])) {
     return matrix_mul_point(try matrix_inverse(_matrix), pt);
@@ -884,7 +884,7 @@ pub fn matrix_inverse(_matrix: anytype) !@TypeOf(_matrix) {
 
     const det = dot4(mr[0], mt[0]);
 
-    if (compare_n(det, 0)) {
+    if (compare_n(det, 0, std.math.floatEps(f32))) {
         return matrix_error.not_exist_inverse_matrix;
     }
 
@@ -895,6 +895,18 @@ pub fn matrix_inverse(_matrix: anytype) !@TypeOf(_matrix) {
     mr[3] /= scale;
 
     return mr;
+}
+
+pub fn matrix3x3(comptime T: type) type {
+    test_float_type(T);
+    return [3][3]T;
+}
+
+/// 라플라스 전개를 사용한 행렬식 계산 Calculating matrix determinant using Laplace expansion
+pub fn matrix3x3_determinant(comptime T: type, _matrix: matrix3x3(T)) T {
+    return _matrix[0][0] * (_matrix[1][1] * _matrix[2][2] - _matrix[1][2] * _matrix[2][1]) -
+        _matrix[0][1] * (_matrix[1][0] * _matrix[2][2] - _matrix[1][2] * _matrix[2][0]) +
+        _matrix[0][2] * (_matrix[1][0] * _matrix[2][1] - _matrix[1][1] * _matrix[2][0]);
 }
 
 test "matrix_inverse" {
@@ -1083,3 +1095,7 @@ test "matrix_inverse" {
 //     }
 // };
 //}
+
+pub inline fn xy_mirror_point(pivot: point, target: point) point {
+    return @as(point, @splat(2.0)) * pivot - target;
+}

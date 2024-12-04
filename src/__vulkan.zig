@@ -128,7 +128,7 @@ const multisampling: vk.PipelineMultisampleStateCreateInfo = .{
 };
 
 const multisampling4: vk.PipelineMultisampleStateCreateInfo = .{
-    .sample_shading_enable = vk.FALSE,
+    .sample_shading_enable = vk.TRUE,
     .rasterization_samples = .{ .@"4_bit" = true },
     .min_sample_shading = 1,
     .p_sample_mask = null,
@@ -1043,6 +1043,7 @@ pub fn vulkan_start() void {
 
     var deviceFeatures: vk.PhysicalDeviceFeatures = .{
         .sampler_anisotropy = vk.TRUE,
+        .sample_rate_shading = vk.TRUE,
     };
 
     {
@@ -1097,6 +1098,9 @@ pub fn vulkan_start() void {
         vkd = Device.init(vkDevice, &device_wrap);
     }
 
+    mem_prop = vki.?.getPhysicalDeviceMemoryProperties(vk_physical_device);
+    properties = vki.?.getPhysicalDeviceProperties(vk_physical_device);
+
     if (graphicsFamilyIndex == presentFamilyIndex) {
         vkGraphicsQueue = vkd.?.getDeviceQueue(graphicsFamilyIndex, 0);
         vkPresentQueue = vkGraphicsQueue;
@@ -1104,9 +1108,6 @@ pub fn vulkan_start() void {
         vkGraphicsQueue = vkd.?.getDeviceQueue(graphicsFamilyIndex, 0);
         vkPresentQueue = vkd.?.getDeviceQueue(presentFamilyIndex, 0);
     }
-
-    mem_prop = vki.?.getPhysicalDeviceMemoryProperties(vk_physical_device);
-    properties = vki.?.getPhysicalDeviceProperties(vk_physical_device);
 
     __vulkan_allocator.init_block_len();
 

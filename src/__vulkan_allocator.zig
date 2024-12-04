@@ -488,7 +488,7 @@ inline fn get_samples(samples: u8) vk.SampleCountFlags {
     return switch (samples) {
         2 => .{ .@"2_bit" = true },
         4 => .{ .@"4_bit" = true },
-        8 => .{ .@"8_bit" = true },
+        8 => .{ .@"4_bit" = true },
         16 => .{ .@"16_bit" = true },
         32 => .{ .@"32_bit" = true },
         64 => .{ .@"64_bit" = true },

@@ -138,12 +138,12 @@ pub fn line_in_polygon(a: point, b: point, pts: []const point, check_inside_line
     var result: point = undefined;
     while (i < pts.len - 1) : (i += 1) {
         if (lines_intersect(pts[i], pts[i + 1], a, b, &result)) {
-            if (math.compare_n(a, result) or math.compare_n(b, result)) continue;
+            if (math.compare_n(a, result, std.math.floatEps(f32)) or math.compare_n(b, result, std.math.floatEps(f32))) continue;
             return true;
         }
     }
     if (lines_intersect(pts[pts.len - 1], pts[0], a, b, &result)) {
-        if (math.compare_n(a, result) or math.compare_n(b, result)) return false;
+        if (math.compare_n(a, result) or math.compare_n(b, result, std.math.floatEps(f32))) return false;
         return true;
     }
     return false;
@@ -174,9 +174,10 @@ pub const compute_option = struct {
 
 pub const shapes = struct {
     pub const shape_node = struct {
-        lines: ?[]line = null,
-        stroke_lines: ?[]line = null,
-        color: ?vector = null,
+        lines: []line,
+        color: ?vector = .{ 0, 0, 0, 1 },
+        stroke_color: ?vector = null,
+        n_polygons: []u32,
         thickness: f32 = 0,
     };
     nodes: []shape_node,
@@ -213,25 +214,17 @@ pub const shapes = struct {
         }
     }
 
-    fn _compute_polygon_sub(_out: *raw_shapes, _lines: []line, _vertices_list: *ArrayList([]graphics.shape_vertex_2d), _indices_list: *ArrayList([]u32)) shapes_error!void {
+    fn _compute_polygon_sub(_out: *raw_shapes, _lines: []line, _n_polygons: []const u32, _vertices_list: *ArrayList([]graphics.shape_vertex_2d), _indices_list: *ArrayList([]u32)) shapes_error!void {
         var vertices_sub_list: ArrayList(graphics.shape_vertex_2d) = ArrayList(graphics.shape_vertex_2d).init(_out.*.allocator.?.allocator());
         var indices_sub_list: ArrayList(u32) = ArrayList(u32).init(_out.*.allocator.?.allocator());
         var vertex_len: u32 = 0;
         var first_vertex_idx: u32 = 0;
 
-        while (vertex_len < _lines.len) {
-            const start_vertex = _lines[first_vertex_idx].start;
-            for (_lines[first_vertex_idx..]) |l| {
-                vertex_len += 1;
-                if (math.compare(l.end, start_vertex)) break;
-            }
-            if (vertex_len == _lines.len and !math.compare(start_vertex, _lines[vertex_len - 1].end)) {
-                return shapes_error.invaild_line;
-            }
+        for (_n_polygons) |n| {
+            vertex_len += n;
             var i: u32 = first_vertex_idx;
 
             try vertices_sub_list.append(.{ .pos = .{ std.math.floatMax(f32), std.math.floatMin(f32) }, .uvw = .{ 1, 0, 0 } });
-            const first_vertex = &vertices_sub_list.items[vertices_sub_list.items.len - 1];
             const first_vertex_idx2: u32 = @intCast(vertices_sub_list.items.len - 1); // we need first {std.math.floatMax(f32), std.math.floatMin(f32) } point, so save idx2 separate
 
             var maxX: f32 = std.math.floatMin(f32);
@@ -239,8 +232,8 @@ pub const shapes = struct {
             while (i < vertex_len) : (i += 1) {
                 try vertices_sub_list.append(.{ .pos = _lines[i].start, .uvw = .{ 1, 0, 0 } });
                 const last_vertex = &vertices_sub_list.items[vertices_sub_list.items.len - 1];
-                if (first_vertex.*.pos[0] > last_vertex.*.pos[0]) first_vertex.*.pos[0] = last_vertex.*.pos[0];
-                if (first_vertex.*.pos[1] < last_vertex.*.pos[1]) first_vertex.*.pos[1] = last_vertex.*.pos[1];
+                if (vertices_sub_list.items[first_vertex_idx2].pos[0] > last_vertex.*.pos[0]) vertices_sub_list.items[first_vertex_idx2].pos[0] = last_vertex.*.pos[0];
+                if (vertices_sub_list.items[first_vertex_idx2].pos[1] < last_vertex.*.pos[1]) vertices_sub_list.items[first_vertex_idx2].pos[1] = last_vertex.*.pos[1];
                 if (maxX < last_vertex.*.pos[0]) maxX = last_vertex.*.pos[0];
                 if (minY > last_vertex.*.pos[1]) minY = last_vertex.*.pos[1];
 
@@ -248,39 +241,35 @@ pub const shapes = struct {
                 try indices_sub_list.append(@intCast(vertices_sub_list.items.len - 1));
                 try indices_sub_list.append(if (i < vertex_len - 1) @intCast(vertices_sub_list.items.len - 1 + 1) else first_vertex_idx2 + 1);
             }
-            first_vertex.*.pos[0] -= (maxX - first_vertex.*.pos[0]) / 2;
-            first_vertex.*.pos[1] += (first_vertex.*.pos[1] - minY) / 2;
+            vertices_sub_list.items[first_vertex_idx2].pos[0] -= (maxX - vertices_sub_list.items[first_vertex_idx2].pos[0]) / 2;
+            vertices_sub_list.items[first_vertex_idx2].pos[1] += (vertices_sub_list.items[first_vertex_idx2].pos[1] - minY) / 2;
 
-            for (_lines[first_vertex_idx..]) |*l| {
+            for (_lines[first_vertex_idx..vertex_len]) |*l| {
                 try l.*.compute_curve(&vertices_sub_list, &indices_sub_list);
             }
-            first_vertex_idx = i;
+            first_vertex_idx = vertex_len;
         }
+
         try _vertices_list.*.append(vertices_sub_list.items);
         try _indices_list.*.append(indices_sub_list.items);
     }
 
-    fn _compute_polygon_sub_outline(_out: *raw_shapes, _lines: []line, _vertices_list: *ArrayList([]graphics.shape_vertex_2d), _indices_list: *ArrayList([]u32), thickness: f32) shapes_error!void {
+    fn _compute_polygon_sub_outline(_out: *raw_shapes, _lines: []line, _n_polygons: []const u32, _vertices_list: *ArrayList([]graphics.shape_vertex_2d), _indices_list: *ArrayList([]u32), thickness: f32) shapes_error!void {
         var vertices_sub_list: ArrayList(graphics.shape_vertex_2d) = ArrayList(graphics.shape_vertex_2d).init(_out.*.allocator.?.allocator());
         var indices_sub_list: ArrayList(u32) = ArrayList(u32).init(_out.*.allocator.?.allocator());
+
+        var lines_ = try _out.*.allocator.?.allocator().dupe(line, _lines);
+        defer _out.*.allocator.?.allocator().free(lines_);
 
         for (&[_]f32{ thickness, -thickness }) |t| {
             var vertex_len: u32 = 0;
             var first_vertex_idx: u32 = 0;
-            while (vertex_len < _lines.len) {
-                const start_vertex = _lines[first_vertex_idx].start;
-                for (_lines[first_vertex_idx..]) |l| {
-                    vertex_len += 1;
-                    if (math.compare(l.end, start_vertex)) break;
-                }
-                if (vertex_len == _lines.len and !math.compare(start_vertex, _lines[vertex_len - 1].end)) {
-                    return shapes_error.invaild_line;
-                }
+            for (_n_polygons) |n| {
+                vertex_len += n;
                 var i: u32 = first_vertex_idx;
-                const ccw: f32 = if (math.cross2(_lines[first_vertex_idx].start, if (_lines[first_vertex_idx].curve_type == .line) _lines[first_vertex_idx].end else _lines[first_vertex_idx].control0) > 0) -1 else 1;
+                const ccw: f32 = if (math.cross2(lines_[first_vertex_idx].start, if (lines_[first_vertex_idx].curve_type == .line) lines_[first_vertex_idx].end else lines_[first_vertex_idx].control0) > 0) -1 else 1;
 
                 try vertices_sub_list.append(.{ .pos = .{ std.math.floatMax(f32), std.math.floatMin(f32) }, .uvw = .{ 1, 0, 0 } });
-                const first_vertex = &vertices_sub_list.items[vertices_sub_list.items.len - 1];
                 const first_vertex_idx2: u32 = @intCast(vertices_sub_list.items.len - 1); // we need first {std.math.floatMax(f32), std.math.floatMin(f32) } point, so save idx2 separate
 
                 var maxX: f32 = std.math.floatMin(f32);
@@ -289,49 +278,49 @@ pub const shapes = struct {
                     const next = if (i + 1 < vertex_len) i + 1 else first_vertex_idx;
                     const prev = if (i == first_vertex_idx) vertex_len - 1 else (i - 1);
 
-                    if (_lines[i].curve_type == .line) { //if type is line, no need to change _lines value
+                    if (lines_[i].curve_type == .line) { //if type is line, no need to change lines_ value
                         try vertices_sub_list.append(.{ .pos = extend_point(
-                            if (_lines[prev].curve_type == .line) _lines[prev].start else _lines[prev].control1,
-                            _lines[i].start,
-                            _lines[i].end,
+                            if (lines_[prev].curve_type == .line) lines_[prev].start else lines_[prev].control1,
+                            lines_[i].start,
+                            lines_[i].end,
                             t,
                             ccw,
                         ), .uvw = .{ 1, 0, 0 } });
                     } else {
-                        _lines[i].start = extend_point(
-                            if (_lines[prev].curve_type == .line) _lines[prev].start else _lines[prev].control1,
-                            _lines[i].start,
-                            _lines[i].control0,
+                        lines_[i].start = extend_point(
+                            if (lines_[prev].curve_type == .line) lines_[prev].start else lines_[prev].control1,
+                            lines_[i].start,
+                            lines_[i].control0,
                             t,
                             ccw,
                         );
-                        try vertices_sub_list.append(.{ .pos = _lines[i].start, .uvw = .{ 1, 0, 0 } });
+                        try vertices_sub_list.append(.{ .pos = lines_[i].start, .uvw = .{ 1, 0, 0 } });
 
-                        _lines[i].control0 = extend_point(
-                            _lines[i].start,
-                            _lines[i].control0,
-                            _lines[i].control1,
+                        lines_[i].control0 = extend_point(
+                            lines_[i].start,
+                            lines_[i].control0,
+                            lines_[i].control1,
                             t,
                             ccw,
                         );
-                        _lines[i].control1 = extend_point(
-                            _lines[i].control0,
-                            _lines[i].control1,
-                            _lines[i].end,
+                        lines_[i].control1 = extend_point(
+                            lines_[i].control0,
+                            lines_[i].control1,
+                            lines_[i].end,
                             t,
                             ccw,
                         );
-                        _lines[i].end = extend_point(
-                            _lines[i].control1,
-                            _lines[i].end,
-                            if (_lines[next].curve_type == .line) _lines[next].end else _lines[next].control0,
+                        lines_[i].end = extend_point(
+                            lines_[i].control1,
+                            lines_[i].end,
+                            if (lines_[next].curve_type == .line) lines_[next].end else lines_[next].control0,
                             t,
                             ccw,
                         );
                     }
                     const last_vertex = &vertices_sub_list.items[vertices_sub_list.items.len - 1];
-                    if (first_vertex.*.pos[0] > last_vertex.*.pos[0]) first_vertex.*.pos[0] = last_vertex.*.pos[0];
-                    if (first_vertex.*.pos[1] < last_vertex.*.pos[1]) first_vertex.*.pos[1] = last_vertex.*.pos[1];
+                    if (vertices_sub_list.items[first_vertex_idx2].pos[0] > last_vertex.*.pos[0]) vertices_sub_list.items[first_vertex_idx2].pos[0] = last_vertex.*.pos[0];
+                    if (vertices_sub_list.items[first_vertex_idx2].pos[1] < last_vertex.*.pos[1]) vertices_sub_list.items[first_vertex_idx2].pos[1] = last_vertex.*.pos[1];
                     if (maxX < last_vertex.*.pos[0]) maxX = last_vertex.*.pos[0];
                     if (minY > last_vertex.*.pos[1]) minY = last_vertex.*.pos[1];
 
@@ -339,14 +328,17 @@ pub const shapes = struct {
                     try indices_sub_list.append(@intCast(vertices_sub_list.items.len - 1));
                     try indices_sub_list.append(if (i < vertex_len - 1) @intCast(vertices_sub_list.items.len - 1 + 1) else first_vertex_idx2 + 1);
                 }
-                first_vertex.*.pos[0] -= (maxX - first_vertex.*.pos[0]) / 2;
-                first_vertex.*.pos[1] += (first_vertex.*.pos[1] - minY) / 2;
+                vertices_sub_list.items[first_vertex_idx2].pos[0] -= (maxX - vertices_sub_list.items[first_vertex_idx2].pos[0]) / 2;
+                vertices_sub_list.items[first_vertex_idx2].pos[1] += (vertices_sub_list.items[first_vertex_idx2].pos[1] - minY) / 2;
 
-                for (_lines[first_vertex_idx..]) |*l| {
+                for (lines_[first_vertex_idx..vertex_len]) |*l| {
                     try l.*.compute_curve(&vertices_sub_list, &indices_sub_list);
                 }
-                first_vertex_idx = i;
+                first_vertex_idx = vertex_len;
             }
+        }
+        for (lines_, 0..) |l, i| {
+            _lines[i].curve_type = l.curve_type;
         }
         try _vertices_list.*.append(vertices_sub_list.items);
         try _indices_list.*.append(indices_sub_list.items);
@@ -360,12 +352,12 @@ pub const shapes = struct {
         errdefer _out.deinit();
 
         count = 0;
-        while (count < self.*.nodes.len) : (count += 1) {
-            if (self.*.nodes[count].lines != null and self.*.nodes[count].lines.?.len >= 3) {
-                try _compute_polygon_sub(&_out, self.*.nodes[count].lines.?, &vertices_list, &indices_list);
+        while (count < self.nodes.len) : (count += 1) {
+            if (self.nodes[count].color != null) {
+                try _compute_polygon_sub(&_out, self.nodes[count].lines, self.nodes[count].n_polygons, &vertices_list, &indices_list);
             }
-            if (self.*.nodes[count].stroke_lines != null and self.*.nodes[count].stroke_lines.?.len >= 3) {
-                try _compute_polygon_sub_outline(&_out, self.*.nodes[count].stroke_lines.?, &vertices_list, &indices_list, self.*.nodes[count].thickness);
+            if (self.nodes[count].stroke_color != null and self.nodes[count].thickness > 0) {
+                try _compute_polygon_sub_outline(&_out, self.nodes[count].lines, self.nodes[count].n_polygons, &vertices_list, &indices_list, self.nodes[count].thickness);
             }
         }
         _out.vertices = vertices_list.items;
@@ -380,6 +372,7 @@ pub const line = struct {
     control0: point,
     control1: point,
     end: point,
+    /// default value 'unknown' recongnises curve type 'cubic' 기본값 'unknown'은 커브 유형 'cubic'으로 인식합니다.
     curve_type: curve_TYPE = curve_TYPE.unknown,
 
     pub fn reverse(self: Self) Self {
@@ -446,15 +439,16 @@ pub const line = struct {
 
     /// TODO need test and improvement https://github.com/azer89/GPU_Curve_Rendering/blob/master/QtTestShader/CurveRenderer.cpp
     fn __compute_curve(self: *Self, _start: point, _control0: point, _control1: point, _end: point, out_vertices: *ArrayList(graphics.shape_vertex_2d), out_indices: *ArrayList(u32), repeat: i32) line_error!void {
-        var d1: f64 = undefined;
-        var d2: f64 = undefined;
-        var d3: f64 = undefined;
-        if (self.*.curve_type == .line) {
+        var d1: f32 = undefined;
+        var d2: f32 = undefined;
+        var d3: f32 = undefined;
+        if (self.curve_type == .line) {
             //xfit.print_debug("line", .{});
             return;
         }
-        const cur_type = if (self.*.curve_type == .quadratic) .quadratic else try __get_curve_type(_start, _control0, _control1, _end, &d1, &d2, &d3);
-        self.*.curve_type = cur_type;
+
+        const cur_type = if (self.curve_type == .quadratic) .quadratic else try __get_curve_type(_start, _control0, _control1, _end, &d1, &d2, &d3);
+        self.curve_type = cur_type;
 
         var mat: math.matrix = undefined;
         var flip: bool = false;
@@ -505,7 +499,7 @@ pub const line = struct {
                     //xfit.print_debug("loop(1)", .{});
                 } else if (repeat == -1 and 0.0 < qm and qm < 1.0) {
                     artifact = 2;
-                    subdiv = @floatCast(ql);
+                    subdiv = @floatCast(qm);
                     //xfit.print_debug("loop(2)", .{});
                 } else {
                     const ltMinusLs = lt - ls;
@@ -527,7 +521,7 @@ pub const line = struct {
                     mat[3][1] = @floatCast(-(ltMinusLs * ltMinusLs) * mtMinusMs);
                     mat[3][2] = @floatCast(-ltMinusLs * mtMinusMs * mtMinusMs);
 
-                    //if (repeat == -1) flip = ((d1 > 0 and mat[0][0] < 0) or (d1 < 0 and mat[0][0] > 0));
+                    if ((mat[1][0] > 0)) flip = true;
                     //xfit.print_debug("loop flip {}", .{flip});
                 }
             },
@@ -552,6 +546,8 @@ pub const line = struct {
                 mat[3][1] = @floatCast(lsMinusLt * lsMinusLt * lsMinusLt);
                 mat[3][2] = 1;
 
+                flip = true;
+
                 //xfit.print_debug("cusp {}", .{flip});
             },
             .quadratic => {
@@ -575,7 +571,7 @@ pub const line = struct {
                 //xfit.print_debug("quadratic {}", .{flip});
             },
             .line => {
-                //xfit.print_debug("line", .{});
+                //std.debug.print("line\n", .{});
                 return;
             },
             else => return line_error.is_not_curve,
@@ -715,6 +711,7 @@ pub const line = struct {
                 try out_indices.*.append(@intCast(vertex_len));
                 try out_indices.*.append(@intCast(vertex_len + 2));
                 try out_indices.*.append(@intCast(vertex_len + 1));
+                try out_indices.*.append(@intCast(vertex_len));
                 try out_indices.*.append(@intCast(vertex_len + 1));
                 try out_indices.*.append(@intCast(vertex_len + 3));
             } else {
@@ -728,24 +725,24 @@ pub const line = struct {
         }
     }
     pub fn get_curve_type(self: Self) line_error!curve_TYPE {
-        var d1: f64 = undefined;
-        var d2: f64 = undefined;
-        var d3: f64 = undefined;
+        var d1: f32 = undefined;
+        var d2: f32 = undefined;
+        var d3: f32 = undefined;
         return try __get_curve_type(self.start, self.control0, self.control1, self.end, &d1, &d2, &d3);
     }
-    fn __get_curve_type(_start: point, _control0: point, _control1: point, _end: point, out_d1: *f64, out_d2: *f64, out_d3: *f64) line_error!curve_TYPE {
-        const start_x: f64 = @floatCast(_start[0]);
-        const start_y: f64 = @floatCast(_start[1]);
-        const control0_x: f64 = @floatCast(_control0[0]);
-        const control0_y: f64 = @floatCast(_control0[1]);
-        const control1_x: f64 = @floatCast(_control1[0]);
-        const control1_y: f64 = @floatCast(_control1[1]);
-        const end_x: f64 = @floatCast(_end[0]);
-        const end_y: f64 = @floatCast(_end[1]);
+    fn __get_curve_type(_start: point, _control0: point, _control1: point, _end: point, out_d1: *f32, out_d2: *f32, out_d3: *f32) line_error!curve_TYPE {
+        const start_x: f32 = @floatCast(_start[0]);
+        const start_y: f32 = @floatCast(_start[1]);
+        const control0_x: f32 = @floatCast(_control0[0]);
+        const control0_y: f32 = @floatCast(_control0[1]);
+        const control1_x: f32 = @floatCast(_control1[0]);
+        const control1_y: f32 = @floatCast(_control1[1]);
+        const end_x: f32 = @floatCast(_end[0]);
+        const end_y: f32 = @floatCast(_end[1]);
 
-        const cross_1: [3]f64 = .{ end_y - control1_y, control1_x - end_x, end_x * control1_y - end_y * control1_x };
-        const cross_2: [3]f64 = .{ start_y - end_y, end_x - start_x, start_x * end_y - start_y * end_x };
-        const cross_3: [3]f64 = .{ control0_y - start_y, start_x - control0_x, control0_x * start_y - control0_y * start_x };
+        const cross_1: [3]f32 = .{ end_y - control1_y, control1_x - end_x, end_x * control1_y - end_y * control1_x };
+        const cross_2: [3]f32 = .{ start_y - end_y, end_x - start_x, start_x * end_y - start_y * end_x };
+        const cross_3: [3]f32 = .{ control0_y - start_y, start_x - control0_x, control0_x * start_y - control0_y * start_x };
 
         const a1 = start_x * cross_1[0] + start_y * cross_1[1] + cross_1[2];
         const a2 = control0_x * cross_2[0] + control0_y * cross_2[1] + cross_2[2];
@@ -761,19 +758,17 @@ pub const line = struct {
         if (math.compare(_start, _control0) and math.compare(_control0, _control1) and math.compare(_control1, _end)) {
             return line_error.is_point_not_line;
         }
-
-        if (std.math.approxEqAbs(f64, discr, 0, std.math.floatEps(f32))) {
-            if (std.math.approxEqAbs(f64, out_d1.*, 0, std.math.floatEps(f32))) {
-                if (std.math.approxEqAbs(f64, out_d2.*, 0, std.math.floatEps(f32))) {
-                    if (std.math.approxEqAbs(f64, out_d3.*, 0, std.math.floatEps(f32))) return curve_TYPE.line;
+        if (discr > std.math.floatEps(f32)) return curve_TYPE.serpentine;
+        if (discr < -std.math.floatEps(f32)) return curve_TYPE.loop;
+        if (std.math.approxEqAbs(f32, discr, 0, std.math.floatEps(f32))) {
+            if (std.math.approxEqAbs(f32, out_d1.*, 0, std.math.floatEps(f32))) {
+                if (std.math.approxEqAbs(f32, out_d2.*, 0, std.math.floatEps(f32))) {
+                    if (std.math.approxEqAbs(f32, out_d3.*, 0, std.math.floatEps(f32))) return curve_TYPE.line;
                     return curve_TYPE.quadratic;
                 }
             }
             return curve_TYPE.cusp;
-        } else {
-            if (std.math.approxEqAbs(f64, out_d1.*, 0, std.math.floatEps(f32))) return curve_TYPE.cusp;
         }
-        if (discr > 0) return curve_TYPE.serpentine;
         return curve_TYPE.loop;
     }
 };
