@@ -27,17 +27,15 @@ const geometry = xfit.geometry;
 const svg = xfit.svg;
 
 const ArrayList = std.ArrayList;
-const MemoryPoolExtra = std.heap.MemoryPoolExtra;
 var gpa: std.heap.GeneralPurposeAllocator(.{}) = undefined;
 var allocator: std.mem.Allocator = undefined;
+var arena: std.heap.ArenaAllocator = undefined;
+var arena_alloc: std.mem.Allocator = undefined;
 
 const matrix = math.matrix;
 const iarea = collision.iarea;
 
 pub var objects: ArrayList(*graphics.iobject) = undefined;
-pub var vertices_mem_pool: MemoryPoolExtra(graphics.dummy_vertices, .{}) = undefined;
-pub var objects_mem_pool: MemoryPoolExtra(graphics.iobject, .{}) = undefined;
-pub var indices_mem_pool: MemoryPoolExtra(graphics.dummy_indices, .{}) = undefined;
 
 pub var g_proj: graphics.projection = .{};
 pub var g_camera: graphics.camera = undefined;
@@ -45,15 +43,11 @@ pub var g_camera: graphics.camera = undefined;
 var font0: font = undefined;
 var font0_data: []u8 = undefined;
 
-var rect_button_src: components.button_source = undefined;
-var rect_button_src2: components.button_source = undefined;
-var rect_button_text_src: components.button_source = undefined;
-var rect_button_srcs = [3]*components.button_source{ &rect_button_src, &rect_button_src2, &rect_button_text_src };
+var rect_button_src: graphics.shape_source = undefined;
 var button_area_rect = math.rect{ .left = -100, .right = 100, .top = 50, .bottom = -50 };
 
-var shape_src: []graphics.shape_source = undefined;
+var shape_src: *graphics.shape_source = undefined;
 var github_shape_src: graphics.shape_source = undefined;
-var shape_src2: graphics.shape_source = undefined;
 var image_src: graphics.texture = undefined;
 var anim_image_src: graphics.texture_array = undefined;
 var cmd: *render_command = undefined;
@@ -113,10 +107,7 @@ pub fn xfit_init() !void {
         try luaT.lua_pcall(0, 0, 0);
     }
 
-    objects = ArrayList(*graphics.iobject).init(allocator);
-    vertices_mem_pool = MemoryPoolExtra(graphics.dummy_vertices, .{}).init(allocator);
-    objects_mem_pool = MemoryPoolExtra(graphics.iobject, .{}).init(allocator);
-    indices_mem_pool = MemoryPoolExtra(graphics.dummy_indices, .{}).init(allocator);
+    objects = ArrayList(*graphics.iobject).init(arena_alloc);
 
     try g_proj.init_matrix_orthographic(CANVAS_W, CANVAS_H);
     g_proj.build(.cpu);
@@ -124,19 +115,18 @@ pub fn xfit_init() !void {
     g_camera = graphics.camera.init(.{ 0, 0, -1, 1 }, .{ 0, 0, 0, 1 }, .{ 0, 1, 0, 1 });
     g_camera.build();
 
-    text_shape = try objects_mem_pool.create();
-    rect_button = try objects_mem_pool.create();
-    img = try objects_mem_pool.create();
-    anim_img = try objects_mem_pool.create();
-    github_shape = try objects_mem_pool.create();
-
-    shape_src2 = graphics.shape_source.init();
+    text_shape = try arena_alloc.create(graphics.iobject);
+    rect_button = try arena_alloc.create(graphics.iobject);
+    img = try arena_alloc.create(graphics.iobject);
+    anim_img = try arena_alloc.create(graphics.iobject);
+    github_shape = try arena_alloc.create(graphics.iobject);
 
     //graphics.set_render_clear_color(.{ 1, 1, 1, 0 });
 
-    rect_button_text_src = components.button_source.init();
-
-    try components.button.make_square_button(rect_button_srcs[0..2], .{ 200, 100 }, 2, allocator);
+    var button_src = try components.button.make_square_button_raw(.{ 200, 100 }, 2, arena_alloc);
+    defer {
+        button_src[1].deinit(arena_alloc);
+    }
 
     const data = file_.read_file("test.webp", allocator) catch |e| xfit.herr3("test.webp read_file", e);
     defer allocator.free(data);
@@ -145,7 +135,7 @@ pub fn xfit_init() !void {
     img_decoder.load_header(data, image_util.color_format.default()) catch |e| xfit.herr3("test.webp loadheader fail", e);
 
     image_src = graphics.texture.init();
-    const image_pixels = try allocator.alloc(u8, img_decoder.width() * img_decoder.height() * 4);
+    const image_pixels = try arena_alloc.alloc(u8, img_decoder.width() * img_decoder.height() * 4);
     img_decoder.decode(data, image_pixels) catch |e| xfit.herr3("test.webp decode", e);
     image_src.build(img_decoder.width(), img_decoder.height(), image_pixels);
 
@@ -155,14 +145,14 @@ pub fn xfit_init() !void {
 
     anim_image_src = graphics.texture_array.init();
     anim_image_src.sampler = graphics.get_default_nearest_sampler();
-    const anim_pixels = try allocator.alloc(u8, img_decoder.size(.RGBA));
+    const anim_pixels = try arena_alloc.alloc(u8, img_decoder.size(.RGBA));
     img_decoder.decode(data, anim_pixels) catch |e| xfit.herr3("wasp.webp decode", e);
     anim_image_src.build(img_decoder.width(), img_decoder.height(), img_decoder.frame_count(), anim_pixels);
 
     img.* = .{ ._image = graphics.image.init(&image_src) };
     anim_img.* = .{ ._anim_image = graphics.animate_image.init(&anim_image_src) };
 
-    font0_data = file_.read_file("Spoqa Han Sans Regular.woff", allocator) catch |e| xfit.herr3("read_file font0_data", e);
+    font0_data = file_.read_file("Spoqa Han Sans Regular.woff", arena_alloc) catch |e| xfit.herr3("read_file font0_data", e);
     font0 = font.init(font0_data, 0) catch |e| xfit.herr3("font0.init", e);
 
     const option2: font.render_option2 = .{
@@ -182,28 +172,26 @@ pub fn xfit_init() !void {
             },
         },
     };
-    shape_src = try font.render_string2("Hello World!\n안녕하세요. break;", option2, allocator);
+    shape_src = try font.render_string2("Hello World!\n안녕하세요. break;", option2, arena_alloc);
 
-    text_shape.* = .{ ._shape = graphics.shape.init(&shape_src[0]) };
-    // var t1 = std.time.Timer.start() catch unreachable;
-    // xfit.print("{d}", .{t1.lap()});
-    try font0.render_string("CONTINUE계속", .{ .color = .{ 1, 0, 1, 1 } }, allocator, &shape_src2);
+    text_shape.* = .{ ._shape = graphics.shape.init(shape_src) };
 
-    try font0.render_string("버튼", .{ .pivot = .{ 0.5, 0.3 }, .scale = .{ 4.5, 4.5 }, .color = .{ 0, 0, 0, 1 } }, allocator, &rect_button_text_src.src);
+    const rect_text_src_raw = try font0.render_string_raw("버튼", .{ .pivot = .{ 0.5, 0.3 }, .scale = .{ 4.5, 4.5 }, .color = .{ 0, 0, 0, 1 } }, allocator);
+    defer rect_text_src_raw.deinit(allocator);
+    var concat_button_src = try button_src[1].concat(rect_text_src_raw, arena_alloc);
+    defer {
+        concat_button_src.deinit(arena_alloc);
+    }
+    rect_button_src = graphics.shape_source.init();
+    try rect_button_src.build(arena_alloc, concat_button_src, .gpu, .cpu);
 
-    rect_button.* = .{ ._button = components.button.init(rect_button_srcs[0..3], .{ .rect = math.rect.calc_with_canvas(button_area_rect, CANVAS_W, CANVAS_H) }) };
-    rect_button.*._button.transform.camera = &g_camera;
-    rect_button.*._button.transform.projection = &g_proj;
+    rect_button.* = .{ ._button = try components.button.init(&rect_button_src, .{ .rect = math.rect.calc_with_canvas(button_area_rect, CANVAS_W, CANVAS_H) }, button_src[0]) };
+    rect_button.*._button.shape.transform.camera = &g_camera;
+    rect_button.*._button.shape.transform.projection = &g_proj;
     rect_button.*.build();
 
     text_shape.*._shape.transform.camera = &g_camera;
     text_shape.*._shape.transform.projection = &g_proj;
-    var extra_src = try allocator.alloc(*graphics.shape_source, shape_src.len - 1 + 1); // shape_src 1..len + shape_src2
-    for (extra_src[0 .. extra_src.len - 1], shape_src[1..]) |*a, *b| {
-        a.* = b;
-    }
-    extra_src[extra_src.len - 1] = &shape_src2;
-    text_shape.*._shape.extra_src = extra_src;
 
     text_shape.*._shape.transform.model = math.matrix_multiply(math.matrix_scaling(f32, 5.0, 5.0, 1.0), math.matrix_translation(f32, -200.0, 0.0, 0.5));
     text_shape.*.build();
@@ -237,9 +225,9 @@ pub fn xfit_init() !void {
     defer svg_datas[1].deinit();
 
     var github_shape_raw = try svg_datas[0].compute_polygon(allocator);
-    defer github_shape_raw.deinit();
+    defer github_shape_raw.deinit(allocator);
     github_shape_src = graphics.shape_source.init();
-    github_shape_src.build(github_shape_raw.vertices[0], github_shape_raw.indices[0], .gpu, .cpu);
+    try github_shape_src.build(arena_alloc, github_shape_raw, .gpu, .cpu);
 
     github_shape.* = .{ ._shape = graphics.shape.init(&github_shape_src) };
     github_shape.*._shape.transform.camera = &g_camera;
@@ -371,12 +359,12 @@ fn move_callback() !bool {
 
 pub fn xfit_update() !void {
     update_mutex.lock();
-    shape_src[0].color[3] = shape_alpha;
+
+    shape_src.*.copy_color_update(0, &[_]math.vector{.{ 1, 1, 1, shape_alpha }});
     text_shape.*._shape.transform.model = math.matrix_multiply(math.matrix_scaling(f32, 5, 5, 1.0), math.matrix_translation(f32, -200 + dx, 0, 0.5));
     update_mutex.unlock();
 
     text_shape.*._shape.transform.copy_update();
-    shape_src[0].copy_color_update();
     rect_button.*.update();
 
     anim.update(xfit.dt());
@@ -394,18 +382,10 @@ pub fn xfit_size() !void {
 pub fn xfit_destroy() !void {
     move_callback_thread.join();
 
-    for (shape_src) |*src| {
-        src.*.deinit();
-    }
-    allocator.free(text_shape.*._shape.extra_src.?);
-    shape_src2.deinit();
-    rect_button_src.src.deinit();
-    rect_button_src2.src.deinit();
-    rect_button_text_src.src.deinit();
+    shape_src.*.deinit();
+    rect_button_src.deinit();
     github_shape_src.deinit();
 
-    allocator.free(image_src.pixels.?);
-    allocator.free(anim_image_src.pixels.?);
     image_src.deinit();
     anim_image_src.deinit();
 
@@ -417,7 +397,6 @@ pub fn xfit_destroy() !void {
     }
 
     font0.deinit();
-    allocator.free(font0_data);
 
     cmd.deinit();
     color_trans.deinit();
@@ -425,11 +404,7 @@ pub fn xfit_destroy() !void {
 
 ///after system clean
 pub fn xfit_clean() !void {
-    allocator.free(shape_src);
-    objects.deinit();
-    vertices_mem_pool.deinit();
-    objects_mem_pool.deinit();
-    indices_mem_pool.deinit();
+    arena.deinit();
     if (xfit.dbg and gpa.deinit() != .ok) unreachable;
 }
 
@@ -452,6 +427,8 @@ pub fn main() !void {
     };
     gpa = std.heap.GeneralPurposeAllocator(.{}).init;
     allocator = gpa.allocator(); //must init in main
+    arena = std.heap.ArenaAllocator.init(allocator);
+    arena_alloc = arena.allocator();
 
     xfit.set_error_handling_func(error_func);
     xfit.xfit_main(allocator, &init_setting);

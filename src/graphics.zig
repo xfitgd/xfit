@@ -10,8 +10,6 @@ const dbg = xfit.dbg;
 
 const __vulkan_allocator = @import("__vulkan_allocator.zig");
 
-const _allocator = __system.allocator;
-
 const __vulkan = @import("__vulkan.zig");
 const vk = __vulkan.vk;
 
@@ -32,9 +30,6 @@ const vulkan_res_node = __vulkan_allocator.vulkan_res_node;
 pub const indices16 = indices_(.U16);
 pub const indices32 = indices_(.U32);
 pub const indices = indices_(DEF_IDX_TYPE_);
-
-pub const dummy_vertices = [@sizeOf(vertices(u8))]u8;
-pub const dummy_indices = [@sizeOf(indices)]u8;
 
 pub inline fn execute_and_wait_all_op() void {
     __vulkan_allocator.execute_and_wait_all_op();
@@ -228,16 +223,16 @@ pub fn vertices(comptime vertexT: type) type {
             self.*.__check_init.deinit();
             self.*.node.clean(callback, self);
         }
-        pub inline fn build_gcpu(self: *Self, _array: []vertexT, _flag: write_flag) geometry.shapes_error!void {
-            try self.*.__build(_array, _flag, true);
+        pub inline fn build_gcpu(self: *Self, _array: []vertexT, _flag: write_flag) void {
+            self.*.__build(_array, _flag, true);
         }
-        pub inline fn build(self: *Self, _array: []vertexT, _flag: write_flag) geometry.shapes_error!void {
-            try self.*.__build(_array, _flag, false);
+        pub inline fn build(self: *Self, _array: []vertexT, _flag: write_flag) void {
+            self.*.__build(_array, _flag, false);
         }
-        pub fn __build(self: *Self, _array: []vertexT, _flag: write_flag, comptime use_gcpu_mem: bool) geometry.shapes_error!void {
+        fn __build(self: *Self, _array: []vertexT, _flag: write_flag, comptime use_gcpu_mem: bool) void {
             self.*.__check_init.init();
             if (_array.len == 0) {
-                return error.is_not_polygon;
+                xfit.herrm("empty vertices array!");
             }
             self.*.node.create_buffer_copy(.{
                 .len = @intCast(_array.len * @sizeOf(vertexT)),
@@ -442,8 +437,6 @@ pub const color_transform = struct {
 pub const transform = struct {
     const Self = @This();
 
-    parent_type: iobject_type,
-
     model: matrix = math.matrix_identity(f32),
     ///if this value itself changes, iobject.update_uniforms is needed
     camera: *camera = undefined,
@@ -457,13 +450,6 @@ pub const transform = struct {
         self.*.__check_init.deinit();
         self.*.__model_uniform.clean(callback, self);
     }
-    // inline fn get_mat_set_wh(self: *Self, _type: type) matrix {
-    //     const e: *_type = @fieldParentPtr("transform", self);
-    //     var mat = self.*.model;
-    //     mat[0][0] *= @floatFromInt(e.*.src.*.width);
-    //     mat[1][1] *= @floatFromInt(e.*.src.*.height);
-    //     return mat;
-    // }
     pub inline fn __build(self: *Self) void {
         self.*.__check_init.init();
         self.*.__model_uniform.create_buffer_copy(.{
@@ -688,53 +674,101 @@ pub const shape = shape_(true);
 pub const pixel_shape = shape_(false);
 
 pub const shape_source = struct {
-    vertices: vertices(shape_vertex_2d),
-    indices: indices32,
-    color: vector = .{ 1, 1, 1, 1 },
-    __uniform: vulkan_res_node(.buffer) = .{},
-    __set: descriptor_set,
+    pub const raw = struct {
+        vertices: []vertices(shape_vertex_2d),
+        indices: []indices32,
+        __color_uniforms: []vulkan_res_node(.buffer),
+        __color_sets: []descriptor_set,
+    };
+    __raw: ?raw,
 
     pub fn init() shape_source {
         return .{
-            .vertices = vertices(shape_vertex_2d).init(),
-            .indices = indices32.init(),
-            .__set = .{
-                .bindings = single_pool_binding[0..1],
-                .size = single_uniform_pool_sizes[0..1],
-                .layout = __vulkan.quad_shape_2d_pipeline_set.descriptorSetLayout,
-            },
+            .__raw = null,
         };
     }
-    pub fn build(self: *shape_source, _vertex_array: []shape_vertex_2d, _index_array: []u32, _flag: write_flag, _color_flag: write_flag) void {
-        if (_vertex_array.len < 4 or _index_array.len < 6) return;
-        self.*.vertices.build(_vertex_array, _flag) catch return;
-        self.*.indices.build(_index_array, _flag);
+    pub fn build(self: *shape_source, _allocator: std.mem.Allocator, _raw: geometry.raw_shapes, _flag: write_flag, _color_flag: write_flag) !void {
+        if (self.*.__raw != null) xfit.herrm("shape_source can't build twice!");
+        if (!((_raw.vertices.len == _raw.indices.len) and (_raw.colors.len == _raw.indices.len))) xfit.herrm("shape_source build _raw.vertices.len != _raw.indices.len != _raw.colors.len!");
 
-        self.*.__uniform.create_buffer(.{
-            .len = @sizeOf(vector),
-            .typ = .uniform,
-            .use = _color_flag,
-        }, mem.obj_to_u8arrC(&self.*.color));
+        var vert: ?[]vertices(shape_vertex_2d) = null;
+        var ind: ?[]indices32 = null;
+        var col_uniforms: ?[]vulkan_res_node(.buffer) = null;
+        var col_sets: ?[]descriptor_set = null;
+        errdefer {
+            if (vert != null) _allocator.free(vert.?);
+            if (ind != null) _allocator.free(ind.?);
+            if (col_uniforms != null) _allocator.free(col_uniforms.?);
+            if (col_sets != null) _allocator.free(col_sets.?);
+        }
+        vert = try _allocator.alloc(vertices(shape_vertex_2d), _raw.vertices.len);
+        ind = try _allocator.alloc(indices32, _raw.indices.len);
+        col_uniforms = try _allocator.alloc(vulkan_res_node(.buffer), _raw.colors.len);
+        col_sets = try _allocator.alloc(descriptor_set, _raw.colors.len);
 
-        var __set_res: [1]res_union = .{
-            .{ .buf = &self.*.__uniform },
+        self.*.__raw = .{
+            .vertices = vert.?,
+            .indices = ind.?,
+            .__color_uniforms = col_uniforms.?,
+            .__color_sets = col_sets.?,
         };
-        self.*.__set.__res = __set_res[0..1];
-        __vulkan_allocator.update_descriptor_sets((&self.*.__set)[0..1]);
+        @memset(self.*.__raw.?.__color_uniforms, .{});
+        @memset(self.*.__raw.?.__color_sets, .{
+            .bindings = single_pool_binding[0..1],
+            .size = single_uniform_pool_sizes[0..1],
+            .layout = __vulkan.quad_shape_2d_pipeline_set.descriptorSetLayout,
+        });
+        for (self.*.__raw.?.vertices, self.*.__raw.?.indices, self.*.__raw.?.__color_uniforms, self.*.__raw.?.__color_sets, _raw.vertices, _raw.indices, _raw.colors, 0..) |*v, *i, *u, *s, vv, ii, cc, idx| {
+            s.*.__res = @constCast(_allocator.dupe(res_union, &[_]res_union{.{ .buf = u }}) catch |e| {
+                for (0..idx) |idx2| {
+                    vert.?[idx2].deinit();
+                    ind.?[idx2].deinit();
+                    col_uniforms.?[idx2].clean(null, {});
+                }
+                return e;
+            });
+            v.* = vertices(shape_vertex_2d).init();
+            i.* = indices32.init();
+            v.*.build(vv, _flag);
+            i.*.build(ii, _flag);
+            u.*.create_buffer_copy(.{
+                .len = @sizeOf(vector),
+                .typ = .uniform,
+                .use = _color_flag,
+            }, mem.obj_to_u8arrC(&cc));
+        }
+        __vulkan_allocator.update_descriptor_sets(self.*.__raw.?.__color_sets);
+    }
+    ///recommend using std.heap.ArenaAllocator instead.
+    pub fn deinit_dealloc(self: *shape_source, _allocator: std.mem.Allocator) void {
+        deinit(self);
+        _allocator.free(self.*.__raw.?.vertices);
+        _allocator.free(self.*.__raw.?.indices);
+        _allocator.free(self.*.__raw.?.__color_uniforms);
+        for (self.*.__raw.?.__color_sets) |s| {
+            _allocator.free(@constCast(s.__res));
+        }
+        _allocator.free(self.*.__raw.?.__color_sets);
     }
     pub fn deinit_callback(self: *shape_source, callback: ?*const fn (caller: *anyopaque) void) void {
-        self.*.vertices.deinit();
-        self.*.indices.deinit();
-        self.*.__uniform.clean(callback, self);
+        for (self.*.__raw.?.vertices, self.*.__raw.?.indices, self.*.__raw.?.__color_uniforms) |*v, *i, *u| {
+            v.*.deinit();
+            i.*.deinit();
+            u.*.clean(callback, self);
+        }
     }
     pub fn deinit(self: *shape_source) void {
-        self.*.vertices.deinit();
-        self.*.indices.deinit();
-        self.*.__uniform.clean(null, {});
+        for (self.*.__raw.?.vertices, self.*.__raw.?.indices, self.*.__raw.?.__color_uniforms) |*v, *i, *u| {
+            v.*.deinit();
+            i.*.deinit();
+            u.*.clean(null, {});
+        }
     }
     ///!call when write_flag is cpu
-    pub fn copy_color_update(self: *shape_source) void {
-        self.*.__uniform.copy_update(&self.*.color);
+    pub fn copy_color_update(self: *shape_source, _start_idx: usize, colors: []const vector) void {
+        for (self.*.__raw.?.__color_uniforms[_start_idx .. _start_idx + colors.len], colors) |*u, c| {
+            u.*.copy_update(&c);
+        }
     }
 };
 
@@ -742,9 +776,8 @@ pub fn shape_(_msaa: bool) type {
     return struct {
         const Self = @This();
 
-        transform: transform = .{ .parent_type = if (_msaa) ._shape else ._pixel_shape },
+        transform: transform = .{},
         src: *shape_source,
-        extra_src: ?[]*shape_source = null,
         __set: descriptor_set,
 
         pub fn init(_src: *shape_source) Self {
@@ -779,49 +812,47 @@ pub fn shape_(_msaa: bool) type {
         pub fn __draw(self: *Self, cmd: vk.CommandBuffer) void {
             self.*.transform.__check_init.check_inited();
             __vulkan.load_instance_and_device();
-            for (&[_][]const *shape_source{ &[_]*shape_source{self.*.src}, self.*.extra_src orelse &[_]*shape_source{} }) |srcs| {
-                for (srcs) |src| {
-                    if (src.*.vertices.node.res == .null_handle or src.*.indices.node.res == .null_handle) continue;
-                    __vulkan.vkd.?.cmdBindPipeline(cmd, .graphics, if (_msaa) __vulkan.shape_color_2d_pipeline_set.pipeline else __vulkan.pixel_shape_color_2d_pipeline_set.pipeline);
+            const raw = self.*.src.*.__raw.?;
+            for (raw.vertices, raw.indices, raw.__color_sets) |v, i, s| {
+                __vulkan.vkd.?.cmdBindPipeline(cmd, .graphics, if (_msaa) __vulkan.shape_color_2d_pipeline_set.pipeline else __vulkan.pixel_shape_color_2d_pipeline_set.pipeline);
 
-                    __vulkan.vkd.?.cmdBindDescriptorSets(
-                        cmd,
-                        .graphics,
-                        __vulkan.shape_color_2d_pipeline_set.pipelineLayout,
-                        0,
-                        1,
-                        @ptrCast(&self.*.__set.__set),
-                        0,
-                        null,
-                    );
+                __vulkan.vkd.?.cmdBindDescriptorSets(
+                    cmd,
+                    .graphics,
+                    __vulkan.shape_color_2d_pipeline_set.pipelineLayout,
+                    0,
+                    1,
+                    @ptrCast(&self.*.__set.__set),
+                    0,
+                    null,
+                );
 
-                    const offsets: vk.DeviceSize = 0;
-                    __vulkan.vkd.?.cmdBindVertexBuffers(cmd, 0, 1, @ptrCast(&src.*.vertices.node.res), @ptrCast(&offsets));
+                const offsets: vk.DeviceSize = 0;
+                __vulkan.vkd.?.cmdBindVertexBuffers(cmd, 0, 1, @ptrCast(&v.node.res), @ptrCast(&offsets));
 
-                    __vulkan.vkd.?.cmdBindIndexBuffer(cmd, src.*.indices.node.res, 0, .uint32);
-                    __vulkan.vkd.?.cmdDrawIndexed(
-                        cmd,
-                        src.*.indices.node.buffer_option.len / get_idx_type_size(self.*.src.*.indices.idx_type),
-                        1,
-                        0,
-                        0,
-                        0,
-                    );
+                __vulkan.vkd.?.cmdBindIndexBuffer(cmd, i.node.res, 0, .uint32);
+                __vulkan.vkd.?.cmdDrawIndexed(
+                    cmd,
+                    i.node.buffer_option.len / get_idx_type_size(i.idx_type),
+                    1,
+                    0,
+                    0,
+                    0,
+                );
 
-                    __vulkan.vkd.?.cmdBindPipeline(cmd, .graphics, if (_msaa) __vulkan.quad_shape_2d_pipeline_set.pipeline else __vulkan.pixel_quad_shape_2d_pipeline_set.pipeline);
+                __vulkan.vkd.?.cmdBindPipeline(cmd, .graphics, if (_msaa) __vulkan.quad_shape_2d_pipeline_set.pipeline else __vulkan.pixel_quad_shape_2d_pipeline_set.pipeline);
 
-                    __vulkan.vkd.?.cmdBindDescriptorSets(
-                        cmd,
-                        .graphics,
-                        __vulkan.quad_shape_2d_pipeline_set.pipelineLayout,
-                        0,
-                        1,
-                        @ptrCast(&src.*.__set.__set),
-                        0,
-                        null,
-                    );
-                    __vulkan.vkd.?.cmdDraw(cmd, 6, 1, 0, 0);
-                }
+                __vulkan.vkd.?.cmdBindDescriptorSets(
+                    cmd,
+                    .graphics,
+                    __vulkan.quad_shape_2d_pipeline_set.pipelineLayout,
+                    0,
+                    1,
+                    @ptrCast(&s.__set),
+                    0,
+                    null,
+                );
+                __vulkan.vkd.?.cmdDraw(cmd, 6, 1, 0, 0);
             }
         }
     };
@@ -849,7 +880,7 @@ pub fn get_idx_type_size(typ: index_type) c_uint {
 pub const image = struct {
     const Self = @This();
 
-    transform: transform = .{ .parent_type = ._image },
+    transform: transform = .{},
     src: *texture,
     color_tran: *color_transform,
     __set: descriptor_set,
@@ -938,7 +969,7 @@ pub fn pixel_perfect_point(img: anytype, _p: point, _canvas_w: f32, _canvas_h: f
 pub const animate_image = struct {
     const Self = @This();
 
-    transform: transform = .{ .parent_type = ._anim_image },
+    transform: transform = .{},
 
     src: *texture_array,
     color_tran: *color_transform,
@@ -1044,7 +1075,7 @@ pub const animate_image = struct {
 pub const tile_image = struct {
     const Self = @This();
 
-    transform: transform = .{ .parent_type = ._tile_image },
+    transform: transform = .{},
 
     src: *tile_texture_array,
     color_tran: *color_transform,

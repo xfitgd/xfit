@@ -67,7 +67,7 @@ pub fn deinit(self: *Self) void {
     var it = self.*.__char_array.valueIterator();
     while (it.next()) |v| {
         if (v.*.raw_p != null) {
-            v.*.raw_p.?.deinit();
+            v.*.raw_p.?.deinit(__system.allocator);
         }
     }
     self.*.__char_array.deinit();
@@ -102,7 +102,7 @@ pub const render_option = struct {
     _offset: point = .{ 0, 0 },
     pivot: point = .{ 0, 0 },
     area: ?point = null,
-    color: ?vector = null,
+    color: vector = .{ 0, 0, 0, 1 },
     flag: graphics.write_flag = .gpu,
     color_flag: graphics.write_flag = .cpu,
 };
@@ -121,57 +121,58 @@ pub fn set_font_size(self: *Self, pt: f32) void {
     self.*.scale = scale_default / pt;
 }
 
-///!need to free return value
-pub fn render_string2(_str: []const u8, _render_option: render_option2, allocator: std.mem.Allocator) ![]graphics.shape_source {
-    var srclist = std.ArrayListAligned(graphics.shape_source, null).init(allocator);
-    errdefer {
-        for (srclist.items) |*s| {
-            s.*.deinit();
-        }
-        srclist.deinit();
-    }
-    var vertex_array: []graphics.shape_vertex_2d = try allocator.alloc(graphics.shape_vertex_2d, 0);
-    var index_array: []u32 = try allocator.alloc(u32, 0);
+pub fn render_string2(_str: []const u8, _render_option: render_option2, allocator: std.mem.Allocator) !*graphics.shape_source {
+    var vertlist = std.ArrayList([]graphics.shape_vertex_2d).init(allocator);
+    var indlist = std.ArrayList([]u32).init(allocator);
+    var colorlist = std.ArrayList(vector).init(allocator);
     defer {
-        allocator.free(vertex_array);
-        allocator.free(index_array);
+        for (vertlist.items) |v| {
+            allocator.free(v);
+        }
+        for (indlist.items) |i| {
+            allocator.free(i);
+        }
+        vertlist.deinit();
+        indlist.deinit();
+        colorlist.deinit();
     }
 
     var i: usize = 0;
+    var idx: usize = 0;
     var option = _render_option.option;
     for (_render_option.ranges) |v| {
         option.scale = _render_option.option.scale * v.scale;
         var same: bool = false;
-        var src: *graphics.shape_source = undefined;
-        for (srclist.items) |*e| {
-            if (math.compare(e.*.color, v.color)) {
+        for (colorlist.items, 0..) |e, ii| {
+            if (math.compare(e, v.color)) {
                 same = true;
-                src = e;
+                idx = ii;
                 break;
             }
         }
         if (!same) {
-            if (srclist.items.len > 0) {
-                srclist.items[srclist.items.len - 1].build(vertex_array, index_array, option.flag, option.color_flag);
-                vertex_array = try allocator.realloc(vertex_array, 0);
-                index_array = try allocator.realloc(index_array, 0);
-            }
-            try srclist.append(graphics.shape_source.init());
-            srclist.items[srclist.items.len - 1].color = v.color;
-
-            src = &srclist.items[srclist.items.len - 1];
+            try vertlist.append(try allocator.alloc(graphics.shape_vertex_2d, 0));
+            try indlist.append(try allocator.alloc(u32, 0));
+            try colorlist.append(v.color);
+            idx = colorlist.items.len - 1;
         }
 
         if (v.len == 0 or i + v.len >= _str.len) {
-            _ = try v.font.*._render_string(_str[i..], option, &vertex_array, &index_array, allocator);
-            src.build(vertex_array, index_array, option.flag, option.color_flag);
+            _ = try v.font.*._render_string(_str[i..], option, &vertlist.items[idx], &indlist.items[idx], allocator);
             break;
         } else {
-            option._offset = try v.font.*._render_string(_str[i..(i + v.len)], option, &vertex_array, &index_array, allocator);
+            option._offset = try v.font.*._render_string(_str[i..(i + v.len)], option, &vertlist.items[idx], &indlist.items[idx], allocator);
             i += v.len;
         }
     }
-    return try srclist.toOwnedSlice();
+    var raw: geometry.raw_shapes = undefined;
+    raw.vertices = vertlist.items;
+    raw.indices = indlist.items;
+    raw.colors = colorlist.items;
+    const src = try allocator.create(graphics.shape_source);
+    src.* = graphics.shape_source.init();
+    try src.*.build(allocator, raw, option.flag, option.color_flag);
+    return src;
 }
 
 fn _render_string(self: *Self, _str: []const u8, _render_option: render_option, _vertex_array: *[]graphics.shape_vertex_2d, _index_array: *[]u32, allocator: std.mem.Allocator) !point {
@@ -200,7 +201,7 @@ fn _render_string(self: *Self, _str: []const u8, _render_option: render_option, 
     return offset * _render_option.scale;
 }
 
-pub fn render_string(self: *Self, _str: []const u8, _render_option: render_option, allocator: std.mem.Allocator, in_out_shape_src: *graphics.shape_source) !void {
+pub fn render_string(self: *Self, _str: []const u8, _render_option: render_option, allocator: std.mem.Allocator) !*graphics.shape_source {
     var vertex_array: []graphics.shape_vertex_2d = try allocator.alloc(graphics.shape_vertex_2d, 0);
     var index_array: []u32 = try allocator.alloc(u32, 0);
     defer {
@@ -208,8 +209,43 @@ pub fn render_string(self: *Self, _str: []const u8, _render_option: render_optio
         allocator.free(index_array);
     }
     _ = try _render_string(self, _str, _render_option, &vertex_array, &index_array, allocator);
-    in_out_shape_src.*.color = _render_option.color orelse vector{ 0, 0, 0, 1 };
-    in_out_shape_src.*.build(vertex_array, index_array, _render_option.flag, _render_option.color_flag);
+    const shape_src = try allocator.create(graphics.shape_source);
+    errdefer allocator.destroy(shape_src);
+    shape_src.* = graphics.shape_source.init();
+    var raw: geometry.raw_shapes = undefined;
+    raw.vertices = @constCast(&[_][]graphics.shape_vertex_2d{vertex_array});
+    raw.indices = @constCast(&[_][]u32{index_array});
+    raw.colors = @constCast(&[_]vector{_render_option.color});
+    try shape_src.*.build(allocator, raw, _render_option.flag, _render_option.color_flag);
+    return shape_src;
+}
+
+pub fn render_string_raw(self: *Self, _str: []const u8, _render_option: render_option, allocator: std.mem.Allocator) !geometry.raw_shapes {
+    var vertices: ?[][]graphics.shape_vertex_2d = null;
+    var indices: ?[][]u32 = null;
+    var colors: ?[]vector = null;
+    errdefer {
+        if (vertices != null) allocator.free(vertices.?);
+        if (indices != null) allocator.free(indices.?);
+        if (colors != null) allocator.free(colors.?);
+    }
+
+    var vertex_array: []graphics.shape_vertex_2d = try allocator.alloc(graphics.shape_vertex_2d, 0);
+    var index_array: []u32 = try allocator.alloc(u32, 0);
+    errdefer {
+        allocator.free(vertex_array);
+        allocator.free(index_array);
+    }
+    _ = try _render_string(self, _str, _render_option, &vertex_array, &index_array, allocator);
+
+    vertices = try allocator.dupe([]graphics.shape_vertex_2d, &[_][]graphics.shape_vertex_2d{vertex_array});
+    indices = try allocator.dupe([]u32, &[_][]u32{index_array});
+    colors = try allocator.dupe(vector, &[_]vector{_render_option.color});
+    return .{
+        .vertices = vertices.?,
+        .indices = indices.?,
+        .colors = colors.?,
+    };
 }
 
 fn _render_char(self: *Self, char: u21, _vertex_array: *[]graphics.shape_vertex_2d, _index_array: *[]u32, offset: *point, area: ?math.point, scale: point, allocator: std.mem.Allocator) !void {
@@ -247,7 +283,6 @@ fn _render_char(self: *Self, char: u21, _vertex_array: *[]graphics.shape_vertex_
             .idx2 = 0,
             .npoly = 0,
             .npoly_len = 0,
-            .allocator = allocator,
             .scale = self.*.scale,
         };
 
@@ -271,14 +306,12 @@ fn _render_char(self: *Self, char: u21, _vertex_array: *[]graphics.shape_vertex_
             poly.nodes[0].stroke_color = null;
             poly.nodes[0].thickness = 0;
 
-            char_d2.raw_p = try poly.compute_polygon(allocator);
+            char_d2.raw_p = try poly.compute_polygon(__system.allocator);
         }
         char_d2.advance[0] = @as(f32, @floatFromInt(self.*.__face.*.glyph.*.advance.x)) / (64.0 * self.*.scale);
         char_d2.advance[1] = @as(f32, @floatFromInt(self.*.__face.*.glyph.*.advance.y)) / (64.0 * self.*.scale);
-
-        char_d2.allocator = allocator;
         self.*.__char_array.put(res, char_d2) catch |e| {
-            char_d2.raw_p.?.deinit();
+            char_d2.raw_p.?.deinit(__system.allocator);
             return e;
         };
         char_d = &char_d2;
@@ -316,7 +349,6 @@ const font_user_data = struct {
     npoly_len: u32,
     npoly: u32,
     scale: f32,
-    allocator: std.mem.Allocator,
 };
 
 fn line_to(vec: [*c]const freetype.FT_Vector, user: ?*anyopaque) callconv(.C) c_int {

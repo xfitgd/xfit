@@ -214,9 +214,29 @@ pub const shapes = struct {
         }
     }
 
-    fn _compute_polygon_sub(_out: *raw_shapes, _lines: []line, _n_polygons: []const u32, _vertices_list: *ArrayList([]graphics.shape_vertex_2d), _indices_list: *ArrayList([]u32)) shapes_error!void {
-        var vertices_sub_list: ArrayList(graphics.shape_vertex_2d) = ArrayList(graphics.shape_vertex_2d).init(_out.*.allocator.?.allocator());
-        var indices_sub_list: ArrayList(u32) = ArrayList(u32).init(_out.*.allocator.?.allocator());
+    fn _compute_polygon_sub(
+        _out: *raw_shapes,
+        _allocator: std.mem.Allocator,
+        _lines: []line,
+        _n_polygons: []const u32,
+        _vertices_list: *ArrayList([]graphics.shape_vertex_2d),
+        _indices_list: *ArrayList([]u32),
+    ) shapes_error!void {
+        _ = _out;
+        var vertices_sub_list: ArrayList(graphics.shape_vertex_2d) = ArrayList(graphics.shape_vertex_2d).init(_allocator);
+        var indices_sub_list: ArrayList(u32) = ArrayList(u32).init(_allocator);
+        defer {
+            vertices_sub_list.deinit();
+            indices_sub_list.deinit();
+        }
+        errdefer {
+            for (_vertices_list.*.items) |v| {
+                _allocator.free(v);
+            }
+            for (_indices_list.*.items) |i| {
+                _allocator.free(i);
+            }
+        }
         var vertex_len: u32 = 0;
         var first_vertex_idx: u32 = 0;
 
@@ -250,16 +270,37 @@ pub const shapes = struct {
             first_vertex_idx = vertex_len;
         }
 
-        try _vertices_list.*.append(vertices_sub_list.items);
-        try _indices_list.*.append(indices_sub_list.items);
+        try _vertices_list.*.append(try _allocator.dupe(graphics.shape_vertex_2d, vertices_sub_list.items));
+        try _indices_list.*.append(try _allocator.dupe(u32, indices_sub_list.items));
     }
 
-    fn _compute_polygon_sub_outline(_out: *raw_shapes, _lines: []line, _n_polygons: []const u32, _vertices_list: *ArrayList([]graphics.shape_vertex_2d), _indices_list: *ArrayList([]u32), thickness: f32) shapes_error!void {
-        var vertices_sub_list: ArrayList(graphics.shape_vertex_2d) = ArrayList(graphics.shape_vertex_2d).init(_out.*.allocator.?.allocator());
-        var indices_sub_list: ArrayList(u32) = ArrayList(u32).init(_out.*.allocator.?.allocator());
+    fn _compute_polygon_sub_outline(
+        _out: *raw_shapes,
+        _allocator: std.mem.Allocator,
+        _lines: []line,
+        _n_polygons: []const u32,
+        _vertices_list: *ArrayList([]graphics.shape_vertex_2d),
+        _indices_list: *ArrayList([]u32),
+        thickness: f32,
+    ) shapes_error!void {
+        _ = _out;
+        var vertices_sub_list: ArrayList(graphics.shape_vertex_2d) = ArrayList(graphics.shape_vertex_2d).init(_allocator);
+        var indices_sub_list: ArrayList(u32) = ArrayList(u32).init(_allocator);
+        defer {
+            vertices_sub_list.deinit();
+            indices_sub_list.deinit();
+        }
+        errdefer {
+            for (_vertices_list.*.items) |v| {
+                _allocator.free(v);
+            }
+            for (_indices_list.*.items) |i| {
+                _allocator.free(i);
+            }
+        }
 
-        var lines_ = try _out.*.allocator.?.allocator().dupe(line, _lines);
-        defer _out.*.allocator.?.allocator().free(lines_);
+        var lines_ = try _allocator.dupe(line, _lines);
+        defer _allocator.free(lines_);
 
         for (&[_]f32{ thickness, -thickness }) |t| {
             var vertex_len: u32 = 0;
@@ -340,28 +381,51 @@ pub const shapes = struct {
         for (lines_, 0..) |l, i| {
             _lines[i].curve_type = l.curve_type;
         }
-        try _vertices_list.*.append(vertices_sub_list.items);
-        try _indices_list.*.append(indices_sub_list.items);
+        try _vertices_list.*.append(try _allocator.dupe(graphics.shape_vertex_2d, vertices_sub_list.items));
+        try _indices_list.*.append(try _allocator.dupe(u32, indices_sub_list.items));
     }
 
     pub fn compute_polygon(self: *shapes, allocator: std.mem.Allocator) shapes_error!raw_shapes {
         var count: usize = 0;
-        var _out = raw_shapes{ .allocator = std.heap.ArenaAllocator.init(allocator) };
-        var vertices_list: ArrayList([]graphics.shape_vertex_2d) = ArrayList([]graphics.shape_vertex_2d).init(_out.allocator.?.allocator());
-        var indices_list: ArrayList([]u32) = ArrayList([]u32).init(_out.allocator.?.allocator());
-        errdefer _out.deinit();
+        var _out: raw_shapes = undefined;
+        var vertices_list: ArrayList([]graphics.shape_vertex_2d) = ArrayList([]graphics.shape_vertex_2d).init(allocator);
+        var indices_list: ArrayList([]u32) = ArrayList([]u32).init(allocator);
+        var color_list: ArrayList(vector) = ArrayList(vector).init(allocator);
+        defer vertices_list.deinit();
+        defer indices_list.deinit();
+        defer color_list.deinit();
 
         count = 0;
         while (count < self.nodes.len) : (count += 1) {
             if (self.nodes[count].color != null) {
-                try _compute_polygon_sub(&_out, self.nodes[count].lines, self.nodes[count].n_polygons, &vertices_list, &indices_list);
+                try _compute_polygon_sub(
+                    &_out,
+                    allocator,
+                    self.nodes[count].lines,
+                    self.nodes[count].n_polygons,
+                    &vertices_list,
+                    &indices_list,
+                );
+                try color_list.append(self.nodes[count].color.?);
             }
             if (self.nodes[count].stroke_color != null and self.nodes[count].thickness > 0) {
-                try _compute_polygon_sub_outline(&_out, self.nodes[count].lines, self.nodes[count].n_polygons, &vertices_list, &indices_list, self.nodes[count].thickness);
+                try _compute_polygon_sub_outline(
+                    &_out,
+                    allocator,
+                    self.nodes[count].lines,
+                    self.nodes[count].n_polygons,
+                    &vertices_list,
+                    &indices_list,
+                    self.nodes[count].thickness,
+                );
+                try color_list.append(self.nodes[count].stroke_color.?);
             }
         }
-        _out.vertices = vertices_list.items;
-        _out.indices = indices_list.items;
+        _out.vertices = try allocator.dupe([]graphics.shape_vertex_2d, vertices_list.items);
+        errdefer allocator.free(_out.vertices);
+        _out.indices = try allocator.dupe([]u32, indices_list.items);
+        errdefer allocator.free(_out.indices);
+        _out.colors = try allocator.dupe(vector, color_list.items);
         return _out;
     }
 };
@@ -774,11 +838,68 @@ pub const line = struct {
 };
 
 pub const raw_shapes = struct {
-    vertices: [][]graphics.shape_vertex_2d = undefined,
-    indices: [][]u32 = undefined,
-    allocator: ?std.heap.ArenaAllocator = null,
-    pub fn deinit(self: *raw_shapes) void {
-        if (self.allocator == null) return;
-        self.allocator.?.deinit();
+    vertices: [][]graphics.shape_vertex_2d,
+    indices: [][]u32,
+    colors: []vector,
+    pub fn deinit(self: raw_shapes, _allocator: std.mem.Allocator) void {
+        for (self.vertices, self.indices) |v, i| {
+            _allocator.free(v);
+            _allocator.free(i);
+        }
+        _allocator.free(self.vertices);
+        _allocator.free(self.indices);
+        _allocator.free(self.colors);
+    }
+    pub fn concat(self: raw_shapes, src: raw_shapes, _allocator: std.mem.Allocator) !raw_shapes {
+        var vertices = try _allocator.alloc([]graphics.shape_vertex_2d, self.vertices.len + src.vertices.len);
+        errdefer _allocator.free(vertices);
+        var indices = try _allocator.alloc([]u32, self.indices.len + src.indices.len);
+        errdefer _allocator.free(indices);
+        var colors = try _allocator.alloc(vector, self.colors.len + src.colors.len);
+        errdefer _allocator.free(colors);
+
+        for (
+            vertices[0..self.vertices.len],
+            indices[0..self.indices.len],
+            self.vertices,
+            self.indices,
+            0..,
+        ) |*v, *i, vv, ii, j| {
+            errdefer {
+                for (0..j) |jj| {
+                    _allocator.free(vertices[jj]);
+                    _allocator.free(indices[jj]);
+                }
+            }
+            v.* = try _allocator.dupe(graphics.shape_vertex_2d, vv);
+            errdefer _allocator.free(v.*);
+            i.* = try _allocator.dupe(u32, ii);
+        }
+
+        for (
+            vertices[self.vertices.len..],
+            indices[self.indices.len..],
+            src.vertices,
+            src.indices,
+            self.indices.len..,
+        ) |*v, *i, vv, ii, j| {
+            errdefer {
+                for (0..j) |jj| {
+                    _allocator.free(vertices[jj]);
+                    _allocator.free(indices[jj]);
+                }
+            }
+            v.* = try _allocator.dupe(graphics.shape_vertex_2d, vv);
+            errdefer _allocator.free(v.*);
+            i.* = try _allocator.dupe(u32, ii);
+        }
+        @memcpy(colors[0..self.colors.len], self.colors);
+        @memcpy(colors[self.colors.len..], src.colors);
+
+        return .{
+            .vertices = vertices,
+            .indices = indices,
+            .colors = colors,
+        };
     }
 };
