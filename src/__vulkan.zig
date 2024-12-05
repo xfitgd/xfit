@@ -1809,17 +1809,17 @@ fn create_framebuffer() void {
     vkd.?.updateDescriptorSets(descriptorWrite.len, &descriptorWrite, 0, null);
 }
 
-pub var rotate_mat: matrix = matrix.identity();
+pub var rotate_mat: matrix = math.matrix_identity(f32);
 
 pub fn refresh_pre_matrix() void {
     if (xfit.is_mobile) {
         const orientation = window.get_screen_orientation();
         rotate_mat = switch (orientation) {
-            .unknown => matrix.identity(),
-            .landscape90 => matrix.rotation2D(std.math.degreesToRadians(90.0)),
-            .landscape270 => matrix.rotation2D(std.math.degreesToRadians(270.0)),
-            .vertical180 => matrix.rotation2D(std.math.degreesToRadians(180.0)),
-            .vertical360 => matrix.identity(),
+            .unknown => math.matrix_identity(f32),
+            .landscape90 => math.matrix_rotation2D(f32, std.math.degreesToRadians(90.0)),
+            .landscape270 => math.matrix_rotation2D(f32, std.math.degreesToRadians(270.0)),
+            .vertical180 => math.matrix_rotation2D(f32, std.math.degreesToRadians(180.0)),
+            .vertical360 => math.matrix_identity(f32),
         };
     }
 }

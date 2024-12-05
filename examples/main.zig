@@ -89,6 +89,7 @@ var img: *graphics.iobject = undefined;
 var anim_img: *graphics.iobject = undefined;
 
 pub fn xfit_init() !void {
+    //lua test
     var luaT = lua.luaL_newstate();
     defer luaT.lua_close();
     luaT.luaL_openlibs();
@@ -100,34 +101,39 @@ pub fn xfit_init() !void {
 
     try luaT.luaL_dostring("print(\"hello\")\n");
 
-    if (xfit.platform != .android) {
+    if (xfit.platform != .android) { //android can't use standard FILE
         try luaT.luaL_loadfile("test.lua");
         try luaT.lua_pcall(0, 0, 0);
         _ = luaT.lua_getglobal("Printhello");
         try luaT.lua_pcall(0, 0, 0);
     }
+    //
 
-    objects = ArrayList(*graphics.iobject).init(arena_alloc);
-
+    //make global g_proj and g_camera
     try g_proj.init_matrix_orthographic(CANVAS_W, CANVAS_H);
     g_proj.build(.cpu);
 
     g_camera = graphics.camera.init(.{ 0, 0, -1, 1 }, .{ 0, 0, 0, 1 }, .{ 0, 1, 0, 1 });
     g_camera.build();
+    //
 
-    text_shape = try arena_alloc.create(graphics.iobject);
-    rect_button = try arena_alloc.create(graphics.iobject);
-    img = try arena_alloc.create(graphics.iobject);
-    anim_img = try arena_alloc.create(graphics.iobject);
-    github_shape = try arena_alloc.create(graphics.iobject);
+    //alloc and set iobjects
+    objects = ArrayList(*graphics.iobject).init(arena_alloc);
+    const iobjs = try arena_alloc.alloc(graphics.iobject, 5);
+
+    text_shape = &iobjs[0];
+    rect_button = &iobjs[1];
+    img = &iobjs[2];
+    anim_img = &iobjs[3];
+    github_shape = &iobjs[4];
+    //
 
     //graphics.set_render_clear_color(.{ 1, 1, 1, 0 });
 
     var button_src = try components.button.make_square_button_raw(.{ 200, 100 }, 2, arena_alloc);
-    defer {
-        button_src[1].deinit(arena_alloc);
-    }
+    defer button_src[1].deinit(arena_alloc);
 
+    //load and decode test.webp
     const data = file_.read_file("test.webp", allocator) catch |e| xfit.herr3("test.webp read_file", e);
     defer allocator.free(data);
     var img_decoder: webp = .{};
@@ -139,22 +145,52 @@ pub fn xfit_init() !void {
     img_decoder.decode(data, image_pixels) catch |e| xfit.herr3("test.webp decode", e);
     image_src.build(img_decoder.width(), img_decoder.height(), image_pixels);
 
+    color_trans = graphics.color_transform.init();
+    color_trans.color_mat = .{
+        .{ -1, 0, 0, 0 },
+        .{ 0, -1, 0, 0 },
+        .{ 0, 0, -1, 0 },
+        .{ 1, 1, 1, 1 },
+    };
+    color_trans.build(.gpu);
+
+    img.* = .{ ._image = graphics.image.init(&image_src) };
+
+    img.*._image.color_tran = &color_trans;
+    img.*._image.transform.camera = &g_camera;
+    img.*._image.transform.projection = &g_proj;
+    img.*._image.transform.model = math.matrix_multiply(math.matrix_scaling(f32, 2, 2, 1.0), math.matrix_translation(f32, 0, 0, 0.7));
+    img.*.build();
+    //
+
+    //load and decode wasp.webp
     const anim_data = file_.read_file("wasp.webp", allocator) catch |e| xfit.herr3("wasp.webp read_file", e);
     defer allocator.free(anim_data);
     img_decoder.load_anim_header(anim_data, image_util.color_format.default()) catch |e| xfit.herr3("wasp.webp load_anim_header fail", e);
 
     anim_image_src = graphics.texture_array.init();
     anim_image_src.sampler = graphics.get_default_nearest_sampler();
-    const anim_pixels = try arena_alloc.alloc(u8, img_decoder.size(.RGBA));
+    const anim_pixels = try arena_alloc.alloc(u8, img_decoder.size(image_util.color_format.default()));
     img_decoder.decode(data, anim_pixels) catch |e| xfit.herr3("wasp.webp decode", e);
     anim_image_src.build(img_decoder.width(), img_decoder.height(), img_decoder.frame_count(), anim_pixels);
 
-    img.* = .{ ._image = graphics.image.init(&image_src) };
     anim_img.* = .{ ._anim_image = graphics.animate_image.init(&anim_image_src) };
 
+    anim_img.*._anim_image.transform.camera = &g_camera;
+    anim_img.*._anim_image.transform.projection = &g_proj;
+    anim_img.*._anim_image.transform.model = math.matrix_translation(f32, 300, -200, 0);
+    anim_img.*.build();
+
+    anim.obj.obj = anim_img;
+    anim.play();
+    //
+
+    //load and init font
     font0_data = file_.read_file("Spoqa Han Sans Regular.woff", arena_alloc) catch |e| xfit.herr3("read_file font0_data", e);
     font0 = font.init(font0_data, 0) catch |e| xfit.herr3("font0.init", e);
+    //
 
+    //build text
     const option2: font.render_option2 = .{
         .option = .{},
         .ranges = &[_]font.range{
@@ -173,15 +209,21 @@ pub fn xfit_init() !void {
         },
     };
     shape_src = try font.render_string2("Hello World!\n안녕하세요. break;", option2, arena_alloc);
-
     text_shape.* = .{ ._shape = graphics.shape.init(shape_src) };
 
+    text_shape.*._shape.transform.camera = &g_camera;
+    text_shape.*._shape.transform.projection = &g_proj;
+
+    text_shape.*._shape.transform.model = math.matrix_multiply(math.matrix_scaling(f32, 5.0, 5.0, 1.0), math.matrix_translation(f32, -200.0, 0.0, 0.5));
+    text_shape.*.build();
+    //
+
+    //build button
     const rect_text_src_raw = try font0.render_string_raw("버튼", .{ .pivot = .{ 0.5, 0.3 }, .scale = .{ 4.5, 4.5 }, .color = .{ 0, 0, 0, 1 } }, allocator);
     defer rect_text_src_raw.deinit(allocator);
-    var concat_button_src = try button_src[1].concat(rect_text_src_raw, arena_alloc);
-    defer {
-        concat_button_src.deinit(arena_alloc);
-    }
+    var concat_button_src = try button_src[1].concat(rect_text_src_raw, allocator);
+    defer concat_button_src.deinit(allocator);
+
     rect_button_src = graphics.shape_source.init();
     try rect_button_src.build(arena_alloc, concat_button_src, .gpu, .cpu);
 
@@ -190,32 +232,10 @@ pub fn xfit_init() !void {
     rect_button.*._button.shape.transform.projection = &g_proj;
     rect_button.*.build();
 
-    text_shape.*._shape.transform.camera = &g_camera;
-    text_shape.*._shape.transform.projection = &g_proj;
+    g_rect_button = &rect_button.*._button;
+    //
 
-    text_shape.*._shape.transform.model = math.matrix_multiply(math.matrix_scaling(f32, 5.0, 5.0, 1.0), math.matrix_translation(f32, -200.0, 0.0, 0.5));
-    text_shape.*.build();
-
-    color_trans = graphics.color_transform.init();
-    color_trans.color_mat = .{
-        .{ -1, 0, 0, 0 },
-        .{ 0, -1, 0, 0 },
-        .{ 0, 0, -1, 0 },
-        .{ 1, 1, 1, 1 },
-    };
-    color_trans.build(.gpu);
-
-    img.*._image.color_tran = &color_trans;
-    img.*._image.transform.camera = &g_camera;
-    img.*._image.transform.projection = &g_proj;
-    img.*._image.transform.model = math.matrix_multiply(math.matrix_scaling(f32, 2, 2, 1.0), math.matrix_translation(f32, 0, 0, 0.7));
-    img.*.build();
-
-    anim_img.*._anim_image.transform.camera = &g_camera;
-    anim_img.*._anim_image.transform.projection = &g_proj;
-    anim_img.*._anim_image.transform.model = math.matrix_translation(f32, 300, -200, 0);
-    anim_img.*.build();
-
+    //load svg and build
     const svg_data = file_.read_file("github-mark-white.svg", allocator) catch |e| xfit.herr3("github-mark-white.svg read_file", e);
     defer allocator.free(svg_data);
     var svg_parser: svg = try svg.init_parse(allocator, svg_data);
@@ -237,24 +257,23 @@ pub fn xfit_init() !void {
         math.matrix_translation(f32, -450, 0, 0),
     );
     github_shape.*.build();
+    //
 
+    //append objects
     try objects.append(img);
     try objects.append(text_shape);
     try objects.append(anim_img);
     try objects.append(rect_button);
     try objects.append(github_shape);
-
-    g_rect_button = &rect_button.*._button;
+    //
 
     cmd = render_command.init();
-    cmd.*.scene = objects.items[0..objects.items.len];
+    cmd.*.scene = objects.items[0..objects.items.len]; // set objects to render_command
 
     cmds[0] = cmd;
-    graphics.render_cmd = cmds[0..cmds.len];
+    graphics.render_cmd = cmds[0..cmds.len]; //set render_command to global
 
-    anim.obj.obj = anim_img;
-    anim.play();
-
+    //add input events
     input.set_key_down_func(key_down);
     input.set_mouse_move_func(mouse_move);
     input.set_touch_move_func(touch_move);
@@ -262,13 +281,16 @@ pub fn xfit_init() !void {
     input.set_Lmouse_up_func(mouse_up);
     input.set_touch_down_func(touch_down);
     input.set_touch_up_func(touch_up);
+    //
 
+    //add timer callback thread 1/100 sec
     move_callback_thread = try timer_callback.start(
         xfit.sec_to_nano_sec2(0, 10, 0, 0),
         0,
         move_callback,
         .{},
     );
+    //
 
     // _ = try timer_callback.start(
     //     xfit.sec_to_nano_sec2(0, 1, 0, 0),

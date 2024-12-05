@@ -13,7 +13,7 @@ set ARCH=%9
 IF "%PLATFORM%" == "android" (
     if not exist "%OUT_DIR%" mkdir "%OUT_DIR%"
     "%ANDROID_PATH%/build-tools/%ANDROID_BUILD_TOOL_VER%/aapt2" compile --dir res -o %OUT_DIR%/res.zip
-    "%ANDROID_PATH%/build-tools/%ANDROID_BUILD_TOOL_VER%/aapt2" link -o %OUT_DIR%/output.apk -I %ANDROID_PATH%/platforms/android-%ANDROID_VER%/android.jar %OUT_DIR%/res.zip --java . --manifest %WORK_DIR%/AndroidManifest.xml
+    "%ANDROID_PATH%/build-tools/%ANDROID_BUILD_TOOL_VER%/aapt2" link -o %OUT_DIR%/output.apk -I %ANDROID_PATH%/platforms/android-%ANDROID_VER%/android.jar %OUT_DIR%/res.zip --java %OUT_DIR% --manifest %WORK_DIR%/AndroidManifest.xml
     IF "%ARCH%" == "aarch64" (
         call :ZIP_APK "%ENGINE_DIR%/zip_aarch64.exe"
     ) ELSE (
