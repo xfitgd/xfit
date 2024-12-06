@@ -143,7 +143,7 @@ pub fn line_in_polygon(a: point, b: point, pts: []const point, check_inside_line
         }
     }
     if (lines_intersect(pts[pts.len - 1], pts[0], a, b, &result)) {
-        if (math.compare_n(a, result) or math.compare_n(b, result, std.math.floatEps(f32))) return false;
+        if (math.compare_n(a, result, std.math.floatEps(f32)) or math.compare_n(b, result, std.math.floatEps(f32))) return false;
         return true;
     }
     return false;
@@ -302,81 +302,201 @@ pub const shapes = struct {
         var lines_ = try _allocator.dupe(line, _lines);
         defer _allocator.free(lines_);
 
-        for (&[_]f32{ thickness, -thickness }) |t| {
-            var vertex_len: u32 = 0;
-            var first_vertex_idx: u32 = 0;
-            for (_n_polygons) |n| {
-                vertex_len += n;
+        var vertex_len: u32 = 0;
+        var first_vertex_idx: u32 = 0;
+        for (_n_polygons) |n| {
+            vertex_len += n;
+
+            const is_close_path = math.compare(_lines[first_vertex_idx].start, _lines[vertex_len - 1].end);
+            var maxX: f32 = std.math.floatMin(f32);
+            var minY: f32 = std.math.floatMax(f32);
+
+            try vertices_sub_list.append(.{ .pos = .{ std.math.floatMax(f32), std.math.floatMin(f32) }, .uvw = .{ 1, 0, 0 } });
+            const first_vertex_idx2: u32 = @intCast(vertices_sub_list.items.len - 1); // we need first {std.math.floatMax(f32), std.math.floatMin(f32) } point, so save idx2 separate
+            var first_vertex_idx3: u32 = undefined;
+            const ccw: f32 = if (math.cross2(_lines[first_vertex_idx].start, if (_lines[first_vertex_idx].curve_type == .line) _lines[first_vertex_idx].end else _lines[first_vertex_idx].control0) > 0) -1 else 1;
+
+            for (&[_]f32{ thickness, -thickness }) |t| {
                 var i: u32 = first_vertex_idx;
-                const ccw: f32 = if (math.cross2(lines_[first_vertex_idx].start, if (lines_[first_vertex_idx].curve_type == .line) lines_[first_vertex_idx].end else lines_[first_vertex_idx].control0) > 0) -1 else 1;
 
-                try vertices_sub_list.append(.{ .pos = .{ std.math.floatMax(f32), std.math.floatMin(f32) }, .uvw = .{ 1, 0, 0 } });
-                const first_vertex_idx2: u32 = @intCast(vertices_sub_list.items.len - 1); // we need first {std.math.floatMax(f32), std.math.floatMin(f32) } point, so save idx2 separate
+                if (t == -thickness and (!is_close_path)) {
+                    i = vertex_len - 1;
+                    while (i >= first_vertex_idx) : (i -= 1) {
+                        const next = if (i - 1 >= first_vertex_idx) i - 1 else vertex_len - 1;
+                        const prev = if (i == vertex_len - 1) first_vertex_idx else (i + 1);
 
-                var maxX: f32 = std.math.floatMin(f32);
-                var minY: f32 = std.math.floatMax(f32);
-                while (i < vertex_len) : (i += 1) {
-                    const next = if (i + 1 < vertex_len) i + 1 else first_vertex_idx;
-                    const prev = if (i == first_vertex_idx) vertex_len - 1 else (i - 1);
+                        if (lines_[i].curve_type == .line) { //if type is line, no need to change lines_ value
+                            try vertices_sub_list.append(.{ .pos = extend_point(
+                                if (_lines[prev].curve_type == .line) lines_[prev].start else _lines[prev].control1,
+                                _lines[i].start,
+                                _lines[i].end,
+                                t,
+                                ccw,
+                            ), .uvw = .{ 1, 0, 0 } });
+                        } else {
+                            lines_[i].start = extend_point(
+                                if (_lines[prev].curve_type == .line) lines_[prev].start else _lines[prev].control1,
+                                _lines[i].start,
+                                _lines[i].control0,
+                                t,
+                                ccw,
+                            );
+                            try vertices_sub_list.append(.{ .pos = lines_[i].start, .uvw = .{ 1, 0, 0 } });
 
-                    if (lines_[i].curve_type == .line) { //if type is line, no need to change lines_ value
-                        try vertices_sub_list.append(.{ .pos = extend_point(
-                            if (lines_[prev].curve_type == .line) lines_[prev].start else lines_[prev].control1,
-                            lines_[i].start,
-                            lines_[i].end,
-                            t,
-                            ccw,
-                        ), .uvw = .{ 1, 0, 0 } });
-                    } else {
-                        lines_[i].start = extend_point(
-                            if (lines_[prev].curve_type == .line) lines_[prev].start else lines_[prev].control1,
-                            lines_[i].start,
-                            lines_[i].control0,
-                            t,
-                            ccw,
-                        );
-                        try vertices_sub_list.append(.{ .pos = lines_[i].start, .uvw = .{ 1, 0, 0 } });
+                            lines_[i].control0 = extend_point(
+                                lines_[i].start,
+                                _lines[i].control0,
+                                _lines[i].control1,
+                                t,
+                                ccw,
+                            );
+                            lines_[i].control1 = extend_point(
+                                lines_[i].control0,
+                                _lines[i].control1,
+                                _lines[i].end,
+                                t,
+                                ccw,
+                            );
+                            lines_[i].end = extend_point(
+                                lines_[i].control1,
+                                _lines[i].end,
+                                if (_lines[next].curve_type == .line) _lines[next].end else _lines[next].control0,
+                                t,
+                                ccw,
+                            );
+                        }
 
-                        lines_[i].control0 = extend_point(
-                            lines_[i].start,
-                            lines_[i].control0,
-                            lines_[i].control1,
-                            t,
-                            ccw,
-                        );
-                        lines_[i].control1 = extend_point(
-                            lines_[i].control0,
-                            lines_[i].control1,
-                            lines_[i].end,
-                            t,
-                            ccw,
-                        );
-                        lines_[i].end = extend_point(
-                            lines_[i].control1,
-                            lines_[i].end,
-                            if (lines_[next].curve_type == .line) lines_[next].end else lines_[next].control0,
-                            t,
-                            ccw,
-                        );
+                        const last_vertex = &vertices_sub_list.items[vertices_sub_list.items.len - 1];
+                        if (vertices_sub_list.items[first_vertex_idx2].pos[0] > last_vertex.*.pos[0]) vertices_sub_list.items[first_vertex_idx2].pos[0] = last_vertex.*.pos[0];
+                        if (vertices_sub_list.items[first_vertex_idx2].pos[1] < last_vertex.*.pos[1]) vertices_sub_list.items[first_vertex_idx2].pos[1] = last_vertex.*.pos[1];
+                        if (maxX < last_vertex.*.pos[0]) maxX = last_vertex.*.pos[0];
+                        if (minY > last_vertex.*.pos[1]) minY = last_vertex.*.pos[1];
+
+                        try indices_sub_list.append(first_vertex_idx2);
+                        try indices_sub_list.append(@intCast(vertices_sub_list.items.len - 1));
+                        try indices_sub_list.append(if (i > first_vertex_idx) @intCast(vertices_sub_list.items.len - 1 + 1) else first_vertex_idx2 + 1);
                     }
-                    const last_vertex = &vertices_sub_list.items[vertices_sub_list.items.len - 1];
-                    if (vertices_sub_list.items[first_vertex_idx2].pos[0] > last_vertex.*.pos[0]) vertices_sub_list.items[first_vertex_idx2].pos[0] = last_vertex.*.pos[0];
-                    if (vertices_sub_list.items[first_vertex_idx2].pos[1] < last_vertex.*.pos[1]) vertices_sub_list.items[first_vertex_idx2].pos[1] = last_vertex.*.pos[1];
-                    if (maxX < last_vertex.*.pos[0]) maxX = last_vertex.*.pos[0];
-                    if (minY > last_vertex.*.pos[1]) minY = last_vertex.*.pos[1];
+                } else if (t == thickness and (!is_close_path)) {
+                    while (i < vertex_len) : (i += 1) {
+                        const next = if (i + 1 < vertex_len) i + 1 else first_vertex_idx;
+                        const prev = if (i == first_vertex_idx) vertex_len - 1 else (i - 1);
 
-                    try indices_sub_list.append(first_vertex_idx2);
-                    try indices_sub_list.append(@intCast(vertices_sub_list.items.len - 1));
-                    try indices_sub_list.append(if (i < vertex_len - 1) @intCast(vertices_sub_list.items.len - 1 + 1) else first_vertex_idx2 + 1);
+                        if (lines_[i].curve_type == .line) { //if type is line, no need to change lines_ value
+                            try vertices_sub_list.append(.{ .pos = extend_point(
+                                if (_lines[prev].curve_type == .line) lines_[prev].start else _lines[prev].control1,
+                                _lines[i].start,
+                                _lines[i].end,
+                                t,
+                                ccw,
+                            ), .uvw = .{ 1, 0, 0 } });
+                        } else {
+                            lines_[i].start = extend_point(
+                                if (_lines[prev].curve_type == .line) lines_[prev].start else _lines[prev].control1,
+                                _lines[i].start,
+                                _lines[i].control0,
+                                t,
+                                ccw,
+                            );
+                            try vertices_sub_list.append(.{ .pos = lines_[i].start, .uvw = .{ 1, 0, 0 } });
+
+                            lines_[i].control0 = extend_point(
+                                lines_[i].start,
+                                _lines[i].control0,
+                                _lines[i].control1,
+                                t,
+                                ccw,
+                            );
+                            lines_[i].control1 = extend_point(
+                                lines_[i].control0,
+                                _lines[i].control1,
+                                _lines[i].end,
+                                t,
+                                ccw,
+                            );
+                            lines_[i].end = extend_point(
+                                lines_[i].control1,
+                                _lines[i].end,
+                                if (_lines[next].curve_type == .line) _lines[next].end else _lines[next].control0,
+                                t,
+                                ccw,
+                            );
+                        }
+
+                        const last_vertex = &vertices_sub_list.items[vertices_sub_list.items.len - 1];
+                        if (vertices_sub_list.items[first_vertex_idx2].pos[0] > last_vertex.*.pos[0]) vertices_sub_list.items[first_vertex_idx2].pos[0] = last_vertex.*.pos[0];
+                        if (vertices_sub_list.items[first_vertex_idx2].pos[1] < last_vertex.*.pos[1]) vertices_sub_list.items[first_vertex_idx2].pos[1] = last_vertex.*.pos[1];
+                        if (maxX < last_vertex.*.pos[0]) maxX = last_vertex.*.pos[0];
+                        if (minY > last_vertex.*.pos[1]) minY = last_vertex.*.pos[1];
+
+                        try indices_sub_list.append(first_vertex_idx2);
+                        try indices_sub_list.append(@intCast(vertices_sub_list.items.len - 1));
+                        try indices_sub_list.append(@intCast(vertices_sub_list.items.len - 1 + 1));
+                    }
+                } else {
+                    while (i < vertex_len) : (i += 1) {
+                        const next = if (i + 1 < vertex_len) i + 1 else first_vertex_idx;
+                        const prev = if (i == first_vertex_idx) vertex_len - 1 else (i - 1);
+
+                        if (lines_[i].curve_type == .line) { //if type is line, no need to change lines_ value
+                            try vertices_sub_list.append(.{ .pos = extend_point(
+                                if (_lines[prev].curve_type == .line) lines_[prev].start else _lines[prev].control1,
+                                _lines[i].start,
+                                _lines[i].end,
+                                t,
+                                ccw,
+                            ), .uvw = .{ 1, 0, 0 } });
+                        } else {
+                            lines_[i].start = extend_point(
+                                if (_lines[prev].curve_type == .line) lines_[prev].start else _lines[prev].control1,
+                                _lines[i].start,
+                                _lines[i].control0,
+                                t,
+                                ccw,
+                            );
+                            try vertices_sub_list.append(.{ .pos = lines_[i].start, .uvw = .{ 1, 0, 0 } });
+
+                            lines_[i].control0 = extend_point(
+                                lines_[i].start,
+                                _lines[i].control0,
+                                _lines[i].control1,
+                                t,
+                                ccw,
+                            );
+                            lines_[i].control1 = extend_point(
+                                lines_[i].control0,
+                                _lines[i].control1,
+                                _lines[i].end,
+                                t,
+                                ccw,
+                            );
+                            lines_[i].end = extend_point(
+                                lines_[i].control1,
+                                _lines[i].end,
+                                if (_lines[next].curve_type == .line) _lines[next].end else _lines[next].control0,
+                                t,
+                                ccw,
+                            );
+                        }
+
+                        const last_vertex = &vertices_sub_list.items[vertices_sub_list.items.len - 1];
+                        if (vertices_sub_list.items[first_vertex_idx2].pos[0] > last_vertex.*.pos[0]) vertices_sub_list.items[first_vertex_idx2].pos[0] = last_vertex.*.pos[0];
+                        if (vertices_sub_list.items[first_vertex_idx2].pos[1] < last_vertex.*.pos[1]) vertices_sub_list.items[first_vertex_idx2].pos[1] = last_vertex.*.pos[1];
+                        if (maxX < last_vertex.*.pos[0]) maxX = last_vertex.*.pos[0];
+                        if (minY > last_vertex.*.pos[1]) minY = last_vertex.*.pos[1];
+
+                        try indices_sub_list.append(first_vertex_idx2);
+                        try indices_sub_list.append(@intCast(vertices_sub_list.items.len - 1));
+                        try indices_sub_list.append(if (i < vertex_len - 1) @intCast(vertices_sub_list.items.len - 1 + 1) else (if (t == thickness) first_vertex_idx2 + 1 else first_vertex_idx3));
+                    }
                 }
-                vertices_sub_list.items[first_vertex_idx2].pos[0] -= (maxX - vertices_sub_list.items[first_vertex_idx2].pos[0]) / 2;
-                vertices_sub_list.items[first_vertex_idx2].pos[1] += (vertices_sub_list.items[first_vertex_idx2].pos[1] - minY) / 2;
-
                 for (lines_[first_vertex_idx..vertex_len]) |*l| {
                     try l.*.compute_curve(&vertices_sub_list, &indices_sub_list);
                 }
-                first_vertex_idx = vertex_len;
+                if (t == thickness) first_vertex_idx3 = @intCast(vertices_sub_list.items.len);
             }
+            vertices_sub_list.items[first_vertex_idx2].pos[0] -= (maxX - vertices_sub_list.items[first_vertex_idx2].pos[0]) / 2;
+            vertices_sub_list.items[first_vertex_idx2].pos[1] += (vertices_sub_list.items[first_vertex_idx2].pos[1] - minY) / 2;
+            first_vertex_idx = vertex_len;
         }
         for (lines_, 0..) |l, i| {
             _lines[i].curve_type = l.curve_type;
@@ -486,6 +606,76 @@ pub const line = struct {
             .curve_type = .line,
         };
     }
+    pub fn rect_line_init(_rect: math.rect) [4]Self {
+        return .{
+            line_init(.{ _rect.left, _rect.top }, .{ _rect.right, _rect.top }),
+            line_init(.{ _rect.right, _rect.top }, .{ _rect.right, _rect.bottom }),
+            line_init(.{ _rect.right, _rect.bottom }, .{ _rect.left, _rect.bottom }),
+            line_init(.{ _rect.left, _rect.bottom }, .{ _rect.left, _rect.top }),
+        };
+    }
+    pub fn circle_cubic_init(_center: point, _r: f32) [4]Self {
+        const t: f32 = (4 / 3) * @tan(std.math.pi / 8.0);
+        const tt = t * _r;
+        return .{
+            .{
+                .start = .{ _center[0] - _r, _center[1] },
+                .control0 = .{ _center[0] - _r, _center[1] + tt },
+                .control1 = .{ _center[0] - tt, _center[1] + _r },
+                .end = .{ _center[0], _center[1] + _r },
+            },
+            .{
+                .start = .{ _center[0], _center[1] + _r },
+                .control0 = .{ _center[0] + tt, _center[1] + _r },
+                .control1 = .{ _center[0] + _r, _center[1] + tt },
+                .end = .{ _center[0] + _r, _center[1] },
+            },
+            .{
+                .start = .{ _center[0] + _r, _center[1] },
+                .control0 = .{ _center[0] + _r, _center[1] - tt },
+                .control1 = .{ _center[0] + tt, _center[1] - _r },
+                .end = .{ _center[0], _center[1] - _r },
+            },
+            .{
+                .start = .{ _center[0], _center[1] - _r },
+                .control0 = .{ _center[0] - tt, _center[1] - _r },
+                .control1 = .{ _center[0] - _r, _center[1] - tt },
+                .end = .{ _center[0] - _r, _center[1] },
+            },
+        };
+    }
+    pub fn ellipse_cubic_init(_center: point, _rxy: point) [4]Self {
+        const t: f32 = (4 / 3) * @tan(std.math.pi / 8.0);
+        const ttx = t * _rxy[0];
+        const tty = t * _rxy[1];
+        return .{
+            .{
+                .start = .{ _center[0] - _rxy[0], _center[1] },
+                .control0 = .{ _center[0] - _rxy[0], _center[1] + tty },
+                .control1 = .{ _center[0] - ttx, _center[1] + _rxy[1] },
+                .end = .{ _center[0], _center[1] + _rxy[1] },
+            },
+            .{
+                .start = .{ _center[0], _center[1] + _rxy[1] },
+                .control0 = .{ _center[0] + ttx, _center[1] + _rxy[1] },
+                .control1 = .{ _center[0] + _rxy[0], _center[1] + tty },
+                .end = .{ _center[0] + _rxy[0], _center[1] },
+            },
+            .{
+                .start = .{ _center[0] + _rxy[0], _center[1] },
+                .control0 = .{ _center[0] + _rxy[0], _center[1] - tty },
+                .control1 = .{ _center[0] + ttx, _center[1] - _rxy[1] },
+                .end = .{ _center[0], _center[1] - _rxy[1] },
+            },
+            .{
+                .start = .{ _center[0], _center[1] - _rxy[1] },
+                .control0 = .{ _center[0] - ttx, _center[1] - _rxy[1] },
+                .control1 = .{ _center[0] - _rxy[0], _center[1] - tty },
+                .end = .{ _center[0] - _rxy[0], _center[1] },
+            },
+        };
+    }
+
     //cubic curve default
     pub fn init(_start: point, _control0: point, _control1: point, _end: point) Self {
         return .{
