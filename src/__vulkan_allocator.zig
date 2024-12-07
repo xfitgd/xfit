@@ -354,7 +354,7 @@ pub const descriptor_set = struct {
     __set: vk.DescriptorSet = .null_handle,
     size: []const descriptor_pool_size,
     bindings: []const c_uint,
-    __res: []const res_union = undefined,
+    __res: []res_union = undefined,
 };
 
 pub fn update_descriptor_sets(sets: []descriptor_set) void {
@@ -972,7 +972,7 @@ fn append_op(node: operation_node) void {
 
     if (node == .__update_descriptor_sets) {
         for (node.__update_descriptor_sets.sets) |*v| {
-            v.*.__res = @constCast(arena_allocator.allocator().dupe(res_union, v.*.__res) catch unreachable);
+            v.*.__res = arena_allocator.allocator().dupe(res_union, v.*.__res) catch unreachable;
         }
     }
     op_queue.append(__system.allocator, node) catch xfit.herrm("self.op_queue.append");

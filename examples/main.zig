@@ -68,7 +68,7 @@ pub const CANVAS_H: f32 = 720;
 
 fn error_func(text: []u8, stack_trace: []u8) void {
     var fs: file = .{};
-    fs.open("xfit_err.log", .{
+    fs.create("xfit_err.log", .{
         .truncate = false,
     }) catch return;
     defer fs.close();
@@ -129,9 +129,6 @@ pub fn xfit_init() !void {
     //
 
     //graphics.set_render_clear_color(.{ 1, 1, 1, 0 });
-
-    var button_src = try components.button.make_square_button_raw(.{ 200, 100 }, 2, arena_alloc);
-    defer button_src[1].deinit(arena_alloc);
 
     //load and decode test.webp
     const data = file_.read_file("test.webp", allocator) catch |e| xfit.herr3("test.webp read_file", e);
@@ -219,6 +216,9 @@ pub fn xfit_init() !void {
     //
 
     //build button
+    var button_src = try components.button.make_square_button_raw(.{ 200, 100 }, 2, arena_alloc);
+    defer button_src[1].deinit(arena_alloc);
+
     const rect_text_src_raw = try font0.render_string_raw("버튼", .{ .pivot = .{ 0.5, 0.3 }, .scale = .{ 4.5, 4.5 }, .color = .{ 0, 0, 0, 1 } }, allocator);
     defer rect_text_src_raw.deinit(allocator);
     var concat_button_src = try button_src[1].concat(rect_text_src_raw, allocator);
@@ -233,6 +233,7 @@ pub fn xfit_init() !void {
     rect_button.*.build();
 
     g_rect_button = &rect_button.*._button;
+
     //
 
     //load svg and build

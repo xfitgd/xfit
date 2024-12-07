@@ -111,11 +111,7 @@ pub const icomponent = struct {
 
     pub fn size(self: icomponent) void {
         init(self);
-        switch (self.obj.*) {
-            inline else => |*case| {
-                case.*.transform.copy_update();
-            },
-        }
+        self.obj.*.ptransform().*.copy_update();
     }
     pub fn get_rect(self: icomponent, _size: point, _CANVAS_W: f32, _CANVAS_H: f32) math.rect {
         const transform: *graphics.transform = self.obj.ptransform();

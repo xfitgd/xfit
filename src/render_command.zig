@@ -22,6 +22,7 @@ pub const MAX_FRAME: usize = 3;
 __refesh: [MAX_FRAME]bool = .{true} ** MAX_FRAME,
 __command_buffers: [MAX_FRAME][]vk.CommandBuffer = undefined,
 scene: ?[]*graphics.iobject = null,
+offscreen_image: ?*graphics.image = null,
 const Self = @This();
 
 pub fn init() *Self {

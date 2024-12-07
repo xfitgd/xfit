@@ -11,8 +11,11 @@ hFile: std.fs.File = .{ .handle = INVALID_FILE_HANDLE },
 pub inline fn is_open(self: *Self) bool {
     return self.hFile.handle != INVALID_FILE_HANDLE;
 }
-pub inline fn open(self: *Self, path: []const u8, create_flags: std.fs.File.CreateFlags) !void {
+pub inline fn create(self: *Self, path: []const u8, create_flags: std.fs.File.CreateFlags) !void {
     self.hFile = try std.fs.cwd().createFile(path, create_flags);
+}
+pub inline fn open(self: *Self, path: []const u8, open_flags: std.fs.File.OpenFlags) !void {
+    self.hFile = try std.fs.cwd().openFile(path, open_flags);
 }
 pub inline fn read(self: *Self, buffer: []u8) !usize {
     return try self.hFile.read(buffer);
@@ -58,7 +61,7 @@ pub inline fn reader(self: *Self) std.fs.File.Reader {
 pub fn read_file(path: []const u8, allocator: std.mem.Allocator) ![]u8 {
     var buffer: []u8 = undefined;
 
-    const _file = try std.fs.cwd().createFile(path, .{ .read = true, .truncate = false });
+    const _file = try std.fs.cwd().openFile(path, .{});
     defer _file.close();
     const _size = (try _file.stat()).size;
 

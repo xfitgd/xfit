@@ -2265,6 +2265,128 @@ pub fn drawFrame() void {
     }
 }
 
+pub fn draw_offscreen(allocator: std.mem.Allocator, size: ?math.pointu, render_commands: []*render_command) !*graphics.image {
+    _ = allocator;
+    _ = size;
+    if (render_commands.len == 0) xfit.herrm("draw_offscreen render_commands empty");
+    @trap();
+
+    //TODO 함수 나머지 내용은 __vulkan_allocator의 스레드 내에서 실행되어야 함. 왜냐하면 먼저 필요한 이미지 생성이 비동기로 실행되어야 하기 때문이고 전체 비동기 함수로 만든다.
+    // const cmds = std.heap.c_allocator.alloc(vk.CommandBuffer, render_commands.len + 1) catch xfit.herrm("draw_offscreen cmds alloc");
+    // defer std.heap.c_allocator.free(cmds);
+
+    // const poolInfo: vk.CommandPoolCreateInfo = .{
+    //     .flags = .{ .reset_command_buffer_bit = true },
+    //     .queue_family_index = graphicsFamilyIndex,
+    // };
+
+    // const local_command_pool = vkd.?.createCommandPool(&poolInfo, null) catch |e| xfit.herr3("__vulkan.vulkan_start createCommandPool vkCommandPool", e);
+    // defer vkd.?.destroyCommandPool(local_command_pool, null);
+
+    // const allocInfo: vk.CommandBufferAllocateInfo = .{
+    //     .command_pool = local_command_pool,
+    //     .level = .primary,
+    //     .command_buffer_count = 1 + render_commands.len,
+    // };
+    // vkd.?.allocateCommandBuffers(&allocInfo, cmds.ptr) catch |e| xfit.herr3("draw_offscreen allocateCommandBuffers cmds", e);
+
+    // var cmdidx: usize = 1;
+
+    // for (render_commands) |*cmd| {
+    //     if (@cmpxchgStrong(bool, &cmd.*.*.__refesh, true, false, .monotonic, .monotonic) == null) {
+    //         // recordCommandBuffer(cmd, @intCast(state.frame));
+    //     }
+    //     if (cmd.*.*.scene != null and cmd.*.*.scene.?.len > 0) {
+    //         cmdidx += 1;
+    //     }
+    // }
+
+    // const waitStages: vk.PipelineStageFlags = .{ .color_attachment_output_bit = true };
+    // var submitInfo: vk.SubmitInfo = .{
+    //     .wait_semaphore_count = 0,
+    //     .command_buffer_count = @intCast(cmdidx),
+    //     .signal_semaphore_count = 0,
+    //     .p_wait_semaphores = null,
+    //     .p_wait_dst_stage_mask = @ptrCast(&waitStages),
+    //     .p_command_buffers = cmds.ptr,
+    //     .p_signal_semaphores = null,
+    // };
+
+    // const cls_color0 = @atomicLoad(f32, &clear_color._0, .monotonic);
+    // const cls_color1 = @atomicLoad(f32, &clear_color._1, .monotonic);
+    // const cls_color2 = @atomicLoad(f32, &clear_color._2, .monotonic);
+    // const cls_color3 = @atomicLoad(f32, &clear_color._3, .monotonic);
+    // const clearColor: vk.ClearValue = .{ .color = .{ .float_32 = .{ cls_color0, cls_color1, cls_color2, cls_color3 } } };
+
+    // const clearDepthStencil: vk.ClearValue = .{ .depth_stencil = .{ .stencil = 0, .depth = 1 } };
+    // var renderPassInfo: vk.RenderPassBeginInfo = .{
+    //     .render_pass = vkRenderPassClear,
+    //     .framebuffer = vk_swapchain_frame_buffers[imageIndex].clear.res,
+    //     .render_area = .{ .offset = .{ .x = 0, .y = 0 }, .extent = vkExtent_rotation },
+    //     .clear_value_count = 2,
+    //     .p_clear_values = &[_]vk.ClearValue{ clearColor, clearDepthStencil },
+    // };
+    // const beginInfo: vk.CommandBufferBeginInfo = .{
+    //     .flags = .{ .one_time_submit_bit = true },
+    //     .p_inheritance_info = null,
+    // };
+    // vkd.?.beginCommandBuffer(vkCommandBuffer[state.frame], &beginInfo) catch |e| xfit.herr3("__vulkan.drawFrame.beginCommandBuffer", e);
+    // vkd.?.cmdBeginRenderPass(vkCommandBuffer[state.frame], &renderPassInfo, .@"inline");
+    // vkd.?.cmdEndRenderPass(vkCommandBuffer[state.frame]);
+    // vkd.?.endCommandBuffer(vkCommandBuffer[state.frame]) catch |e| xfit.herr3("__vulkan.drawFrame.endCommandBuffer", e);
+
+    // vkd.?.resetFences(1, @ptrCast(&vkInFlightFence[state.frame])) catch |e| xfit.herr3("__vulkan.drawFrame.resetFences", e);
+
+    // __vulkan_allocator.submit_mutex.lock();
+    // vkd.?.queueSubmit(vkGraphicsQueue, 1, @ptrCast(&submitInfo), vkInFlightFence[state.frame]) catch |e| xfit.herr3("__vulkan.drawFrame.queueSubmit", e);
+    // __vulkan_allocator.submit_mutex.unlock();
+
+    // const swapChains = [_]vk.SwapchainKHR{vkSwapchain};
+
+    // const presentInfo: vk.PresentInfoKHR = .{
+    //     .wait_semaphore_count = 1,
+    //     .swapchain_count = 1,
+    //     .p_wait_semaphores = @ptrCast(&vkRenderFinishedSemaphore[state.frame]),
+    //     .p_swapchains = @ptrCast(&swapChains),
+    //     .p_image_indices = @ptrCast(&imageIndex),
+    // };
+    // __vulkan_allocator.submit_mutex.lock();
+    // const queuePresentKHR_result = vkd.?.queuePresentKHR(vkPresentQueue, &presentInfo) catch |e| {
+    //     if (e == error.OutOfDateKHR) {
+    //         __vulkan_allocator.submit_mutex.unlock();
+    //         recreate_swapchain();
+    //         return;
+    //     } else if (e == error.SurfaceLostKHR) {
+    //         __vulkan_allocator.submit_mutex.unlock();
+    //         recreateSurface();
+    //         recreate_swapchain();
+    //         return;
+    //     } else {
+    //         xfit.herr3("__vulkan.drawFrame.queuePresentKHR", e);
+    //     }
+    // };
+    // __vulkan_allocator.submit_mutex.unlock();
+
+    // if (queuePresentKHR_result == .error_out_of_date_khr) {
+    //     recreate_swapchain();
+    //     return;
+    // } else if (queuePresentKHR_result == .suboptimal_khr) {
+    //     var prop: vk.SurfaceCapabilitiesKHR = undefined;
+    //     prop = vki.?.getPhysicalDeviceSurfaceCapabilitiesKHR(vk_physical_device, vkSurface) catch |e| xfit.herr3("__vulkan.drawFrame.getPhysicalDeviceSurfaceCapabilitiesKHR", e);
+    //     if (prop.current_extent.width != vkExtent.width or prop.current_extent.height != vkExtent.height) {
+    //         recreate_swapchain();
+    //         return;
+    //     }
+    // } else if (queuePresentKHR_result == .error_surface_lost_khr) {
+    //     recreateSurface();
+    //     recreate_swapchain();
+    //     return;
+    // } else {
+    //     xfit.herr(queuePresentKHR_result == .success, "__vulkan.drawFrame.vkQueuePresentKHR : {}", .{queuePresentKHR_result});
+    // }
+    // state.frame = (state.frame + 1) % render_command.MAX_FRAME;
+}
+
 pub fn wait_device_idle() void {
     vkd.?.deviceWaitIdle() catch |e| xfit.herr3("__vulkan.deviceWaitIdle", e);
 }

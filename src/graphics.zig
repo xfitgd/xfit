@@ -165,9 +165,9 @@ pub const iobject = union(iobject_type) {
             inline else => |*case| case.*.deinit(),
         }
     }
-    pub inline fn deinit_callback(self: *Self, callback: ?*const fn (caller: *anyopaque) void) void {
+    pub inline fn deinit_callback(self: *Self, callback: ?*const fn (caller: *anyopaque) void, data: anytype) void {
         switch (self.*) {
-            inline else => |*case| case.*.deinit_callback(callback),
+            inline else => |*case| case.*.deinit_callback(callback, data),
         }
     }
     pub inline fn build(self: *Self) void {
@@ -193,6 +193,7 @@ pub const iobject = union(iobject_type) {
     }
     pub inline fn ptransform(self: *Self) *transform {
         return switch (self.*) {
+            inline ._button, ._pixel_button => |*case| &case.*.shape.transform,
             inline else => |*case| &case.*.transform,
         };
     }
@@ -219,9 +220,9 @@ pub fn vertices(comptime vertexT: type) type {
             self.*.__check_init.deinit();
             self.*.node.clean(null, {});
         }
-        pub inline fn deinit_callback(self: *Self, callback: ?*const fn (caller: *anyopaque) void) void {
+        pub inline fn deinit_callback(self: *Self, callback: ?*const fn (caller: *anyopaque) void, data: anytype) void {
             self.*.__check_init.deinit();
-            self.*.node.clean(callback, self);
+            self.*.node.clean(callback, data);
         }
         pub inline fn build_gcpu(self: *Self, _array: []vertexT, _flag: write_flag) void {
             self.*.__build(_array, _flag, true);
@@ -269,9 +270,9 @@ pub fn indices_(comptime _type: index_type) type {
             self.*.__check_init.deinit();
             self.*.node.clean(null, {});
         }
-        pub inline fn deinit_callback(self: *Self, callback: ?*const fn (caller: *anyopaque) void) void {
+        pub inline fn deinit_callback(self: *Self, callback: ?*const fn (caller: *anyopaque) void, data: anytype) void {
             self.*.__check_init.deinit();
-            self.*.node.clean(callback, self);
+            self.*.node.clean(callback, data);
         }
         pub inline fn build_gcpu(self: *Self, _array: []idxT, _flag: write_flag) void {
             self.*.__build(_array, _flag, true);
@@ -446,9 +447,9 @@ pub const transform = struct {
 
     __check_init: mem.check_init = .{},
 
-    pub inline fn __deinit(self: *Self, callback: ?*const fn (caller: *anyopaque) void) void {
+    pub inline fn __deinit(self: *Self, callback: ?*const fn (caller: *anyopaque) void, data: anytype) void {
         self.*.__check_init.deinit();
-        self.*.__model_uniform.clean(callback, self);
+        self.*.__model_uniform.clean(callback, data);
     }
     pub inline fn __build(self: *Self) void {
         self.*.__check_init.init();
@@ -468,7 +469,7 @@ pub const transform = struct {
 pub const texture = struct {
     const Self = @This();
     __image: vulkan_res_node(.texture) = .{},
-    pixels: ?[]u8 = undefined,
+    pixels: ?[]u8 = null,
     sampler: vk.Sampler,
     __set: descriptor_set,
     __check_init: mem.check_init = .{},
@@ -490,32 +491,25 @@ pub const texture = struct {
             },
         };
     }
-    pub inline fn build_gcpu(self: *Self, _width: u32, _height: u32, _pixels: ?[]u8) void {
-        self.*.__build(_width, _height, _pixels, true);
-    }
-    pub inline fn build(self: *Self, _width: u32, _height: u32, _pixels: ?[]u8) void {
-        self.*.__build(_width, _height, _pixels, false);
-    }
-    fn __build(self: *Self, _width: u32, _height: u32, _pixels: ?[]u8, comptime use_gcpu_mem: bool) void {
+    pub fn build(self: *Self, _width: u32, _height: u32, _pixels: ?[]u8) void {
         self.__check_init.init();
         self.pixels = _pixels;
         self.__image.create_texture(.{
             .width = _width,
             .height = _height,
-            .use_gcpu_mem = use_gcpu_mem,
+            .use_gcpu_mem = false,
         }, self.sampler, self.pixels.?);
         var __set_res: [1]res_union = .{.{ .tex = &self.__image }};
         self.__set.__res = __set_res[0..1];
         __vulkan_allocator.update_descriptor_sets((&self.__set)[0..1]);
     }
-
     pub inline fn deinit(self: *Self) void {
         self.*.__check_init.deinit();
         self.*.__image.clean(null, {});
     }
-    pub fn deinit_callback(self: *Self, callback: ?*const fn (caller: *anyopaque) void) void {
+    pub fn deinit_callback(self: *Self, callback: ?*const fn (caller: *anyopaque) void, data: anytype) void {
         self.*.__check_init.deinit();
-        self.*.__image.clean(callback, self);
+        self.*.__image.clean(callback, data);
     }
     // pub fn copy(self: *Self, _data: []const u8, rect: ?math.recti) void {
     //     __vulkan_allocator.copy_texture(self, _data, rect);
@@ -584,9 +578,9 @@ pub const texture_array = struct {
         self.*.__check_init.deinit();
         self.*.__image.clean(null, {});
     }
-    pub fn deinit_callback(self: *Self, callback: ?*const fn (caller: *anyopaque) void) void {
+    pub fn deinit_callback(self: *Self, callback: ?*const fn (caller: *anyopaque) void, data: anytype) void {
         self.*.__check_init.deinit();
-        self.*.__image.clean(callback, self);
+        self.*.__image.clean(callback, data);
     }
 };
 
@@ -664,9 +658,9 @@ pub const tile_texture_array = struct {
         self.*.__check_init.deinit();
         self.*.__image.clean(null, {});
     }
-    pub inline fn deinit_callback(self: *Self, callback: ?*const fn (caller: *anyopaque) void) void {
+    pub inline fn deinit_callback(self: *Self, callback: ?*const fn (caller: *anyopaque) void, data: anytype) void {
         self.*.__check_init.deinit();
-        self.*.__image.clean(callback, self);
+        self.*.__image.clean(callback, self, data);
     }
 };
 
@@ -718,15 +712,12 @@ pub const shape_source = struct {
             .size = single_uniform_pool_sizes[0..1],
             .layout = __vulkan.quad_shape_2d_pipeline_set.descriptorSetLayout,
         });
-        for (self.*.__raw.?.vertices, self.*.__raw.?.indices, self.*.__raw.?.__color_uniforms, self.*.__raw.?.__color_sets, _raw.vertices, _raw.indices, _raw.colors, 0..) |*v, *i, *u, *s, vv, ii, cc, idx| {
-            s.*.__res = @constCast(_allocator.dupe(res_union, &[_]res_union{.{ .buf = u }}) catch |e| {
-                for (0..idx) |idx2| {
-                    vert.?[idx2].deinit();
-                    ind.?[idx2].deinit();
-                    col_uniforms.?[idx2].clean(null, {});
-                }
-                return e;
-            });
+        const ress = try _allocator.alloc([1]res_union, self.*.__raw.?.__color_sets.len);
+        defer _allocator.free(ress);
+
+        for (self.*.__raw.?.vertices, self.*.__raw.?.indices, self.*.__raw.?.__color_uniforms, self.*.__raw.?.__color_sets, _raw.vertices, _raw.indices, _raw.colors, ress) |*v, *i, *u, *s, vv, ii, cc, *r| {
+            r.* = .{res_union{ .buf = u }};
+            s.*.__res = r.*[0..r.*.len];
             v.* = vertices(shape_vertex_2d).init();
             i.* = indices32.init();
             v.*.build(vv, _flag);
@@ -739,22 +730,42 @@ pub const shape_source = struct {
         }
         __vulkan_allocator.update_descriptor_sets(self.*.__raw.?.__color_sets);
     }
-    ///recommend using std.heap.ArenaAllocator instead.
-    pub fn deinit_dealloc(self: *shape_source, _allocator: std.mem.Allocator) void {
-        deinit(self);
+    const dealloc_struct = struct {
+        self: *shape_source,
+        allocator: std.mem.Allocator,
+    };
+    fn dealloc_callback(caller: *anyopaque) void {
+        const ar: *dealloc_struct = @alignCast(@ptrCast(caller));
+        const _allocator: std.mem.Allocator = ar.*.allocator;
+        const self: *shape_source = ar.*.self;
         _allocator.free(self.*.__raw.?.vertices);
         _allocator.free(self.*.__raw.?.indices);
+
         _allocator.free(self.*.__raw.?.__color_uniforms);
-        for (self.*.__raw.?.__color_sets) |s| {
-            _allocator.free(@constCast(s.__res));
-        }
         _allocator.free(self.*.__raw.?.__color_sets);
+
+        __system.allocator.destroy(ar);
     }
-    pub fn deinit_callback(self: *shape_source, callback: ?*const fn (caller: *anyopaque) void) void {
-        for (self.*.__raw.?.vertices, self.*.__raw.?.indices, self.*.__raw.?.__color_uniforms) |*v, *i, *u| {
+    ///recommend using std.heap.ArenaAllocator instead.
+    pub fn deinit_dealloc(self: *shape_source, _allocator: std.mem.Allocator) void {
+        const s = __system.allocator.create(dealloc_struct) catch unreachable;
+        s.*.self = self;
+        s.*.allocator = _allocator;
+        deinit_callback(
+            self,
+            dealloc_callback,
+            s,
+        );
+    }
+    pub fn deinit_callback(self: *shape_source, callback: ?*const fn (caller: *anyopaque) void, data: anytype) void {
+        for (self.*.__raw.?.vertices, self.*.__raw.?.indices, self.*.__raw.?.__color_uniforms, 0..) |*v, *i, *u, idx| {
             v.*.deinit();
             i.*.deinit();
-            u.*.clean(callback, self);
+            if (idx < self.*.__raw.?.__color_uniforms.len - 1) {
+                u.*.clean(null, {});
+            } else {
+                u.*.clean(callback, data);
+            }
         }
     }
     pub fn deinit(self: *shape_source) void {
@@ -804,10 +815,10 @@ pub fn shape_(_msaa: bool) type {
             self.*.update_uniforms();
         }
         pub fn deinit(self: *Self) void {
-            self.*.transform.__deinit(null);
+            self.*.transform.__deinit(null, {});
         }
-        pub fn deinit_callback(self: *Self, callback: ?*const fn (caller: *anyopaque) void) void {
-            self.*.transform.__deinit(callback);
+        pub fn deinit_callback(self: *Self, callback: ?*const fn (caller: *anyopaque) void, data: anytype) void {
+            self.*.transform.__deinit(callback, data);
         }
         pub fn __draw(self: *Self, cmd: vk.CommandBuffer) void {
             self.*.transform.__check_init.check_inited();
@@ -886,10 +897,10 @@ pub const image = struct {
     __set: descriptor_set,
 
     pub fn deinit(self: *Self) void {
-        self.*.transform.__deinit(null);
+        self.*.transform.__deinit(null, {});
     }
-    pub fn deinit_callback(self: *Self, callback: ?*const fn (caller: *anyopaque) void) void {
-        self.*.transform.__deinit(callback);
+    pub fn deinit_callback(self: *Self, callback: ?*const fn (caller: *anyopaque) void, data: anytype) void {
+        self.*.transform.__deinit(callback, data);
     }
     pub fn update_uniforms(self: *Self) void {
         var __set_res: [4]res_union = .{
@@ -978,12 +989,12 @@ pub const animate_image = struct {
     frame: u32 = 0,
 
     pub fn deinit(self: *Self) void {
-        self.*.transform.__deinit(null);
+        self.*.transform.__deinit(null, {});
         self.*.__frame_uniform.clean(null, {});
     }
-    pub fn deinit_callback(self: *Self, callback: ?*const fn (caller: *anyopaque) void) void {
-        self.*.transform.__deinit(null);
-        self.*.__frame_uniform.clean(callback, self);
+    pub fn deinit_callback(self: *Self, callback: ?*const fn (caller: *anyopaque) void, data: anytype) void {
+        self.*.transform.__deinit(null, {});
+        self.*.__frame_uniform.clean(callback, data);
     }
     pub fn next_frame(self: *Self) void {
         if (!self.*.__frame_uniform.is_build() or self.*.src.*.get_tex_count_build() == 0) return;
@@ -1084,12 +1095,12 @@ pub const tile_image = struct {
     tile_idx: u32 = undefined,
 
     pub fn deinit(self: *Self) void {
-        self.*.transform.__deinit(null);
+        self.*.transform.__deinit(null, {});
         self.*.__tile_uniform.clean(null, {});
     }
-    pub fn deinit_callback(self: *Self, callback: ?*const fn (caller: *anyopaque) void) void {
-        self.*.transform.__deinit(null);
-        self.*.__tile_uniform.clean(callback, self);
+    pub fn deinit_callback(self: *Self, callback: ?*const fn (caller: *anyopaque) void, data: anytype) void {
+        self.*.transform.__deinit(null, {});
+        self.*.__tile_uniform.clean(callback, data);
     }
     pub fn set_frame(self: *Self, _frame: u32) void {
         if (!self.*.__tile_uniform.is_build() or self.*.src.*.get_tex_count_build() == 0) return;

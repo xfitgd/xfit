@@ -165,7 +165,7 @@ pub inline fn print_error(comptime fmt: []const u8, args: anytype) void {
         var str2 = std.ArrayList(u8).init(std.heap.c_allocator);
         defer str2.deinit();
         const error_trace: ?*std.builtin.StackTrace = @errorReturnTrace(); // ! because of this, it must be declared inline
-        if (error_trace != null) {
+        if (error_trace != null and error_trace.?.*.instruction_addresses.len > 0 and error_trace.?.*.index > 0) {
             std.debug.writeStackTrace(error_trace.?.*, str2.writer(), debug_info, .no_color) catch {};
         } else {
             std.debug.writeCurrentStackTrace(str2.writer(), debug_info, .no_color, @returnAddress()) catch {};
@@ -174,7 +174,7 @@ pub inline fn print_error(comptime fmt: []const u8, args: anytype) void {
         std.debug.print("{s}\n{s}", .{ str, str2.items });
 
         system.a_fn_call(__system.error_handling_func, .{ str, str2.items }) catch {};
-        // fs.open("xfit_err.log", .{ .truncate = false }) catch fs.open("xfit_err.log", .{ .exclusive = true }) catch  return;
+        // fs.create("xfit_err.log", .{ .truncate = false }) catch fs.create("xfit_err.log", .{ .exclusive = true }) catch  return;
     } else {
         const str = std.fmt.allocPrint(std.heap.c_allocator, "{s} @ " ++ fmt ++ " ", .{now_str} ++ args) catch return;
         defer std.heap.c_allocator.free(str);
@@ -182,7 +182,7 @@ pub inline fn print_error(comptime fmt: []const u8, args: anytype) void {
         // const path = std.fmt.allocPrint(std.heap.c_allocator, "{s}/xfit_err.log" ++ fmt, .{__android.get_file_dir()} ++ args) catch  return;
         // defer std.heap.c_allocator.free(path);
 
-        // fs.open(path, .{ .truncate = false }) catch fs.open(path, .{ .exclusive = true }) catch  return;
+        // fs.create(path, .{ .truncate = false }) catch fs.create(path, .{ .exclusive = true }) catch  return;
 
         str[str.len - 1] = 0;
         _ = __android.android.__android_log_write(__android.android.ANDROID_LOG_ERROR, "xfit", str.ptr);

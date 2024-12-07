@@ -235,8 +235,8 @@ pub fn button_(_msaa: bool) type {
         pub fn deinit(self: *Self) void {
             self.*.shape.deinit();
         }
-        pub inline fn deinit_callback(self: *Self, callback: ?*const fn (caller: *anyopaque) void) void {
-            self.*.shape.deinit_callback(callback);
+        pub inline fn deinit_callback(self: *Self, callback: ?*const fn (caller: *anyopaque) void, data: anytype) void {
+            self.*.shape.deinit_callback(callback, data);
         }
         pub fn __draw(self: *Self, cmd: vk.CommandBuffer) void {
             self.*.shape.__draw(cmd);
