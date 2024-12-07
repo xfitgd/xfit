@@ -200,11 +200,11 @@ pub fn button_(_msaa: bool) type {
 
             return .{ sets, try rect_poly.compute_polygon(_allocator) };
         }
-        pub fn make_square_button(scale: point, thickness: f32, _allocator: std.mem.Allocator) !std.meta.Tuple(.{ []button_sets, *shape_source }) {
-            var raw_polygons = make_square_button_raw(scale, thickness, _allocator);
+        pub fn make_square_button(scale: point, thickness: f32, _allocator: std.mem.Allocator) !std.meta.Tuple(&[_]type{ []button_sets, *shape_source }) {
+            var raw_polygons = try make_square_button_raw(scale, thickness, _allocator);
             defer raw_polygons[1].deinit(_allocator);
 
-            const out: *shape_source = _allocator.create(shape_source);
+            const out: *shape_source = try _allocator.create(shape_source);
             errdefer _allocator.destroy(out);
 
             out.* = shape_source.init();

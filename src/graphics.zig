@@ -240,11 +240,11 @@ pub fn vertices(comptime vertexT: type) type {
                 .typ = .vertex,
                 .use = _flag,
                 .use_gcpu_mem = use_gcpu_mem,
-            }, mem.u8arrC(_array));
+            }, std.mem.sliceAsBytes(_array));
         }
         ///!call when write_flag is cpu
         pub fn copy_update(self: *Self, _array: []vertexT) void {
-            self.*.node.copy_update(_array.ptr);
+            self.*.node.copy_update(_array);
         }
     };
 }
@@ -287,12 +287,12 @@ pub fn indices_(comptime _type: index_type) type {
                 .typ = .index,
                 .use = _flag,
                 .use_gcpu_mem = use_gcpu_mem,
-            }, mem.u8arrC(_array));
+            }, std.mem.sliceAsBytes(_array));
         }
 
         ///!call when write_flag is cpu
         pub fn copy_update(self: *Self, _array: []idxT) void {
-            self.*.node.copy_update(_array.ptr);
+            self.*.node.copy_update(_array);
         }
     };
 }
@@ -364,7 +364,7 @@ pub const projection = struct {
             .len = @sizeOf(matrix),
             .typ = .uniform,
             .use = _flag,
-        }, mem.obj_to_u8arrC(&mat));
+        }, @as([*]const u8, @ptrCast(&mat))[0..@sizeOf(@TypeOf(mat))]);
     }
     ///!call when write_flag is cpu
     pub fn copy_update(self: *Self) void {
@@ -393,7 +393,7 @@ pub const camera = struct {
             .len = @sizeOf(matrix),
             .typ = .uniform,
             .use = .cpu,
-        }, mem.obj_to_u8arrC(&self.*.view));
+        }, @as([*]const u8, @ptrCast(&self.*.view))[0..@sizeOf(@TypeOf(self.*.view))]);
     }
     ///!call when write_flag is cpu
     pub fn copy_update(self: *Self) void {
@@ -425,7 +425,7 @@ pub const color_transform = struct {
             .len = @sizeOf(matrix),
             .typ = .uniform,
             .use = _flag,
-        }, mem.obj_to_u8arrC(&self.*.color_mat));
+        }, @as([*]const u8, @ptrCast(&self.*.color_mat))[0..@sizeOf(@TypeOf(self.*.color_mat))]);
     }
     ///!call when write_flag is cpu
     pub fn copy_update(self: *Self) void {
@@ -457,7 +457,7 @@ pub const transform = struct {
             .len = @sizeOf(matrix),
             .typ = .uniform,
             .use = .cpu,
-        }, mem.obj_to_u8arrC(&self.*.model));
+        }, @as([*]const u8, @ptrCast(&self.*.model))[0..@sizeOf(@TypeOf(self.*.model))]);
     }
     ///!call when write_flag is readwrite_cpu
     pub fn copy_update(self: *Self) void {
@@ -726,7 +726,7 @@ pub const shape_source = struct {
                 .len = @sizeOf(vector),
                 .typ = .uniform,
                 .use = _color_flag,
-            }, mem.obj_to_u8arrC(&cc));
+            }, @as([*]const u8, @ptrCast(&cc))[0..@sizeOf(@TypeOf(cc))]);
         }
         __vulkan_allocator.update_descriptor_sets(self.*.__raw.?.__color_sets);
     }
@@ -1007,7 +1007,7 @@ pub const animate_image = struct {
     }
     pub fn prev_frame(self: *Self) void {
         if (!self.*.__frame_uniform.is_build() or self.*.src.*.get_tex_count_build() == 0) return;
-        if (self.*.src.*.__image.__resource_len - 1 < self.*.frame) {
+        if (self.*.src.*.__image.texture_option.len - 1 < self.*.frame) {
             self.*.frame = 0;
             return;
         }
@@ -1016,7 +1016,7 @@ pub const animate_image = struct {
     }
     pub fn set_frame(self: *Self, _frame: u32) void {
         if (!self.*.__frame_uniform.is_build() or self.*.src.*.get_tex_count_build() == 0) return;
-        if (self.*.src.*.__image.__resource_len - 1 < _frame) {
+        if (self.*.src.*.__image.texture_option.len - 1 < _frame) {
             return;
         }
         self.*.frame = _frame;
@@ -1047,7 +1047,7 @@ pub const animate_image = struct {
             .len = @sizeOf(f32),
             .typ = .uniform,
             .use = .cpu,
-        }, mem.obj_to_u8arrC(&__frame_cpy));
+        }, @as([*]const u8, @ptrCast(&__frame_cpy))[0..@sizeOf(@TypeOf(__frame_cpy))]);
 
         self.*.update_uniforms();
     }
@@ -1104,14 +1104,14 @@ pub const tile_image = struct {
     }
     pub fn set_frame(self: *Self, _frame: u32) void {
         if (!self.*.__tile_uniform.is_build() or self.*.src.*.get_tex_count_build() == 0) return;
-        if (self.*.src.*.__image.__resource_len - 1 < _frame) {
+        if (self.*.src.*.__image.texture_option.len - 1 < _frame) {
             return;
         }
         self.*.tile_idx = _frame;
         copy_update_tile_idx(self);
     }
     pub fn copy_update_tile_idx(self: *Self) void {
-        if (!self.*.__tile_uniform.is_build() or self.*.src.*.__image.texture_option.len == 0 or self.*.src.*.__image.texture_option.len - 1 < self.*.frame) return;
+        if (!self.*.__tile_uniform.is_build() or self.*.src.*.__image.texture_option.len == 0 or self.*.src.*.__image.texture_option.len - 1 < self.*.tile_idx) return;
         const __idx_cpy: f32 = @floatFromInt(self.*.tile_idx);
         self.*.__tile_uniform.copy_update(&__idx_cpy);
     }
@@ -1134,7 +1134,7 @@ pub const tile_image = struct {
             .len = @sizeOf(f32),
             .typ = .uniform,
             .use = .cpu,
-        }, mem.obj_to_u8arrC(&__idx_cpy));
+        }, @as([*]const u8, @ptrCast(&__idx_cpy))[0..@sizeOf(@TypeOf(__idx_cpy))]);
 
         self.*.update_uniforms();
     }

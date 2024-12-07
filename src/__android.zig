@@ -444,9 +444,12 @@ fn process_input(_source: ?*android_poll_source) void {
 fn render_func() void {
     __vulkan.vulkan_start();
 
-    root.xfit_init() catch |e| {
-        xfit.herr3("xfit_init", e);
-    };
+    if (!xfit.__xfit_test) {
+        root.xfit_init() catch |e| {
+            xfit.herr3("xfit_init", e);
+        };
+    }
+
     start_sem.post();
 
     __vulkan_allocator.execute_and_wait_all_op();
@@ -456,9 +459,11 @@ fn render_func() void {
     }
     __vulkan_allocator.execute_and_wait_all_op();
     __vulkan.wait_device_idle();
-    root.xfit_destroy() catch |e| {
-        xfit.herr3("xfit_destroy", e);
-    };
+    if (!xfit.__xfit_test) {
+        root.xfit_destroy() catch |e| {
+            xfit.herr3("xfit_destroy", e);
+        };
+    }
     __vulkan.vulkan_destroy();
 }
 
@@ -475,9 +480,11 @@ fn engine_handle_cmd(_cmd: AppEvent) void {
         AppEvent.APP_CMD_INIT_WINDOW => {
             if (app.window != null) {
                 if (!app.inited) {
-                    root.main() catch |e| {
-                        xfit.herr3("root.main", e);
-                    };
+                    if (!xfit.__xfit_test) {
+                        root.main() catch |e| {
+                            xfit.herr3("root.main", e);
+                        };
+                    }
 
                     render_thread = std.Thread.spawn(.{}, render_func, .{}) catch unreachable;
 
@@ -497,9 +504,11 @@ fn engine_handle_cmd(_cmd: AppEvent) void {
             app.paused = false;
             __system.pause.store(false, std.builtin.AtomicOrder.monotonic);
             __system.activated.store(false, std.builtin.AtomicOrder.monotonic);
-            root.xfit_activate(false, false) catch |e| {
-                xfit.herr3("xfit_activate", e);
-            };
+            if (!xfit.__xfit_test) {
+                root.xfit_activate(false, false) catch |e| {
+                    xfit.herr3("xfit_activate", e);
+                };
+            }
         },
         AppEvent.APP_CMD_LOST_FOCUS => {
             if (app.accelerometer_sensor != null) {
@@ -508,9 +517,11 @@ fn engine_handle_cmd(_cmd: AppEvent) void {
             app.paused = true;
             __system.pause.store(true, std.builtin.AtomicOrder.monotonic);
             __system.activated.store(true, std.builtin.AtomicOrder.monotonic);
-            root.xfit_activate(true, true) catch |e| {
-                xfit.herr3("xfit_activate", e);
-            };
+            if (!xfit.__xfit_test) {
+                root.xfit_activate(true, true) catch |e| {
+                    xfit.herr3("xfit_activate", e);
+                };
+            }
         },
         AppEvent.APP_CMD_WINDOW_RESIZED => {
             __vulkan.fullscreen_mutex.lock();
@@ -893,9 +904,11 @@ fn anrdoid_app_entry() void {
         }
     }
 
-    root.xfit_clean() catch |e| {
-        xfit.herr3("xfit_clean", e);
-    };
+    if (!xfit.__xfit_test) {
+        root.xfit_clean() catch |e| {
+            xfit.herr3("xfit_clean", e);
+        };
+    }
     __system.real_destroy();
 
     free_saved_state();

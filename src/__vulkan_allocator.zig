@@ -1104,7 +1104,12 @@ pub fn vulkan_res_node(_res_type: res_type) type {
             self.*.map_copy(u8data);
         }
         pub fn copy_update(self: *vulkan_res_node_Self, _data: anytype) void {
-            const u8data = mem.obj_to_u8arrC(_data);
+            var u8data: []const u8 = undefined;
+            if (@typeInfo(@TypeOf(_data)) == .pointer and @typeInfo(@TypeOf(_data)).pointer.size == .One) {
+                u8data = @as([*]const u8, @ptrCast(_data))[0..@sizeOf(@TypeOf(_data.*))];
+            } else {
+                u8data = std.mem.sliceAsBytes(_data);
+            }
 
             const map_data = arena_allocator.allocator().dupe(u8, u8data) catch unreachable;
 

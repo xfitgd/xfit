@@ -5,7 +5,7 @@ const builtin = @import("builtin");
 pub const meta = @import("meta.zig");
 pub const system = @import("system.zig");
 pub const animator = @import("animator.zig");
-pub const asset_file = @import("asset_file.zig");
+pub const asset_file = if (__xfit_test) void else @import("asset_file.zig");
 pub const collision = @import("collision.zig");
 pub const components = @import("components.zig");
 pub const datetime = @import("datetime.zig");
@@ -17,7 +17,7 @@ pub const graphics = @import("graphics.zig");
 pub const image_util = @import("image_util.zig");
 pub const lua = @import("lua.zig");
 pub const math = @import("math.zig");
-pub const raw_input = @import("raw_input.zig");
+pub const raw_input = if (__xfit_test) void else @import("raw_input.zig");
 pub const render_command = @import("render_command.zig");
 pub const sound = @import("sound.zig");
 pub const timer_callback = @import("timer_callback.zig");
@@ -36,29 +36,49 @@ pub const json = @import("json.zig");
 pub const gltf = @import("gltf");
 pub const svg = @import("svg.zig");
 
+pub const XfitPlatform = enum(u32) {
+    windows,
+    android,
+    linux,
+};
+
+///std.testing.refAllDeclsRecursive(@This());
+fn refAllDeclsRecursive2(comptime T: type) void {
+    if (!builtin.is_test) return;
+    inline for (comptime std.meta.declarations(T)) |decl| {
+        if (@TypeOf(@field(T, decl.name)) == type) {
+            if (comptime std.mem.eql(u8, decl.name, "c")) continue;
+            if (comptime std.mem.eql(u8, decl.name, "miniaudio")) continue;
+            if (comptime std.mem.eql(u8, decl.name, "vulkan")) continue;
+            switch (@typeInfo(@field(T, decl.name))) {
+                .@"struct", .@"enum", .@"union", .@"opaque" => refAllDeclsRecursive2(@field(T, decl.name)),
+                else => {},
+            }
+        }
+        _ = &@field(T, decl.name);
+    }
+}
+
 test {
-    std.testing.refAllDecls(gltf);
-    std.testing.refAllDecls(yaml);
-    std.testing.refAllDecls(xml);
-    std.testing.refAllDecls(math);
-    std.testing.refAllDecls(geometry);
-    std.testing.refAllDecls(svg);
+    @setEvalBranchQuota(10000000);
+    refAllDeclsRecursive2(@This());
 }
 
 //system engine only headers
 const __system = @import("__system.zig");
-const __windows = @import("__windows.zig");
-const __android = @import("__android.zig");
+const __windows = if (platform == .windows) @import("__windows.zig") else void;
+const __android = if (platform == .android) @import("__android.zig") else void;
 const __vulkan = @import("__vulkan.zig");
 const __linux = @import("__linux.zig");
 
-pub const platform = @import("build_options").platform;
-pub const subsystem = @import("build_options").subsystem;
-pub const XfitPlatform = @TypeOf(platform);
-pub const SubSystem = @TypeOf(subsystem);
+pub const __xfit_test: bool = !@hasDecl(root, "xfit_init");
+
+pub const platform: XfitPlatform = if (__xfit_test) .linux else @enumFromInt(@intFromEnum(@import("build_options").platform));
+pub const SubSystem = std.Target.SubSystem;
+pub const subsystem: SubSystem = if (__xfit_test) .Posix else @enumFromInt(@intFromEnum(@import("build_options").subsystem));
 
 pub const dbg = builtin.mode == .Debug;
-pub const enable_log: bool = @import("build_options").enable_log;
+pub const enable_log: bool = if (__xfit_test) true else @import("build_options").enable_log;
 pub const is_mobile: bool = platform == .android;
 
 pub const __android_entry = if (platform == .android) __android.android.ANativeActivity_createFunc else {};
@@ -73,13 +93,15 @@ pub fn xfit_main(_allocator: std.mem.Allocator, _init_setting: *const init_setti
         __windows.system_windows_start();
 
         if (subsystem == SubSystem.Console) {
-            root.xfit_init() catch |e| {
-                herr3("xfit_init", e);
-            };
+            if (!__xfit_test) {
+                root.xfit_init() catch |e| {
+                    herr3("xfit_init", e);
+                };
 
-            root.xfit_destroy() catch |e| {
-                herr3("xfit_destroy", e);
-            };
+                root.xfit_destroy() catch |e| {
+                    herr3("xfit_destroy", e);
+                };
+            }
         } else {
             __windows.windows_start();
 
@@ -88,21 +110,25 @@ pub fn xfit_main(_allocator: std.mem.Allocator, _init_setting: *const init_setti
 
         __system.destroy();
 
-        root.xfit_clean() catch |e| {
-            herr3("xfit_clean", e);
-        };
+        if (!__xfit_test) {
+            root.xfit_clean() catch |e| {
+                herr3("xfit_clean", e);
+            };
+        }
 
         __system.real_destroy();
     } else if (platform == .android) {} else if (platform == .linux) {
         __linux.system_linux_start();
         if (subsystem == SubSystem.Console) {
-            root.xfit_init() catch |e| {
-                herr3("xfit_init", e);
-            };
+            if (!__xfit_test) {
+                root.xfit_init() catch |e| {
+                    herr3("xfit_init", e);
+                };
 
-            root.xfit_destroy() catch |e| {
-                herr3("xfit_destroy", e);
-            };
+                root.xfit_destroy() catch |e| {
+                    herr3("xfit_destroy", e);
+                };
+            }
         } else {
             __linux.linux_start();
 
@@ -111,9 +137,11 @@ pub fn xfit_main(_allocator: std.mem.Allocator, _init_setting: *const init_setti
         __linux.linux_destroy();
         __system.destroy();
 
-        root.xfit_clean() catch |e| {
-            herr3("xfit_clean", e);
-        };
+        if (!__xfit_test) {
+            root.xfit_clean() catch |e| {
+                herr3("xfit_clean", e);
+            };
+        }
 
         __system.real_destroy();
     } else {
@@ -382,9 +410,11 @@ pub const screen_mode = enum { WINDOW, BORDERLESSSCREEN, FULLSCREEN };
 
 pub const vSync_mode = enum { none, double, triple };
 
+const CW_USEDEFAULT = @import("std").zig.c_translation.cast(c_int, @import("std").zig.c_translation.promoteIntLiteral(c_int, 0x80000000, .hex));
+
 pub const init_setting = struct {
-    pub const DEF_SIZE = @as(u32, @bitCast(__windows.CW_USEDEFAULT));
-    pub const DEF_POS = __windows.CW_USEDEFAULT;
+    pub const DEF_SIZE = @as(u32, @bitCast(if (platform == .windows) __windows.CW_USEDEFAULT else CW_USEDEFAULT));
+    pub const DEF_POS = if (platform == .windows) __windows.CW_USEDEFAULT else CW_USEDEFAULT;
     pub const PRIMARY_SCREEN_INDEX = std.math.maxInt(u32);
     //*ignore field mobile
     window_width: u32 = DEF_SIZE, //or 0

@@ -6,8 +6,9 @@ const ArrayList = std.ArrayList;
 const root = @import("root");
 
 const xfit = @import("xfit.zig");
-const __android = @import("__android.zig");
-const __windows = @import("__windows.zig");
+
+const __windows = if (xfit.platform == .windows) @import("__windows.zig") else void;
+const __android = if (xfit.platform == .android) @import("__android.zig") else void;
 const __linux = @import("__linux.zig");
 const window = @import("window.zig");
 const __vulkan = @import("__vulkan.zig");
@@ -17,8 +18,8 @@ const math = @import("math.zig");
 const file = @import("file.zig");
 const datetime = @import("datetime.zig");
 
-pub const windows = __windows.win32;
-pub const android = __android.android;
+pub const windows = if (xfit.platform == .windows) __windows.win32 else void;
+pub const android = if (xfit.platform == .android) __android.android else void;
 pub const vulkan = __vulkan.vk;
 
 pub inline fn get_processor_core_len() u32 {
@@ -169,7 +170,7 @@ pub fn notify() void {
     if (xfit.platform == .windows) {
         _ = __windows.win32.FlashWindow(__windows.hWnd, __windows.TRUE);
     } else {
-        @compileError("not support platform");
+        if (!xfit.__xfit_test) @compileError("not support platform");
     }
 }
 pub fn text_notify(text: []const u8) void {
@@ -179,7 +180,7 @@ pub fn text_notify(text: []const u8) void {
     } else if (xfit.platform == .android) {
         //TODO implement android text notification
     } else {
-        @compileError("not support platform");
+        if (!xfit.__xfit_test) @compileError("not support platform");
     }
 }
 

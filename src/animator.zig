@@ -66,9 +66,9 @@ pub const multi_player = struct {
             self.*.__playing_dt += dt;
             while (self.*.__playing_dt >= 1 / self.*.target_fps) : (self.*.__playing_dt -= 1 / self.*.target_fps) {
                 var isp: bool = false;
-                for (self.*.objs) |v| {
-                    if (self.*.loop or v.cur_frame() < v.get_tex_count_build() - 1) {
-                        v.next_frame();
+                for (self.*.objs) |*v| {
+                    if (self.*.loop or v.*.cur_frame() < v.*.get_tex_count_build() - 1) {
+                        v.*.next_frame();
                         isp = true;
                     }
                 }
@@ -87,18 +87,18 @@ pub const multi_player = struct {
         self.*.playing = false;
     }
     pub fn set_frame(self: *multi_player, _frame: u32) void {
-        for (self.*.objs) |v| {
-            v.set_frame(_frame);
+        for (self.*.objs) |*v| {
+            v.*.set_frame(_frame);
         }
     }
     pub fn prev_frame(self: *multi_player) void {
-        for (self.*.objs) |v| {
-            v.prev_frame();
+        for (self.*.objs) |*v| {
+            v.*.prev_frame();
         }
     }
     pub fn next_frame(self: *multi_player) void {
-        for (self.*.objs) |v| {
-            v.next_frame();
+        for (self.*.objs) |*v| {
+            v.*.next_frame();
         }
     }
 };

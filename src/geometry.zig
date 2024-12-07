@@ -164,7 +164,7 @@ pub const circle = struct {
         return math.length_pow(a.p, b.p) <= math.pow(a.radius + b.radius, 2);
     }
     pub fn circle_in_point(c: @This(), p: point) bool {
-        return math.length_pow(c.p, p.p) <= c.radius * c.radius;
+        return math.length_pow(c.p, p) <= c.radius * c.radius;
     }
 };
 
@@ -203,16 +203,9 @@ pub const shapes = struct {
         return point{ cur[0] + bislen * bisn[0], cur[1] + bislen * bisn[1] };
     }
 
-    pub fn apply_option(self: shapes, option: compute_option, _out_lines: [][]line) shapes_error!void {
-        if (_out_lines.len != self.lines.len) return shapes_error.invaild_line;
-
-        for (_out_lines, self.lines) |v, l| {
-            if (v.len != l.len) return shapes_error.invaild_line;
-            for (v, l) |*v2, l2| {
-                v2.* = l2.mul_mat(option.mat);
-            }
-        }
-    }
+    //TODO
+    // pub fn apply_option(self: *shapes, option: compute_option) !void {
+    // }
 
     fn _compute_polygon_sub(
         _out: *raw_shapes,
@@ -570,8 +563,8 @@ pub const line = struct {
     }
     pub fn mul_mat(self: Self, _mat: math.matrix) Self {
         if (self.curve_type == .line) {
-            const start_ = _mat.mul_point(self.start);
-            const end_ = _mat.mul_point(self.end);
+            const start_ = math.matrix_mul_point(_mat, self.start);
+            const end_ = math.matrix_mul_point(_mat, self.end);
             return .{
                 .start = start_,
                 .control0 = start_,
@@ -581,10 +574,10 @@ pub const line = struct {
             };
         }
         return .{
-            .start = _mat.mul_point(self.start),
-            .control0 = _mat.mul_point(self.control0),
-            .control1 = _mat.mul_point(self.control1),
-            .end = _mat.mul_point(self.end),
+            .start = math.matrix_mul_point(_mat, self.start),
+            .control0 = math.matrix_mul_point(_mat, self.control0),
+            .control1 = math.matrix_mul_point(_mat, self.control1),
+            .end = math.matrix_mul_point(_mat, self.end),
             .curve_type = self.curve_type,
         };
     }

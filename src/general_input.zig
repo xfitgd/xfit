@@ -1,7 +1,8 @@
 const std = @import("std");
+const xfit = @import("xfit.zig");
 
-const __windows = @import("__windows.zig");
-const __android = @import("__android.zig");
+const __windows = if (xfit.platform == .windows) @import("__windows.zig") else void;
+const __android = if (xfit.platform == .android) @import("__android.zig") else void;
 const __system = @import("__system.zig");
 const system = @import("system.zig");
 

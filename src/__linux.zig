@@ -99,9 +99,11 @@ fn render_func() void {
     //var sqe = ring.get_sqe() catch |e| xfit.herr3("input_func ring.get_sqe", e);
     __vulkan.vulkan_start();
 
-    root.xfit_init() catch |e| {
-        xfit.herr3("xfit_init", e);
-    };
+    if (!xfit.__xfit_test) {
+        root.xfit_init() catch |e| {
+            xfit.herr3("xfit_init", e);
+        };
+    }
 
     __vulkan_allocator.execute_and_wait_all_op();
 
@@ -112,9 +114,11 @@ fn render_func() void {
 
     __vulkan.wait_device_idle();
 
-    root.xfit_destroy() catch |e| {
-        xfit.herr3("xfit_destroy", e);
-    };
+    if (!xfit.__xfit_test) {
+        root.xfit_destroy() catch |e| {
+            xfit.herr3("xfit_destroy", e);
+        };
+    }
 
     __vulkan.vulkan_destroy();
 }
@@ -211,7 +215,7 @@ pub fn set_window_size(w: u32, h: u32) void {
     set_size_hint(true);
 }
 
-pub fn set_window_mode2(pos: math.point(i32), size: math.point(u32), state: window.window_state, can_maximize: bool, can_minimize: bool, can_resizewindow: bool) void {
+pub fn set_window_mode2(pos: math.point_(i32), size: math.point_(u32), state: window.window_state, can_maximize: bool, can_minimize: bool, can_resizewindow: bool) void {
     _ = can_maximize;
     _ = can_minimize;
     @atomicStore(bool, &__system.init_set.can_resizewindow, can_resizewindow, .monotonic);
@@ -418,9 +422,11 @@ pub fn linux_loop() void {
                 __system.activated.store(true, std.builtin.AtomicOrder.monotonic);
 
                 //xfit.write_log("activate\n");
-                root.xfit_activate(true, false) catch |e| {
-                    xfit.herr3("xfit_activate", e);
-                };
+                if (!xfit.__xfit_test) {
+                    root.xfit_activate(true, false) catch |e| {
+                        xfit.herr3("xfit_activate", e);
+                    };
+                }
             },
             c.FocusOut => {
                 for (&__system.keys) |*value| {
@@ -457,9 +463,11 @@ pub fn linux_loop() void {
                 }
 
                 //xfit.write_log("deactivate\n");
-                root.xfit_activate(false, __system.pause.load(.monotonic)) catch |e| {
-                    xfit.herr3("xfit_activate", e);
-                };
+                if (!xfit.__xfit_test) {
+                    root.xfit_activate(false, __system.pause.load(.monotonic)) catch |e| {
+                        xfit.herr3("xfit_activate", e);
+                    };
+                }
             },
             c.ConfigureNotify => {
                 const w = window.window_width();

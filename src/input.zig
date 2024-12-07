@@ -1,7 +1,9 @@
 const std = @import("std");
 
-const __android = @import("__android.zig");
-const __windows = @import("__windows.zig");
+const xfit = @import("xfit.zig");
+
+const __windows = if (xfit.platform == .windows) @import("__windows.zig") else void;
+const __android = if (xfit.platform == .android) @import("__android.zig") else void;
 const __linux = @import("__linux.zig");
 const window = @import("window.zig");
 const __system = @import("__system.zig");
@@ -10,7 +12,6 @@ const math = @import("math.zig");
 
 pub const general_input = @import("general_input.zig");
 pub const xbox_pad_input = @import("xbox_pad_input.zig");
-const xfit = @import("xfit.zig");
 
 pub const key =
     if (xfit.platform == .windows)

@@ -76,7 +76,7 @@ pub fn lua_yield(self: *Self, nresults: c_int) c_int {
     return c.lua_yieldk(self.*.luaT, nresults, 0, null);
 }
 pub fn lua_newtable(self: *Self) !void {
-    c.lua_createtable(self, 0, 0);
+    c.lua_createtable(self.*.luaT, 0, 0);
 }
 pub fn luaL_dostring(self: *Self, _buf: [*c]const u8) !void {
     try luaL_loadstring(self, _buf);
@@ -88,8 +88,11 @@ pub fn lua_toboolean(self: *Self, idx: c_int) c_int {
 pub fn lua_tocfunction(self: *Self, idx: c_int) lua_CFunction {
     return c.lua_tocfunction(self.*.luaT, idx);
 }
-pub fn lua_tonumber(self: *Self, idx: c_int) c.lua_Integer {
-    return c.lua_tonumber(self.*.luaT, idx);
+pub fn lua_tonumber(self: *Self, idx: c_int) c.lua_Number {
+    return c.lua_tonumberx(self.*.luaT, idx, null);
+}
+pub fn lua_tointeger(self: *Self, idx: c_int) c.lua_Integer {
+    return c.lua_tointegerx(self.*.luaT, idx, null);
 }
 pub fn lua_typename(self: *Self, tp: c_int) [*c]const u8 {
     return c.lua_typename(self.*.luaT, tp);
@@ -98,7 +101,7 @@ pub fn lua_type(self: *Self, tp: c_int) c_int {
     return c.lua_type(self.*.luaT, tp);
 }
 pub fn lua_tostring(self: *Self, idx: c_int) [*c]const u8 {
-    return c.lua_tostring(self.*.luaT, idx);
+    return c.lua_tolstring(self.*.luaT, idx, null);
 }
 pub fn lua_topointer(self: *Self, idx: c_int) ?*const anyopaque {
     return c.lua_topointer(self.*.luaT, idx);
@@ -110,7 +113,7 @@ pub fn luaL_checkinteger(self: *Self, arg: c_int) c.lua_Integer {
     return c.luaL_checkinteger(self.*.luaT, arg);
 }
 pub fn lua_touserdata(self: *Self, idx: c_int) ?*anyopaque {
-    return c.lua_touserdata(self.*.luaT, idx, null);
+    return c.lua_touserdata(self.*.luaT, idx);
 }
 pub fn luaL_checkstring(self: *Self, arg: c_int) [*c]const u8 {
     return c.luaL_checklstring(self.*.luaT, arg, null);
@@ -132,9 +135,6 @@ pub fn lua_pop(self: *Self, n: c_int) void {
 }
 pub fn lua_pushnil(self: *Self) void {
     c.lua_pushnil(self.*.luaT);
-}
-pub fn lua_pushliteral(self: *Self, s: [*c]const u8) [*c]const u8 {
-    return c.lua_pushliteral(self.*.luaT, s);
 }
 pub fn lua_pushstring(self: *Self, s: [*c]const u8) [*c]const u8 {
     return c.lua_pushstring(self.*.luaT, s);
@@ -165,7 +165,7 @@ pub fn lua_settable(self: *Self, idx: c_int) void {
     c.lua_settable(self.*.luaT, idx);
 }
 pub fn lua_setmetatable(self: *Self, idx: c_int) void {
-    c.lua_setmetatable(self.*.luaT, idx);
+    _ = c.lua_setmetatable(self.*.luaT, idx);
 }
 pub fn lua_seti(self: *Self, index: c_int, n: c.lua_Integer) void {
     c.lua_seti(self.*.luaT, index, n);

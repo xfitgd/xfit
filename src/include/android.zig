@@ -2267,7 +2267,9 @@ pub const M_2_SQRTPI = @as(f64, 1.12837916709551257390);
 pub const M_SQRT2 = @as(f64, 1.41421356237309504880);
 pub const M_SQRT1_2 = @as(f64, 0.70710678118654752440);
 pub const MAXFLOAT = @import("std").zig.c_translation.cast(f32, @as(f64, 3.40282346638528860e+38));
-pub const ASENSOR_RESOLUTION_INVALID = nanf("");
+pub inline fn ASENSOR_RESOLUTION_INVALID() f32 {
+    nanf("");
+}
 pub const ASENSOR_FIFO_COUNT_INVALID = -@as(c_int, 1);
 pub const ASENSOR_DELAY_INVALID = @as(c_int, @import("std").math.minInt(c_int));
 pub const ASENSOR_INVALID = -@as(c_int, 1);

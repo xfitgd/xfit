@@ -2,36 +2,6 @@ const std = @import("std");
 const system = @import("system.zig");
 const xfit = @import("xfit.zig");
 
-//TODO not verified
-
-//// pub inline fn align_ptr_cast(dest_type: type, src: anytype) dest_type {
-////     return @as(dest_type, @ptrCast(@alignCast(src)));
-//// }
-///convert src type array(Slice) to u8 array(Slice)
-pub inline fn u8arr(src: anytype) []u8 {
-    return @as([*]u8, @ptrCast(src.ptr))[0..(@sizeOf(@TypeOf(src[0])) * src.len)];
-}
-///convert src type array(Slice) to u8 array(Slice)
-pub inline fn u8arrC(src: anytype) []const u8 {
-    return @as([*]const u8, @ptrCast(src.ptr))[0..(@sizeOf(@TypeOf(src[0])) * src.len)];
-}
-///convert src object pointer to u8 array(Slice)
-pub inline fn obj_to_u8arr(src: anytype) []u8 {
-    return @as([*]u8, @ptrCast(src))[0..@sizeOf(@TypeOf(src.*))];
-}
-///convert src object pointer to u8 array(Slice)
-pub inline fn obj_to_u8arrC(src: anytype) []const u8 {
-    return @as([*]const u8, @ptrCast(src))[0..@sizeOf(@TypeOf(src.*))];
-}
-///convert src type array(Slice) to dest_type type array(Slice)
-pub inline fn cvtarr(comptime dest_type: type, src: anytype) []dest_type {
-    return @as([*]dest_type, src.ptr)[0..@divFloor((@sizeOf(@TypeOf(src[0])) * src.len), @sizeOf(dest_type))];
-}
-///convert src type array(Slice) to dest_type type array(Slice)
-pub inline fn cvtarrC(comptime dest_type: type, src: anytype) []const dest_type {
-    return @as([*]const dest_type, src.ptr)[0..@divFloor((@sizeOf(@TypeOf(src[0])) * src.len), @sizeOf(dest_type))];
-}
-
 pub const check_alloc = struct {
     const Self = @This();
     __check_alloc: if (xfit.dbg) ?[]bool else void = if (xfit.dbg) null,

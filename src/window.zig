@@ -4,24 +4,26 @@ const builtin = @import("builtin");
 
 const system = @import("system.zig");
 const __system = @import("__system.zig");
-const __windows = @import("__windows.zig");
 const __linux = @import("__linux.zig");
 const __vulkan = @import("__vulkan.zig");
-const __android = @import("__android.zig");
 const math = @import("math.zig");
+
 const xfit = @import("xfit.zig");
 
+const __windows = if (xfit.platform == .windows) @import("__windows.zig") else void;
+const __android = if (xfit.platform == .android) @import("__android.zig") else void;
+
 pub const window_state = enum(i32) {
-    Restore = __windows.win32.SW_NORMAL,
-    Maximized = __windows.win32.SW_MAXIMIZE,
-    Minimized = __windows.win32.SW_MINIMIZE,
+    Restore = if (xfit.platform == .windows) __windows.win32.SW_NORMAL else 1,
+    Maximized = if (xfit.platform == .windows) __windows.win32.SW_MAXIMIZE else 3,
+    Minimized = if (xfit.platform == .windows) __windows.win32.SW_MINIMIZE else 6,
 };
 
 pub const window_show = enum(i32) {
-    NORMAL = __windows.win32.SW_NORMAL,
-    DEFAULT = __windows.win32.SW_SHOWDEFAULT,
-    MAXIMIZE = __windows.win32.SW_MAXIMIZE,
-    MINIMIZE = __windows.win32.SW_MINIMIZE,
+    NORMAL = if (xfit.platform == .windows) __windows.win32.SW_NORMAL else 1,
+    DEFAULT = if (xfit.platform == .windows) __windows.win32.SW_SHOWDEFAULT else 10,
+    MAXIMIZE = if (xfit.platform == .windows) __windows.win32.SW_MAXIMIZE else 3,
+    MINIMIZE = if (xfit.platform == .windows) __windows.win32.SW_MINIMIZE else 6,
 };
 
 pub const screen_orientation = enum {
@@ -90,9 +92,13 @@ pub fn get_window_title() []const u8 {
 }
 pub fn set_window_title(title: []const u8) void {
     std.heap.c_allocator.free(__system.title);
-    title = std.heap.c_allocator.dupeZ(u8, title) catch |e| xfit.herr3("set_window_title.title = allocator.dupeZ", e);
+    __system.title = std.heap.c_allocator.dupeZ(u8, title) catch |e| xfit.herr3("set_window_title.title = allocator.dupeZ", e);
 
-    __windows.set_window_title();
+    if (xfit.platform == .windows) {
+        __windows.set_window_title();
+    } else if (xfit.platform == .linux) {
+        //TODO
+    }
 }
 
 pub fn set_window_size(w: u32, h: u32) void {
@@ -149,7 +155,7 @@ pub fn set_window_mode() void {
     }
     __system.size_update.store(true, .release);
 }
-pub fn set_window_mode2(pos: math.point(i32), size: math.point(u32), state: system.window_state, _can_maximize: bool, _can_minimize: bool, _can_resizewindow: bool) void {
+pub fn set_window_mode2(pos: math.point_(i32), size: math.point_(u32), state: window_state, _can_maximize: bool, _can_minimize: bool, _can_resizewindow: bool) void {
     if (__system.size_update.load(.acquire)) return;
     __vulkan.fullscreen_mutex.lock();
     defer __vulkan.fullscreen_mutex.unlock();
@@ -157,7 +163,7 @@ pub fn set_window_mode2(pos: math.point(i32), size: math.point(u32), state: syst
         __windows.set_window_mode2(pos, size, state, state, _can_maximize, _can_minimize, _can_resizewindow);
     } else if (xfit.platform == .linux) {
         //TODO _can_maximize, _can_minimize will be supported later(?)
-        __linux.set_window_mode2(pos, size, state, state, _can_maximize, _can_minimize, _can_resizewindow);
+        __linux.set_window_mode2(pos, size, state, _can_maximize, _can_minimize, _can_resizewindow);
     } else {
         return;
     }
@@ -165,8 +171,8 @@ pub fn set_window_mode2(pos: math.point(i32), size: math.point(u32), state: syst
     @atomicStore(bool, &__system.init_set.can_maximize, _can_maximize, std.builtin.AtomicOrder.monotonic);
     @atomicStore(bool, &__system.init_set.can_minimize, _can_minimize, std.builtin.AtomicOrder.monotonic);
     @atomicStore(bool, &__system.init_set.can_resizewindow, _can_resizewindow, std.builtin.AtomicOrder.monotonic);
-    @atomicStore(i32, &__system.init_set.window_x, pos.x, std.builtin.AtomicOrder.monotonic);
-    @atomicStore(i32, &__system.init_set.window_y, pos.y, std.builtin.AtomicOrder.monotonic);
+    @atomicStore(i32, &__system.init_set.window_x, pos[0], std.builtin.AtomicOrder.monotonic);
+    @atomicStore(i32, &__system.init_set.window_y, pos[1], std.builtin.AtomicOrder.monotonic);
 
     switch (state) {
         .Restore => {

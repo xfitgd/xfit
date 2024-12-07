@@ -1,11 +1,14 @@
 const std = @import("std");
 
-const __windows = @import("__windows.zig");
-const __android = @import("__android.zig");
 const __system = @import("__system.zig");
 const raw_input = @import("raw_input.zig");
 const __raw_input = @import("__raw_input.zig");
 const system = @import("system.zig");
+
+const xfit = @import("xfit.zig");
+
+const __windows = if (xfit.platform == .windows) @import("__windows.zig") else void;
+const __android = if (xfit.platform == .android) @import("__android.zig") else void;
 
 //TODO linux support
 
@@ -130,7 +133,6 @@ pub const ChangeDeviceFn = *const fn (_device_idx: u32, add_or_remove: bool) voi
 
 var fn_: ?CallbackFn = null;
 var change_fn_: ChangeDeviceFn = undefined;
-const xfit = @import("xfit.zig");
 
 var raw: if (xfit.platform == .windows) raw_input else void = if (xfit.platform == .windows) .{ .handle = undefined } else {};
 var out_data: [XBOX_OUT_PACKET_SIZE]u8 = undefined;

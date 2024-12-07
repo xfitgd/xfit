@@ -204,9 +204,11 @@ pub fn loop() void {
         S.now = n;
         @atomicStore(u64, &delta_time, _delta_time, .monotonic);
     }
-    root.xfit_update() catch |e| {
-        xfit.herr3("xfit_clean", e);
-    };
+    if (!xfit.__xfit_test) {
+        root.xfit_update() catch |e| {
+            xfit.herr3("xfit_clean", e);
+        };
+    }
 
     if (__vulkan_allocator.execute_all_cmd_per_update.load(.monotonic)) {
         __vulkan_allocator.execute_all_op();

@@ -3,9 +3,9 @@ const builtin = @import("builtin");
 const utils = @import("utils.zig");
 const Child = std.meta.Child;
 
-const FieldHandlerFn = fn (comptime ns: ?[]const u8, comptime key: ?[]const u8) ?[]const u8;
+pub const FieldHandlerFn = fn (comptime ns: ?[]const u8, comptime key: ?[]const u8) ?[]const u8;
 
-const WriteOptions = struct {
+pub const WriteOptions = struct {
     renameHandler: ?FieldHandlerFn = null,
 
     // Whether to write fields when they're the same as the default value
@@ -65,7 +65,7 @@ pub fn writeFromStruct(data: anytype, writer: anytype, comptime namespace: ?[]co
     }
 }
 
-fn writeProperty(writer: anytype, field_name: []const u8, val: anytype) !void {
+pub fn writeProperty(writer: anytype, field_name: []const u8, val: anytype) !void {
     switch (@typeInfo(@TypeOf(val))) {
         .bool => {
             try writer.print("{s}={s}\n", .{ field_name, if (val) "true" else "false" });

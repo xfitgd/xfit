@@ -3,9 +3,9 @@ const builtin = @import("builtin");
 const ArrayList = std.ArrayList;
 const MemoryPoolExtra = std.heap.MemoryPoolExtra;
 
-const __windows = @import("__windows.zig");
 const window = @import("window.zig");
-const __android = @import("__android.zig");
+const __windows = if (xfit.platform == .windows) @import("__windows.zig") else void;
+const __android = if (xfit.platform == .android) @import("__android.zig") else void;
 const __linux = @import("__linux.zig");
 const system = @import("system.zig");
 const math = @import("math.zig");
@@ -2106,9 +2106,12 @@ pub fn recreate_swapchain() void {
     fullscreen_mutex.unlock();
 
     __render_command.__refresh_all();
-    root.xfit_size() catch |e| {
-        xfit.herr3("xfit_size", e);
-    };
+
+    if (!xfit.__xfit_test) {
+        root.xfit_size() catch |e| {
+            xfit.herr3("xfit_size", e);
+        };
+    }
 
     __vulkan_allocator.execute_and_wait_all_op();
 }

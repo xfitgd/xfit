@@ -1,12 +1,6 @@
 const std = @import("std");
 const builtin = @import("builtin");
-
-pub const XfitPlatform = enum(u32) {
-    windows,
-    android,
-    linux,
-};
-
+pub const XfitPlatform = @import("src/xfit.zig").XfitPlatform;
 const user_setting = @import("user_setting.zig");
 
 inline fn get_lazypath(b: *std.Build, path: []const u8) std.Build.LazyPath {
@@ -34,7 +28,25 @@ pub fn build(b: *std.Build) !void {
     xml = b.dependency("xml", .{});
     gltf = b.dependency("zgltf", .{});
 
-    standard_target = b.standardTargetOptions(.{});
+    standard_target = b.standardTargetOptions(.{ .default_target = .{
+        .os_tag = .linux,
+        .abi = .gnu,
+        .cpu_model = .baseline,
+    } });
+    if (standard_target.result.cpu.arch == .x86_64) {
+        standard_target.result.cpu.features.addFeatureSet(std.Target.x86.featureSet(&.{
+            .ssse3,
+            .sse3,
+            .sse4_1,
+            .sse4_2,
+            .popcnt,
+        }));
+    } else if (standard_target.result.cpu.arch == .aarch64) {
+        standard_target.result.cpu.features.addFeatureSet(std.Target.aarch64.featureSet(&.{.neon}));
+    }
+    standard_target.query.cpu_features_add = standard_target.result.cpu.features;
+    standard_target.query.abi = .gnu; //gnu required
+    standard_target.result.abi = .gnu; //gnu required
     const optimize = b.standardOptimizeOption(.{});
 
     _ = b.addModule("xfit", .{ .root_source_file = b.path("src/xfit.zig") });
@@ -43,6 +55,8 @@ pub fn build(b: *std.Build) !void {
         .root_source_file = b.path("src/xfit.zig"),
         .target = standard_target,
         .optimize = optimize,
+        .link_libc = true,
+        .pic = true,
     });
     unit_tests.root_module.addImport("yaml", yaml.module("yaml"));
     unit_tests.root_module.addImport("xml", xml.module("xml"));
@@ -51,6 +65,14 @@ pub fn build(b: *std.Build) !void {
     unit_tests.addIncludePath(b.path("src/include"));
     unit_tests.addIncludePath(b.path("src/include/freetype"));
     unit_tests.addIncludePath(b.path("src/include/opus"));
+
+    for (linux_lib_names) |n| {
+        const path = try std.fmt.allocPrint(b.*.allocator, "src/lib/linux/{s}/{s}", .{ get_arch_text(standard_target.result.cpu.arch), n });
+        defer b.*.allocator.free(path);
+        unit_tests.addObjectFile(get_lazypath(b, path));
+    }
+    unit_tests.addCSourceFile(.{ .file = get_lazypath(b, "src/lib/linux/conio.c") });
+    unit_tests.subsystem = .Posix;
 
     const run_unit_tests = b.addRunArtifact(unit_tests);
 
@@ -90,6 +112,23 @@ pub const run_option = struct {
     enable_log: bool = true,
     ///omit frame pointer always true when debug
     enable_trace: bool = true,
+};
+
+const linux_lib_names = [_][]const u8{
+    "libwebp.a",
+    "libwebpdemux.a",
+    "libfreetype.a",
+    "libogg.a",
+    "libopus.a",
+    "libopusfile.a",
+    "libvorbis.a",
+    "libvorbisenc.a",
+    "libvorbisfile.a",
+    "liblua.a", //custom
+    "libminiaudio.a",
+    "libz.so",
+    "libX11.so",
+    "libXrandr.so",
 };
 
 pub fn run(
@@ -170,28 +209,11 @@ pub fn run(
         "libgdi32.a",
     };
 
-    const linux_lib_names = comptime [_][]const u8{
-        "libwebp.a",
-        "libwebpdemux.a",
-        "libfreetype.a",
-        "libogg.a",
-        "libopus.a",
-        "libopusfile.a",
-        "libvorbis.a",
-        "libvorbisenc.a",
-        "libvorbisfile.a",
-        "liblua.a", //custom
-        "libminiaudio.a",
-        "libz.so",
-        "libX11.so",
-        "libXrandr.so",
-    };
-
     const build_options_module = build_options.createModule();
 
     const xfit = bb.module("xfit");
     xfit.addImport("build_options", build_options_module);
-    
+
     var i: usize = 0;
     while (i < targets.len) : (i += 1) {
         var result: *std.Build.Step.Compile = undefined;

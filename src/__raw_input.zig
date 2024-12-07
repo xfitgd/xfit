@@ -99,7 +99,7 @@ pub fn init(_MAX_DEVICES: u32, _guid: *const raw_input.GUID, _change_fn: raw_inp
     var idata: win32.SP_DEVICE_INTERFACE_DATA = .{};
     var index: u32 = 0;
     while (win32.SetupDiEnumDeviceInterfaces(dev, null, _guid, index, &idata) == 1) {
-        var size: u32 = undefined;
+        var size: c_ulong = undefined;
         _ = win32.SetupDiGetDeviceInterfaceDetailA(dev, &idata, null, 0, &size, null);
 
         const detail = std.heap.c_allocator.alignedAlloc(u8, 4, size) catch xfit.herrm("rawinput init detail alloc");
@@ -185,7 +185,7 @@ pub fn get(self: *Self, idx: u32, ctl_code: u32, in: []const u8, out: []u8) bool
     defer std.heap.c_allocator.free(in_);
     @memcpy(in_, in);
 
-    var size: u32 = undefined;
+    var size: c_ulong = undefined;
     const res = win32.DeviceIoControl(
         self.*.devices[idx].handle,
         ctl_code,
@@ -229,5 +229,5 @@ pub fn set(self: *Self, device_idx: u32, data: []const u8) raw_input.ERROR!u32 {
     if (0 == win32.WriteFile(self.*.devices[device_idx].handle, data.ptr, @intCast(data.len), &read, null)) {
         return raw_input.ERROR.WRITE_FAIL;
     }
-    return read;
+    return @truncate(read);
 }

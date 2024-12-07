@@ -38,5 +38,5 @@ pub fn set(self: *Self, device_idx: u32, data: []const u8) !u32 {
 }
 
 pub fn get(self: *Self, idx: u32, ctl_code: u32, in: []const u8, out: []u8) bool {
-    return try @as(*__raw_input, @alignCast(@ptrCast(self.*.handle))).*.get(idx, ctl_code, in, out);
+    return @as(*__raw_input, @alignCast(@ptrCast(self.*.handle))).*.get(idx, ctl_code, in, out);
 }

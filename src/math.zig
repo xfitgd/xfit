@@ -105,6 +105,7 @@ pub fn rect_(comptime T: type) type {
                 self.bottom == target.bottom;
         }
         pub fn calc_with_canvas(self: Self, _CANVAS_W: T, _CANVAS_H: T) Self {
+            if (@typeInfo(T) != .float and @import("xfit.zig").__xfit_test) return undefined;
             if (@typeInfo(T) != .float) @compileError("rect T type must be float");
 
             const _width = @as(f32, @floatFromInt(window.window_width()));
@@ -119,6 +120,7 @@ pub fn rect_(comptime T: type) type {
             };
         }
         pub fn get(_pos: pointT, _size: pointT) Self {
+            if (@typeInfo(T) != .float and @import("xfit.zig").__xfit_test) return undefined;
             if (@typeInfo(T) != .float) @compileError("rect T type must be float");
             return .{
                 .left = _pos[0] - _size[0] / 2,
@@ -129,24 +131,33 @@ pub fn rect_(comptime T: type) type {
         }
         fn rect_matrix(_type: type) type {
             const info = @typeInfo(_type);
-            if (info != .float) @compileError("rect T type must be float");
+            if (info != .float) {
+                if (@import("xfit.zig").__xfit_test) return matrix;
+                @compileError("rect T type must be float");
+            }
             if (info.float.bits == 32) return matrix;
             return matrix_(_type);
         }
         pub fn mul_matrix(self: Self, mat: rect_matrix(T)) Self {
+            if (@typeInfo(T) != .float and @import("xfit.zig").__xfit_test) return undefined;
+            const p1 = matrix_mul_point(mat, .{ self.left, self.top });
+            const p2 = matrix_mul_point(mat, .{ self.right, self.bottom });
             return .{
-                .left = mat.mul_point(self.left),
-                .right = mat.mul_point(self.right),
-                .top = mat.mul_point(self.top),
-                .bottom = mat.mul_point(self.bottom),
+                .left = p1[0],
+                .right = p2[0],
+                .top = p1[1],
+                .bottom = p2[1],
             };
         }
         pub fn div_matrix(self: Self, mat: rect_matrix(T)) !Self {
+            if (@typeInfo(T) != .float and @import("xfit.zig").__xfit_test) return undefined;
+            const p1 = try matrix_div_point(mat, .{ self.left, self.top });
+            const p2 = try matrix_div_point(mat, .{ self.right, self.bottom });
             return .{
-                .left = try mat.div_point(self.left),
-                .right = try mat.div_point(self.right),
-                .top = try mat.div_point(self.top),
-                .bottom = try mat.div_point(self.bottom),
+                .left = p1[0],
+                .right = p2[0],
+                .top = p1[1],
+                .bottom = p2[1],
             };
         }
         pub fn is_point_in(self: Self, pt: pointT) bool {
@@ -156,9 +167,23 @@ pub fn rect_(comptime T: type) type {
             return self.left <= pt[0] and self.right >= pt[0] and self.top <= pt[1] and self.bottom >= pt[1];
         }
         pub fn is_mouse_in(self: Self) bool {
+            if (pointT != point and pointT != point8) {
+                const inp = input.get_cursor_pos();
+                return self.is_point_in(.{ @intFromFloat(inp[0]), @intFromFloat(inp[1]) });
+            } else if (pointT == point8) {
+                const inp = input.get_cursor_pos();
+                return self.is_point_in(.{ @floatCast(inp[0]), @floatCast(inp[1]) });
+            }
             return self.is_point_in(input.get_cursor_pos());
         }
         pub fn is_mouse_in_window_rect(self: Self) bool {
+            if (pointT != point and pointT != point8) {
+                const inp = input.get_cursor_pos();
+                return self.is_point_in_window_rect(.{ @intFromFloat(inp[0]), @intFromFloat(inp[1]) });
+            } else if (pointT == point8) {
+                const inp = input.get_cursor_pos();
+                return self.is_point_in_window_rect(.{ @floatCast(inp[0]), @floatCast(inp[1]) });
+            }
             return self.is_point_in_window_rect(input.get_cursor_pos());
         }
     };
@@ -185,17 +210,17 @@ pub const vector8 = @Vector(4, f64);
 pub const point3d = @Vector(3, f32);
 pub const point3d8 = @Vector(3, f64);
 
-pub fn point_(comptime float_T: type) type {
-    if (@typeInfo(float_T) != .float) @compileError("float_T must be a float type");
-    return @Vector(2, float_T);
+pub fn point_(comptime T: type) type {
+    test_number_type(T);
+    return @Vector(2, T);
 }
-pub fn point3d_(comptime float_T: type) type {
-    if (@typeInfo(float_T) != .float) @compileError("float_T must be a float type");
-    return @Vector(3, float_T);
+pub fn point3d_(comptime T: type) type {
+    test_number_type(T);
+    return @Vector(3, T);
 }
-pub fn vector_(comptime float_T: type) type {
-    if (@typeInfo(float_T) != .float) @compileError("float_T must be a float type");
-    return @Vector(4, float_T);
+pub fn vector_(comptime T: type) type {
+    test_number_type(T);
+    return @Vector(4, T);
 }
 
 pub fn length_pow(p1: anytype, p2: anytype) @TypeOf(p1[0], p2[0]) {
@@ -556,7 +581,7 @@ pub fn matrix_scaling_inverse(comptime float_T: type, x: float_T, y: float_T, z:
 }
 ///Vulkan test completed
 pub fn matrix_perspectiveFovLhVulkan(comptime float_T: type, fovy: float_T, aspect: float_T, near: float_T, far: float_T) matrix_error!matrix_(float_T) {
-    var res = try matrix_perspectiveFovLh(fovy, aspect, near, far);
+    var res = try matrix_perspectiveFovLh(f32, fovy, aspect, near, far);
     res[1][1] *= -1;
     return res;
 }
@@ -728,7 +753,7 @@ pub fn matrix_mul_vector(_matrix: anytype, _target_vector: anytype) vector_(@Typ
 pub inline fn matrix_div_vector(_matrix: anytype, _target_vector: anytype) !vector_(@TypeOf(_matrix[0][0])) {
     return matrix_mul_vector(try matrix_inverse(_matrix), _target_vector);
 }
-pub inline fn matrix_mul_point(_matrix: anytype, pt: point_(@TypeOf(_matrix[0][0]))) !point_(@TypeOf(_matrix[0][0])) {
+pub inline fn matrix_mul_point(_matrix: anytype, pt: point_(@TypeOf(_matrix[0][0]))) point_(@TypeOf(_matrix[0][0])) {
     const xx = point{ _matrix[0][0], _matrix[0][1] };
     const yy = point{ _matrix[1][0], _matrix[1][1] };
     return .{ dot3(pt, xx) + _matrix[3][0], dot3(pt, yy) + _matrix[3][1] };
