@@ -215,6 +215,9 @@ fn _render_string(self: *Self, _str: []const u8, _render_option: render_option, 
     //https://gencmurat.com/en/posts/zig-strings/
     var utf8 = (try std.unicode.Utf8View.init(_str)).iterator();
     var offset: point = _render_option._offset;
+
+    self.*.mutex.lock();
+    errdefer self.*.mutex.unlock();
     while (utf8.nextCodepoint()) |codepoint| {
         if (_render_option.area != null and offset[1] <= -_render_option.area.?[1]) break;
         if (codepoint == '\n') {
@@ -226,6 +229,7 @@ fn _render_string(self: *Self, _str: []const u8, _render_option: render_option, 
         try _render_char(self, codepoint, _vertex_array, _index_array, &offset, _render_option.area, _render_option.scale, allocator);
         maxP = @max(maxP, point{ offset[0], offset[1] + @as(f32, @floatFromInt(self.*.__face.*.size.*.metrics.height)) / (64.0 * self.*.scale) });
     }
+    self.*.mutex.unlock();
     var i: usize = 0;
     const size: point = (if (_render_option.area != null) _render_option.area.? else (maxP - minP)) * point{ 1, 1 };
     while (i < _vertex_array.*.len) : (i += 1) {
@@ -282,8 +286,6 @@ pub fn render_string_raw(self: *Self, _str: []const u8, _render_option: render_o
 }
 
 fn _render_char(self: *Self, char: u21, _vertex_array: *[]graphics.shape_vertex_2d, _index_array: *[]u32, offset: *point, area: ?math.point, scale: point, allocator: std.mem.Allocator) !void {
-    self.*.mutex.lock(); //access __char_array and glyph
-
     var char_d: ?*char_data = self.*.__char_array.getPtr(char);
 
     if (char_d != null) {} else blk: {
@@ -296,10 +298,7 @@ fn _render_char(self: *Self, char: u21, _vertex_array: *[]graphics.shape_vertex_
 
         var char_d2: char_data = undefined;
 
-        var poly: geometry.shapes = .{ .nodes = allocator.alloc(geometry.shapes.shape_node, 1) catch |e| {
-            self.*.mutex.unlock();
-            return e;
-        } };
+        var poly: geometry.shapes = .{ .nodes = try allocator.alloc(geometry.shapes.shape_node, 1) };
         defer {
             for (poly.nodes) |v| {
                 allocator.free(v.lines);
@@ -307,14 +306,8 @@ fn _render_char(self: *Self, char: u21, _vertex_array: *[]graphics.shape_vertex_
             }
             allocator.free(poly.nodes);
         }
-        poly.nodes[0].lines = allocator.alloc(geometry.line, self.*.__face.*.glyph.*.outline.n_points) catch |e| {
-            self.*.mutex.unlock();
-            return e;
-        };
-        poly.nodes[0].n_polygons = allocator.alloc(u32, self.*.__face.*.glyph.*.outline.n_points) catch |e| {
-            self.*.mutex.unlock();
-            return e;
-        };
+        poly.nodes[0].lines = try allocator.alloc(geometry.line, self.*.__face.*.glyph.*.outline.n_points);
+        poly.nodes[0].n_polygons = try allocator.alloc(u32, self.*.__face.*.glyph.*.outline.n_points);
 
         const funcs: freetype.FT_Outline_Funcs = .{
             .line_to = line_to,
@@ -337,37 +330,37 @@ fn _render_char(self: *Self, char: u21, _vertex_array: *[]graphics.shape_vertex_
         }
 
         if (freetype.FT_Outline_Decompose(&self.*.__face.*.glyph.*.outline, &funcs, &data) != freetype.FT_Err_Ok) {
-            self.*.mutex.unlock();
             return font_error.OutOfMemory;
         }
-        self.*.mutex.unlock();
-        if (data.idx2 == 0) {
-            char_d2.raw_p = null;
-        } else {
-            if (data.npoly > 0) {
-                data.polygon.*.nodes[0].n_polygons[data.npoly_len] = data.npoly;
-                data.npoly_len += 1;
-            }
-            poly.nodes[0].lines = try allocator.realloc(poly.nodes[0].lines, data.idx2);
-            poly.nodes[0].n_polygons = try allocator.realloc(poly.nodes[0].n_polygons, data.npoly_len);
-            poly.nodes[0].color = .{ 0, 0, 0, 1 };
-            poly.nodes[0].stroke_color = null;
-            poly.nodes[0].thickness = 0;
+        //self.*.mutex.unlock();
+        {
+            //errdefer self.*.mutex.lock();
+            if (data.idx2 == 0) {
+                char_d2.raw_p = null;
+            } else {
+                if (data.npoly > 0) {
+                    data.polygon.*.nodes[0].n_polygons[data.npoly_len] = data.npoly;
+                    data.npoly_len += 1;
+                }
+                poly.nodes[0].lines = try allocator.realloc(poly.nodes[0].lines, data.idx2);
+                poly.nodes[0].n_polygons = try allocator.realloc(poly.nodes[0].n_polygons, data.npoly_len);
+                poly.nodes[0].color = .{ 0, 0, 0, 1 };
+                poly.nodes[0].stroke_color = null;
+                poly.nodes[0].thickness = 0;
 
-            char_d2.raw_p = try poly.compute_polygon(__system.allocator); //높은 부하 작업 High load operations
+                char_d2.raw_p = try poly.compute_polygon(__system.allocator); //높은 부하 작업 High load operations
+            }
         }
-        self.*.mutex.lock();
+        //self.*.mutex.lock();
         char_d2.advance[0] = @as(f32, @floatFromInt(self.*.__face.*.glyph.*.advance.x)) / (64.0 * self.*.scale);
         char_d2.advance[1] = @as(f32, @floatFromInt(self.*.__face.*.glyph.*.advance.y)) / (64.0 * self.*.scale);
 
         self.*.__char_array.put(res, char_d2) catch |e| {
-            self.*.mutex.unlock();
             char_d2.raw_p.?.deinit(__system.allocator);
             return e;
         };
         char_d = &char_d2;
     }
-    defer self.*.mutex.unlock();
 
     if (area != null and offset.*[0] + char_d.?.*.advance[0] >= area.?[0]) {
         offset.*[1] -= @as(f32, @floatFromInt(self.*.__face.*.size.*.metrics.height)) / (64.0 * self.*.scale);
