@@ -30,6 +30,7 @@ pub const char_data = struct {
 __char_array: AutoHashMap(u21, char_data),
 __face: freetype.FT_Face = null,
 scale: f32 = scale_default,
+mutex: std.Thread.Mutex = .{},
 const scale_default: f32 = 256;
 
 fn handle_error(code: freetype.FT_Error) void {
@@ -64,6 +65,8 @@ pub fn init(_font_data: []const u8, _face_index: u32) !Self {
 }
 
 pub fn deinit(self: *Self) void {
+    self.*.mutex.lock();
+    defer self.*.mutex.unlock();
     var it = self.*.__char_array.valueIterator();
     while (it.next()) |v| {
         if (v.*.raw_p != null) {
@@ -74,6 +77,8 @@ pub fn deinit(self: *Self) void {
 }
 
 pub fn clear_char_array(self: *Self) void {
+    self.*.mutex.lock();
+    defer self.*.mutex.unlock();
     const allocator = self.*.__char_array.allocator;
     deinit(self);
     self.*.__char_array = AutoHashMap(u21, char_data).init(allocator);
@@ -277,17 +282,24 @@ pub fn render_string_raw(self: *Self, _str: []const u8, _render_option: render_o
 }
 
 fn _render_char(self: *Self, char: u21, _vertex_array: *[]graphics.shape_vertex_2d, _index_array: *[]u32, offset: *point, area: ?math.point, scale: point, allocator: std.mem.Allocator) !void {
+    self.*.mutex.lock(); //access __char_array and glyph
+
     var char_d: ?*char_data = self.*.__char_array.getPtr(char);
 
     if (char_d != null) {} else blk: {
         const res = load_glyph(self, char);
         if (res != char) {
-            if (self.*.__char_array.getPtr(res) != null) break :blk;
+            if (self.*.__char_array.getPtr(res) != null) {
+                break :blk;
+            }
         }
 
         var char_d2: char_data = undefined;
 
-        var poly: geometry.shapes = .{ .nodes = try allocator.alloc(geometry.shapes.shape_node, 1) };
+        var poly: geometry.shapes = .{ .nodes = allocator.alloc(geometry.shapes.shape_node, 1) catch |e| {
+            self.*.mutex.unlock();
+            return e;
+        } };
         defer {
             for (poly.nodes) |v| {
                 allocator.free(v.lines);
@@ -295,8 +307,14 @@ fn _render_char(self: *Self, char: u21, _vertex_array: *[]graphics.shape_vertex_
             }
             allocator.free(poly.nodes);
         }
-        poly.nodes[0].lines = try allocator.alloc(geometry.line, self.*.__face.*.glyph.*.outline.n_points);
-        poly.nodes[0].n_polygons = try allocator.alloc(u32, self.*.__face.*.glyph.*.outline.n_points);
+        poly.nodes[0].lines = allocator.alloc(geometry.line, self.*.__face.*.glyph.*.outline.n_points) catch |e| {
+            self.*.mutex.unlock();
+            return e;
+        };
+        poly.nodes[0].n_polygons = allocator.alloc(u32, self.*.__face.*.glyph.*.outline.n_points) catch |e| {
+            self.*.mutex.unlock();
+            return e;
+        };
 
         const funcs: freetype.FT_Outline_Funcs = .{
             .line_to = line_to,
@@ -319,8 +337,10 @@ fn _render_char(self: *Self, char: u21, _vertex_array: *[]graphics.shape_vertex_
         }
 
         if (freetype.FT_Outline_Decompose(&self.*.__face.*.glyph.*.outline, &funcs, &data) != freetype.FT_Err_Ok) {
+            self.*.mutex.unlock();
             return font_error.OutOfMemory;
         }
+        self.*.mutex.unlock();
         if (data.idx2 == 0) {
             char_d2.raw_p = null;
         } else {
@@ -334,16 +354,21 @@ fn _render_char(self: *Self, char: u21, _vertex_array: *[]graphics.shape_vertex_
             poly.nodes[0].stroke_color = null;
             poly.nodes[0].thickness = 0;
 
-            char_d2.raw_p = try poly.compute_polygon(__system.allocator);
+            char_d2.raw_p = try poly.compute_polygon(__system.allocator); //높은 부하 작업 High load operations
         }
+        self.*.mutex.lock();
         char_d2.advance[0] = @as(f32, @floatFromInt(self.*.__face.*.glyph.*.advance.x)) / (64.0 * self.*.scale);
         char_d2.advance[1] = @as(f32, @floatFromInt(self.*.__face.*.glyph.*.advance.y)) / (64.0 * self.*.scale);
+
         self.*.__char_array.put(res, char_d2) catch |e| {
+            self.*.mutex.unlock();
             char_d2.raw_p.?.deinit(__system.allocator);
             return e;
         };
         char_d = &char_d2;
     }
+    defer self.*.mutex.unlock();
+
     if (area != null and offset.*[0] + char_d.?.*.advance[0] >= area.?[0]) {
         offset.*[1] -= @as(f32, @floatFromInt(self.*.__face.*.size.*.metrics.height)) / (64.0 * self.*.scale);
         offset.*[0] = 0;
@@ -368,6 +393,7 @@ fn _render_char(self: *Self, char: u21, _vertex_array: *[]graphics.shape_vertex_
     }
     offset.*[0] += char_d.?.*.advance[0];
     //offset.*[1] -= char_d.?.*.advance[1];
+
 }
 
 const font_user_data = struct {
