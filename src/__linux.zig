@@ -25,7 +25,7 @@ pub var state_window: c.Atom = undefined;
 pub var window_extent: [4]c_long = undefined;
 
 var render_thread: std.Thread = undefined;
-var cur_fullscreen_monitor: system.monitor_info = undefined;
+//var cur_fullscreen_monitor: system.monitor_info = undefined;
 
 pub fn system_linux_start() void {
     display = c.XOpenDisplay(null);
@@ -147,14 +147,18 @@ fn change_borderless() void {
 }
 
 fn change_fullscreen(monitor: *const system.monitor_info, _switch_from_window: bool) void {
+    _ = monitor;
     if (_switch_from_window) change_borderless();
-    cur_fullscreen_monitor = monitor.*;
     if (__vulkan.VK_EXT_full_screen_exclusive_support and !__vulkan.is_fullscreen_ex) {
         __vulkan.is_fullscreen_ex = true;
     }
 }
 
-fn restore_fullscreen() void {}
+fn restore_fullscreen() void {
+    if (__vulkan.is_fullscreen_ex) {
+        __vulkan.is_fullscreen_ex = false;
+    }
+}
 
 pub fn set_window_mode() void {
     const wm = window.get_screen_mode();
@@ -179,12 +183,12 @@ pub fn set_window_mode() void {
 pub fn set_borderlessscreen_mode(monitor: *const system.monitor_info) void {
     const wm = window.get_screen_mode();
     if (wm != .BORDERLESSSCREEN) {
-        _ = c.XMoveResizeWindow(display, wnd, monitor.*.rect.left, monitor.*.rect.top, @intCast(monitor.*.rect.width()), @intCast(monitor.*.rect.height()));
         if (wm == .FULLSCREEN) {
             restore_fullscreen();
         } else {
             change_borderless();
         }
+        _ = c.XMoveResizeWindow(display, wnd, monitor.*.rect.left, monitor.*.rect.top, @intCast(monitor.*.rect.width()), @intCast(monitor.*.rect.height()));
 
         if (__vulkan.is_fullscreen_ex) {
             __vulkan.is_fullscreen_ex = false;
@@ -395,7 +399,38 @@ pub fn linux_start() void {
     _ = c.XMoveWindow(display, wnd, __system.init_set.window_x, __system.init_set.window_y);
     _ = c.XFlush(display);
 
-    __system.save_prev_window_state(); //initial value
+    __system.prev_window = .{
+        .x = __system.init_set.window_x,
+        .y = __system.init_set.window_y,
+        .width = __system.init_set.window_width,
+        .height = __system.init_set.window_height,
+        .state = window.window_state.Restore,
+    }; //initial value
+
+    if (__system.init_set.screen_mode != .WINDOW) {
+        const monitor = get_monitor_from_window();
+
+        var xev: c.XEvent = std.mem.zeroes(c.XEvent);
+        const evmask = c.SubstructureRedirectMask | c.SubstructureNotifyMask;
+
+        xev.type = c.ClientMessage;
+        xev.xclient.window = wnd;
+        xev.xclient.message_type = c.XInternAtom(display, "_NET_WM_STATE", c.True);
+        xev.xclient.format = 32;
+        xev.xclient.data.l[0] = 1;
+        xev.xclient.data.l[1] = @intCast(c.XInternAtom(display, "_NET_WM_STATE_FULLSCREEN", c.True));
+        xev.xclient.data.l[2] = 0;
+
+        _ = c.XSendEvent(display, c.DefaultRootWindow(display), 0, evmask, &xev);
+
+        _ = c.XMoveResizeWindow(display, wnd, monitor.*.rect.left, monitor.*.rect.top, monitor.*.resolution.size[0], monitor.*.resolution.size[1]);
+
+        if (__system.init_set.screen_mode == .FULLSCREEN) {
+            if (__vulkan.VK_EXT_full_screen_exclusive_support and !__vulkan.is_fullscreen_ex) {
+                __vulkan.is_fullscreen_ex = true;
+            }
+        }
+    } else {}
 
     //left %ld right %ld top %ld bottom %ld
     //xfit.print_log("{d},{d},{d},{d}\n", .{ window_extent[0], window_extent[1], window_extent[2], window_extent[3] });
@@ -504,17 +539,18 @@ pub fn linux_loop() void {
                             &res_data,
                         ) == c.Success) {
                             var i: c_ulong = 0;
-                            var is_fullscreen: bool = false;
+                            var is_window: bool = true;
                             while (i < res_num) : (i += 1) {
                                 const res_data_long: [*c]c_ulong = @ptrCast(@alignCast(res_data));
                                 if (res_data_long[i] == c.XInternAtom(display, "_NET_WM_STATE_FULLSCREEN", c.True)) {
                                     reset_size_hint();
-                                    @atomicStore(xfit.screen_mode, &__system.init_set.screen_mode, .FULLSCREEN, std.builtin.AtomicOrder.monotonic);
-                                    is_fullscreen = true;
+                                    if (window.get_screen_mode() == .WINDOW)
+                                        @atomicStore(xfit.screen_mode, &__system.init_set.screen_mode, .FULLSCREEN, std.builtin.AtomicOrder.monotonic);
+                                    is_window = false;
                                     break;
                                 }
                             }
-                            if (!is_fullscreen and window.get_screen_mode() != .WINDOW) {
+                            if (is_window and window.get_screen_mode() != .WINDOW) {
                                 @atomicStore(xfit.screen_mode, &__system.init_set.screen_mode, .WINDOW, std.builtin.AtomicOrder.monotonic);
                                 set_size_hint(true);
                                 if (__vulkan.is_fullscreen_ex) {
