@@ -216,8 +216,8 @@ pub fn xfit_init() !void {
     //
 
     //build button
-    var button_src = try components.button.make_square_button_raw(.{ 200, 100 }, 2, arena_alloc);
-    defer button_src[1].deinit(arena_alloc);
+    var button_src = try components.button.make_square_button_raw(.{ 200, 100 }, 2, arena_alloc, allocator);
+    defer button_src[1].deinit(allocator);
 
     const rect_text_src_raw = try font0.render_string_raw("버튼", .{ .pivot = .{ 0.5, 0.3 }, .scale = .{ 4.5, 4.5 }, .color = .{ 0, 0, 0, 1 } }, allocator);
     defer rect_text_src_raw.deinit(allocator);
