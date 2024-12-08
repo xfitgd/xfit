@@ -322,6 +322,17 @@ fn reset_size_hint() void {
     _ = c.XSetNormalHints(display, wnd, hint);
 }
 
+pub fn set_window_title() void {
+    const wm_Name = c.XInternAtom(display, "_NET_WM_NAME", 0);
+    const utf8Str = c.XInternAtom(display, "UTF8_STRING", 0);
+    _ = c.XChangeProperty(display, wnd, wm_Name, utf8Str, 8, c.PropModeReplace, __system.title.ptr, @intCast(__system.title.len));
+
+    _ = c.XSetClassHint(display, wnd, @constCast(&c.XClassHint{
+        .res_class = __system.title.ptr,
+        .res_name = __system.title.ptr,
+    }));
+}
+
 pub fn linux_start() void {
     if (__system.init_set.screen_index > __system.monitors.items.len - 1) __system.init_set.screen_index = @intCast(def_screen_idx);
 
@@ -353,14 +364,7 @@ pub fn linux_start() void {
     var res_remain: c_ulong = undefined;
     var res_data: [*c]u8 = undefined;
 
-    const wm_Name = c.XInternAtom(display, "_NET_WM_NAME", 0);
-    const utf8Str = c.XInternAtom(display, "UTF8_STRING", 0);
-    _ = c.XChangeProperty(display, wnd, wm_Name, utf8Str, 8, c.PropModeReplace, __system.title.ptr, @intCast(__system.title.len));
-
-    _ = c.XSetClassHint(display, wnd, @constCast(&c.XClassHint{
-        .res_class = __system.title.ptr,
-        .res_name = __system.title.ptr,
-    }));
+    set_window_title();
 
     del_window = c.XInternAtom(display, "WM_DELETE_WINDOW", 0);
     state_window = c.XInternAtom(display, "WM_STATE", 0);

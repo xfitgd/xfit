@@ -97,7 +97,7 @@ pub fn set_window_title(title: []const u8) void {
     if (xfit.platform == .windows) {
         __windows.set_window_title();
     } else if (xfit.platform == .linux) {
-        //TODO
+        __linux.set_window_title();
     }
 }
 
