@@ -1,20 +1,21 @@
 {
     "version": "0.2.0",
     "configurations": [
+        //Add LLDB_USE_NATIVE_PDB_READER="yes" to the environment variables FOR WINDOWS
         {
-            "name": "Debug (Windows MSVC)",
-            "type": "cppvsdbg",
+           "type": "lldb",
             "request": "launch",
-            "program":  "${workspaceFolder}/zig-out/bin/XfitTest.exe",
+            "name": "Debug (Windows)",
+            "program": "${workspaceFolder}/zig-out/bin/XfitTest",
+            "args": [],
             "cwd": "${workspaceFolder}/assets",
-            "console": "integratedTerminal",
-            "preLaunchTask": "build zig"
+            "preLaunchTask": "build zig",
         },
         {
             "type": "lldb",
             "request": "launch",
             "name": "Debug (Linux)",
-            "program": "${workspaceFolder}/zig-out/bin/XfitTest",
+            "program": "${workspaceFolder}/zig-out/bin/XfitTest.exe",
             "args": [],
             "cwd": "${workspaceFolder}/assets",
             "preLaunchTask": "build zig",
