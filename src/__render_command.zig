@@ -16,7 +16,7 @@ pub fn __refresh_all() void {
     defer mutex.unlock();
     if (render_cmd_list == null) return;
     for (render_cmd_list.?.items) |cmd| {
-        cmd.*.__refresh_cmds();
+        //cmd.*.__refresh_cmds();
         cmd.*.refresh();
     }
 }

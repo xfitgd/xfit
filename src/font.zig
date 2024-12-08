@@ -329,6 +329,7 @@ fn _render_char(self: *Self, char: u21, _vertex_array: *[]graphics.shape_vertex_
             freetype.FT_Outline_Reverse(&self.*.__face.*.glyph.*.outline);
         }
 
+        //TODO FT_Outline_New FT_Outline_Copy FT_Outline_Done로 임시객체로 복제하여 Lock Free 구현
         if (freetype.FT_Outline_Decompose(&self.*.__face.*.glyph.*.outline, &funcs, &data) != freetype.FT_Err_Ok) {
             return font_error.OutOfMemory;
         }
