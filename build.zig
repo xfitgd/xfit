@@ -33,17 +33,6 @@ pub fn build(b: *std.Build) !void {
         .abi = .gnu,
         .cpu_model = .baseline,
     } });
-    if (standard_target.result.cpu.arch == .x86_64) {
-        standard_target.result.cpu.features.addFeatureSet(std.Target.x86.featureSet(&.{
-            .ssse3,
-            .sse3,
-            .sse4_1,
-            .sse4_2,
-            .popcnt,
-        }));
-    } else if (standard_target.result.cpu.arch == .aarch64) {
-        standard_target.result.cpu.features.addFeatureSet(std.Target.aarch64.featureSet(&.{.neon}));
-    }
     standard_target.query.cpu_features_add = standard_target.result.cpu.features;
     standard_target.query.abi = .gnu; //gnu required
     standard_target.result.abi = .gnu; //gnu required

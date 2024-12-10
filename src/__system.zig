@@ -94,7 +94,6 @@ pub var title: [:0]u8 = undefined;
 pub var init_set: xfit.init_setting = .{};
 
 pub var delta_time: u64 = 0;
-pub var program_time: u64 = 0;
 pub var processor_core_len: u32 = 0;
 pub var platform_ver: system.platform_version = undefined;
 pub var __screen_orientation: window.screen_orientation = .unknown;
@@ -196,11 +195,8 @@ pub fn loop() void {
                 }
             }
             n = std.time.Instant.now() catch |e| xfit.herr3(" const n = std.time.Instant.now()", e);
-            @atomicStore(u64, &program_time, n.since(S.start), .monotonic);
             _delta_time = n.since(S.now);
-        } else {
-            @atomicStore(u64, &program_time, n.since(S.start), .monotonic);
-        }
+        } else {}
         S.now = n;
         @atomicStore(u64, &delta_time, _delta_time, .monotonic);
     }

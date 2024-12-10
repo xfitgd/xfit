@@ -310,13 +310,6 @@ pub inline fn dt_u64() u64 {
 pub inline fn dt() f64 {
     return @as(f64, @floatFromInt(@atomicLoad(u64, &__system.delta_time, .monotonic))) / 1000000000.0;
 }
-///nanosec 1 / 1000000000 sec
-pub inline fn program_time_u64() u64 {
-    return @atomicLoad(u64, &__system.program_time, .monotonic);
-}
-pub inline fn program_time() f64 {
-    return @as(f64, @floatFromInt(@atomicLoad(u64, &__system.program_time, .monotonic))) / 1000000000.0;
-}
 pub inline fn set_error_handling_func(_func: *const fn (text: []u8, stack_trace: []u8) void) void {
     @atomicStore(@TypeOf(__system.error_handling_func), &__system.error_handling_func, _func, std.builtin.AtomicOrder.monotonic);
 }
@@ -357,7 +350,7 @@ pub fn exit() void {
         return;
     }
     if (platform == .windows) {
-        __system.exiting.store(true, std.builtin.AtomicOrder.release);
+        __system.exiting.store(true, .release);
     } else if (platform == .android) {
         __system.exiting.store(true, .release);
     } else if (platform == .linux) {
@@ -377,11 +370,11 @@ pub const screen_mode = enum { WINDOW, BORDERLESSSCREEN, FULLSCREEN };
 
 pub const vSync_mode = enum { none, double, triple };
 
-const CW_USEDEFAULT = @import("std").zig.c_translation.cast(c_int, @import("std").zig.c_translation.promoteIntLiteral(c_int, 0x80000000, .hex));
+const CW_USEDEFAULT: i32 = if (platform == .windows) @intCast(__windows.CW_USEDEFAULT) else @bitCast(@as(u32, 0x80000000));
 
 pub const init_setting = struct {
-    pub const DEF_SIZE = @as(u32, @bitCast(if (platform == .windows) __windows.CW_USEDEFAULT else CW_USEDEFAULT));
-    pub const DEF_POS = if (platform == .windows) __windows.CW_USEDEFAULT else CW_USEDEFAULT;
+    pub const DEF_SIZE = @as(u32, @bitCast(CW_USEDEFAULT));
+    pub const DEF_POS = CW_USEDEFAULT;
     pub const PRIMARY_SCREEN_INDEX = std.math.maxInt(u32);
     //*ignore field mobile
     window_width: u32 = DEF_SIZE, //or 0

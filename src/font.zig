@@ -333,9 +333,9 @@ fn _render_char(self: *Self, char: u21, _vertex_array: *[]graphics.shape_vertex_
         if (freetype.FT_Outline_Decompose(&self.*.__face.*.glyph.*.outline, &funcs, &data) != freetype.FT_Err_Ok) {
             return font_error.OutOfMemory;
         }
-        //self.*.mutex.unlock();
+        self.*.mutex.unlock();
         {
-            //errdefer self.*.mutex.lock();
+            errdefer self.*.mutex.lock();
             if (data.idx2 == 0) {
                 char_d2.raw_p = null;
             } else {
@@ -352,7 +352,7 @@ fn _render_char(self: *Self, char: u21, _vertex_array: *[]graphics.shape_vertex_
                 char_d2.raw_p = try poly.compute_polygon(__system.allocator); //높은 부하 작업 High load operations
             }
         }
-        //self.*.mutex.lock();
+        self.*.mutex.lock();
         char_d2.advance[0] = @as(f32, @floatFromInt(self.*.__face.*.glyph.*.advance.x)) / (64.0 * self.*.scale);
         char_d2.advance[1] = @as(f32, @floatFromInt(self.*.__face.*.glyph.*.advance.y)) / (64.0 * self.*.scale);
 

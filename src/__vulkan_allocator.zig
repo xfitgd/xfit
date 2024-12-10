@@ -25,6 +25,8 @@ pub var supported_noncache_local: bool = false;
 
 pub var execute_all_cmd_per_update: std.atomic.Value(bool) = std.atomic.Value(bool).init(true);
 var arena_allocator: std.heap.ArenaAllocator = undefined;
+var th_arena_allocator: std.heap.ThreadSafeAllocator = undefined;
+var aallocator: std.mem.Allocator = undefined;
 
 pub fn init_block_len() void {
     var i: u32 = 0;
@@ -141,6 +143,10 @@ pub fn init() void {
     @memset(memory_idx_counts, 0);
 
     arena_allocator = std.heap.ArenaAllocator.init(__system.allocator);
+    th_arena_allocator = .{
+        .child_allocator = arena_allocator.allocator(),
+    };
+    aallocator = th_arena_allocator.allocator();
 
     // ! use vk.VK_COMMAND_POOL_CREATE_TRANSIENT_BIT, android will crash(?)
     const poolInfo: vk.CommandPoolCreateInfo = .{
@@ -189,8 +195,9 @@ pub fn deinit() void {
     }
     set_list.deinit();
     descriptor_pools.deinit();
-    //arena_allocator.deinit();
+    th_arena_allocator.mutex.lock();
     arena_allocator.deinit();
+    th_arena_allocator.mutex.unlock();
 
     __vulkan.vkd.?.destroyCommandPool(cmd_pool, null);
 }
@@ -710,8 +717,8 @@ fn execute_update_descriptor_sets(sets: []descriptor_set) void {
                 img_cnt += 1;
             }
         }
-        const bufs = arena_allocator.allocator().alloc(vk.DescriptorBufferInfo, buf_cnt) catch unreachable;
-        const imgs = arena_allocator.allocator().alloc(vk.DescriptorImageInfo, img_cnt) catch unreachable;
+        const bufs = aallocator.alloc(vk.DescriptorBufferInfo, buf_cnt) catch unreachable;
+        const imgs = aallocator.alloc(vk.DescriptorImageInfo, img_cnt) catch unreachable;
         buf_cnt = 0;
         img_cnt = 0;
         for (v.__res) |r| {
@@ -898,7 +905,9 @@ fn thread_func() void {
             __vulkan.vkd.?.queueWaitIdle(__vulkan.vkGraphicsQueue) catch |e| xfit.herr3("__vulkan_allocator thread_func.queueWaitIdle", e);
         }
 
+        th_arena_allocator.mutex.lock();
         if (!arena_allocator.reset(.retain_capacity)) unreachable;
+        th_arena_allocator.mutex.unlock();
 
         {
             var i: usize = 0;
@@ -972,13 +981,10 @@ fn append_op(node: operation_node) void {
 
     if (node == .__update_descriptor_sets) {
         for (node.__update_descriptor_sets.sets) |*v| {
-            v.*.__res = arena_allocator.allocator().dupe(res_union, v.*.__res) catch unreachable;
+            v.*.__res = aallocator.dupe(res_union, v.*.__res) catch unreachable;
         }
     }
     op_queue.append(__system.allocator, node) catch xfit.herrm("self.op_queue.append");
-    // if (self.op_queue.items.len == 12) {
-    //     unreachable;
-    // }
 }
 fn append_op_save(node: operation_node) void {
     op_save_queue.append(__system.allocator, node) catch xfit.herrm("self.op_save_queue.append");
@@ -1013,7 +1019,7 @@ pub fn vulkan_res_node(_res_type: res_type) type {
             if (_res_type == .buffer) {
                 self.*.buffer_option = option;
                 self.*.builded = true;
-                const map_data = arena_allocator.allocator().dupe(u8, _data) catch unreachable;
+                const map_data = aallocator.dupe(u8, _data) catch unreachable;
                 append_op(.{ .create_buffer = .{ .buf = self, .data = map_data } });
             } else {
                 @compileError("_res_type need buffer");
@@ -1034,7 +1040,7 @@ pub fn vulkan_res_node(_res_type: res_type) type {
                 self.*.sampler = _sampler;
                 self.*.texture_option = option;
                 self.*.builded = true;
-                const map_data = arena_allocator.allocator().dupe(u8, _data) catch unreachable;
+                const map_data = aallocator.dupe(u8, _data) catch unreachable;
                 append_op(.{ .create_texture = .{ .buf = self, .data = map_data, .allocated = true } });
             } else {
                 @compileError("_res_type need image");
@@ -1111,7 +1117,7 @@ pub fn vulkan_res_node(_res_type: res_type) type {
                 u8data = std.mem.sliceAsBytes(_data);
             }
 
-            const map_data = arena_allocator.allocator().dupe(u8, u8data) catch unreachable;
+            const map_data = aallocator.dupe(u8, u8data) catch unreachable;
 
             self.*.map_copy(map_data);
         }
@@ -1179,7 +1185,7 @@ const vulkan_res = struct {
         var off_idx: usize = 0;
         var ranges: []vk.MappedMemoryRange = undefined;
         if (self.*.cached) {
-            ranges = arena_allocator.allocator().alignedAlloc(vk.MappedMemoryRange, @alignOf(vk.MappedMemoryRange), nodes.len) catch unreachable;
+            ranges = aallocator.alignedAlloc(vk.MappedMemoryRange, @alignOf(vk.MappedMemoryRange), nodes.len) catch unreachable;
 
             for (nodes, ranges) |copy, *r| {
                 const nd: *DoublyLinkedList(node).Node = @alignCast(@ptrCast(copy.map_copy.ires.get_idx()));

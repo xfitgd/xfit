@@ -715,7 +715,16 @@ pub const shape_source = struct {
         const ress = try _allocator.alloc([1]res_union, self.*.__raw.?.__color_sets.len);
         defer _allocator.free(ress);
 
-        for (self.*.__raw.?.vertices, self.*.__raw.?.indices, self.*.__raw.?.__color_uniforms, self.*.__raw.?.__color_sets, _raw.vertices, _raw.indices, _raw.colors, ress) |*v, *i, *u, *s, vv, ii, cc, *r| {
+        for (
+            self.*.__raw.?.vertices,
+            self.*.__raw.?.indices,
+            self.*.__raw.?.__color_uniforms,
+            self.*.__raw.?.__color_sets,
+            _raw.vertices,
+            _raw.indices,
+            _raw.colors,
+            ress,
+        ) |*v, *i, *u, *s, vv, ii, cc, *r| {
             r.* = .{res_union{ .buf = u }};
             s.*.__res = r.*[0..r.*.len];
             v.* = vertices(shape_vertex_2d).init();
