@@ -190,7 +190,7 @@ pub fn loop() void {
             const maxf: u64 = @intFromFloat((1.0 * (1.0 / maxframe)) * 1000000000); //1 / (maxframe / 1); reduce division once
             if (maxf > _delta_time) {
                 if (ispause) {
-                    xfit.sleep(maxf - _delta_time); //wait state, accuracy is enough.
+                    std.time.sleep(maxf - _delta_time); //wait state, accuracy is enough.
                 } else {
                     xfit.sleep_ex(maxf - _delta_time);
                 }

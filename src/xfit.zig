@@ -327,39 +327,6 @@ pub inline fn sleep_ex(ns: u64) void {
         std.time.sleep(ns);
     }
 }
-pub fn sleep(ns: u64) void {
-    if (platform == .windows) {
-        std.os.windows.kernel32.Sleep(@intCast(ns / 1000000));
-    } else {
-        const s = ns / std.time.ns_per_s;
-        const ns_ = ns % std.time.ns_per_s;
-        if (builtin.os.tag == .linux) {
-            const linux = std.os.linux;
-
-            var req: linux.timespec = .{
-                .sec = std.math.cast(linux.time_t, s) orelse std.math.maxInt(linux.time_t),
-                .nsec = std.math.cast(linux.time_t, ns_) orelse std.math.maxInt(linux.time_t),
-            };
-            var rem: linux.timespec = undefined;
-
-            while (true) {
-                switch (linux.E.init(linux.clock_nanosleep(.MONOTONIC, .{ .ABSTIME = false }, &req, &rem))) {
-                    .SUCCESS => return,
-                    .INTR => {
-                        req = rem;
-                        continue;
-                    },
-                    .FAULT,
-                    .INVAL,
-                    .OPNOTSUPP,
-                    => unreachable,
-                    else => return,
-                }
-            }
-        }
-        std.posix.nanosleep(s, ns_);
-    }
-}
 
 pub inline fn console_pause() void {
     if (platform == .windows) {

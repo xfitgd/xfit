@@ -3,9 +3,13 @@ const xfit = @import("xfit.zig");
 
 const graphics = @import("graphics.zig");
 
+///for using non xfit dependency
+const CHECK_EXIT = true;
+const PRINT_ERROR = true;
+
 inline fn loop(wait_nanosec: u64, comptime function: anytype, args: anytype) bool {
-    xfit.sleep(wait_nanosec);
-    if (xfit.exiting()) return false;
+    std.time.sleep(wait_nanosec);
+    if (CHECK_EXIT and xfit.exiting()) return false;
     return callback_(function, args);
 }
 
@@ -14,11 +18,11 @@ fn callback_(comptime function: anytype, args: anytype) bool {
     if (res == .error_union) { // ? code from standard library Thread.zig
         if (res.error_union.payload == bool) {
             return @call(.auto, function, args) catch |err| {
-                xfit.herr3("timer_callback callback_", err);
+                if (PRINT_ERROR) xfit.herr3("timer_callback callback_", err);
             };
         } else {
             _ = @call(.auto, function, args) catch |err| {
-                xfit.herr3("timer_callback callback_", err);
+                if (PRINT_ERROR) xfit.herr3("timer_callback callback_", err);
             };
         }
     } else if (res == .bool) {
@@ -32,9 +36,9 @@ fn callback_(comptime function: anytype, args: anytype) bool {
 fn callback(wait_nanosec: u64, repeat: u64, comptime function: anytype, args: anytype) void {
     var re = repeat;
     if (re == 0) {
-        while (loop(wait_nanosec, function, args) and !xfit.exiting()) {}
+        while (loop(wait_nanosec, function, args) and (!CHECK_EXIT or !xfit.exiting())) {}
     } else {
-        while (re > 0 and loop(wait_nanosec, function, args) and !xfit.exiting()) : (re -= 1) {}
+        while (re > 0 and loop(wait_nanosec, function, args) and (!CHECK_EXIT or !xfit.exiting())) : (re -= 1) {}
     }
 }
 
@@ -53,9 +57,9 @@ fn callback2(
         if (!callback_(start_func, start_args)) return;
     }
     if (re == 0) {
-        while (loop(wait_nanosec, function, args) and !xfit.exiting()) {}
+        while (loop(wait_nanosec, function, args) and (!CHECK_EXIT or !xfit.exiting())) {}
     } else {
-        while (re > 0 and loop(wait_nanosec, function, args) and !xfit.exiting()) : (re -= 1) {}
+        while (re > 0 and loop(wait_nanosec, function, args) and (!CHECK_EXIT or !xfit.exiting())) : (re -= 1) {}
     }
     if (@TypeOf(end_func) != @TypeOf(null)) {
         _ = callback_(end_func, end_args);
