@@ -58,9 +58,6 @@ pub fn button_(_msaa: bool) type {
         shape: shape_(_msaa),
         area: iarea,
         state: button_state = .UP,
-        on_over: ?*const fn (user_data: *anyopaque, _mouse_pos: point) void = null,
-        on_down: ?*const fn (user_data: *anyopaque, _mouse_pos: point) void = null,
-        on_up: ?*const fn (user_data: *anyopaque, _mouse_pos: ?point) void = null,
         user_data: *anyopaque = undefined,
         _touch_idx: ?u32 = null,
         sets: []button_sets,
@@ -89,12 +86,13 @@ pub fn button_(_msaa: bool) type {
                 }
             }
         }
-        pub fn on_mouse_move(self: *Self, _mouse_pos: point) void {
+        ///callback can 'void'({})
+        pub fn on_mouse_move(self: *Self, _mouse_pos: point, comptime callback: anytype, args: anytype) void {
             if (self.area.rect.is_point_in(_mouse_pos)) {
                 if (self.state == .UP) {
                     self.state = .OVER;
                     self.update_color();
-                    if (self.on_over != null) self.on_over.?(self.*.user_data, _mouse_pos);
+                    if (@TypeOf(callback) != void) _ = @call(.auto, callback, args);
                 }
             } else {
                 if (self.state != .UP) {
@@ -103,20 +101,22 @@ pub fn button_(_msaa: bool) type {
                 }
             }
         }
-        pub fn on_mouse_down(self: *Self, _mouse_pos: point) void {
+        ///callback can 'void'({})
+        pub fn on_mouse_down(self: *Self, _mouse_pos: point, comptime callback: anytype, args: anytype) void {
             if (self.state == .UP) {
                 if (self.area.rect.is_point_in(_mouse_pos)) {
                     self.state = .DOWN;
                     self.update_color();
-                    if (self.on_down != null) self.on_down.?(self.*.user_data, _mouse_pos);
+                    if (@TypeOf(callback) != void) _ = @call(.auto, callback, args);
                 }
             } else if (self.state == .OVER) {
                 self.state = .DOWN;
                 self.update_color();
-                if (self.on_down != null) self.on_down.?(self.*.user_data, _mouse_pos);
+                if (@TypeOf(callback) != void) _ = @call(.auto, callback, args);
             }
         }
-        pub fn on_mouse_up(self: *Self, _mouse_pos: point) void {
+        ///callback can 'void'({})
+        pub fn on_mouse_up(self: *Self, _mouse_pos: point, comptime callback: anytype, args: anytype) void {
             if (self.state == .DOWN) {
                 if (self.area.rect.is_point_in(_mouse_pos)) {
                     self.state = .OVER;
@@ -124,39 +124,42 @@ pub fn button_(_msaa: bool) type {
                     self.state = .UP;
                 }
                 self.update_color();
-                if (self.on_up != null) self.on_up.?(self.*.user_data, _mouse_pos);
+                if (@TypeOf(callback) != void) _ = @call(.auto, callback, args);
             }
         }
-        pub fn on_touch_down(self: *Self, touch_idx: u32, _touch_pos: point) void {
+        ///callback can 'void'({})
+        pub fn on_touch_down(self: *Self, touch_idx: u32, _touch_pos: point, comptime callback: anytype, args: anytype) void {
             if (self.state == .UP) {
                 if (self.area.rect.is_point_in(_touch_pos)) {
                     self.state = .DOWN;
                     self.update_color();
                     self._touch_idx = touch_idx;
-                    if (self.on_down != null) self.on_down.?(self.*.user_data, _touch_pos);
+                    if (@TypeOf(callback) != void) _ = @call(.auto, callback, args);
                 }
             } else if (self._touch_idx != null and self._touch_idx.? == touch_idx) {
                 self.state = .UP;
                 self._touch_idx = null;
                 self.update_color();
-                if (self.on_up != null) self.on_up.?(self.*.user_data, _touch_pos);
             }
         }
-        pub fn on_touch_up(self: *Self, touch_idx: u32, _touch_pos: point) void {
+        ///callback can 'void'({})
+        pub fn on_touch_up(self: *Self, touch_idx: u32, _touch_pos: point, comptime callback: anytype, args: anytype) void {
+            _ = _touch_pos;
             if (self.state == .DOWN and self._touch_idx.? == touch_idx) {
                 self.state = .UP;
                 self._touch_idx = null;
                 self.update_color();
-                if (self.on_up != null) self.on_up.?(self.*.user_data, _touch_pos);
+                if (@TypeOf(callback) != void) _ = @call(.auto, callback, args);
             }
         }
-        pub fn on_touch_move(self: *Self, touch_idx: u32, _touch_pos: point) void {
+        ///callback can 'void'({})
+        pub fn on_touch_move(self: *Self, touch_idx: u32, _touch_pos: point, comptime callback: anytype, args: anytype) void {
             if (self.area.rect.is_point_in(_touch_pos)) {
                 if (self._touch_idx == null and self.state == .UP) {
                     self._touch_idx = touch_idx;
                     self.state = .OVER;
                     self.update_color();
-                    if (self.on_over != null) self.on_over.?(self.*.user_data, _touch_pos);
+                    if (@TypeOf(callback) != void) _ = @call(.auto, callback, args);
                 }
             } else if (self._touch_idx != null and self._touch_idx.? == touch_idx) {
                 self._touch_idx = null;

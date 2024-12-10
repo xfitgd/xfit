@@ -179,8 +179,10 @@ pub fn text_notify(text: []const u8) void {
         //TODO implement windows text notification
     } else if (xfit.platform == .android) {
         //TODO implement android text notification
+    } else if (xfit.platform == .linux) {
+        //TODO implement linux text notification
     } else {
-        if (!xfit.__xfit_test) @compileError("not support platform");
+        @compileError("not support platform");
     }
 }
 
