@@ -601,6 +601,15 @@ pub fn linux_loop() void {
                 }
             },
             c.KeyRelease => {
+                //https://stackoverflow.com/questions/2100654/ignore-auto-repeat-in-x11-applications
+                if (c.XEventsQueued(display, c.QueuedAfterReading) != 0) {
+                    var nev: c.XEvent = undefined;
+                    _ = c.XPeekEvent(display, &nev);
+
+                    if (nev.type == c.KeyPress and nev.xkey.time == event.xkey.time and nev.xkey.keycode == event.xkey.keycode) {
+                        continue;
+                    }
+                }
                 const keyr = c.XLookupKeysym(&event.xkey, 0);
                 if (keyr > 0xffff) continue;
                 var keyv: u16 = @intCast(keyr);
