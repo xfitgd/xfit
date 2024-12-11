@@ -19,10 +19,14 @@ const __render_command = @import("__render_command.zig");
 
 pub const MAX_FRAME: usize = 3;
 
+pub var mutex: std.Thread.Mutex = .{};
+
 __refesh: [MAX_FRAME]bool = .{true} ** MAX_FRAME,
 __command_buffers: [MAX_FRAME][]vk.CommandBuffer = undefined,
 scene: ?[]*graphics.iobject = null,
 offscreen_image: ?*graphics.image = null,
+///!you have to lock this add or modify iobject 'scene'
+objs_mutex: std.Thread.Mutex = .{},
 const Self = @This();
 
 pub fn init() *Self {
@@ -30,8 +34,8 @@ pub fn init() *Self {
         xfit.herrm("__system.allocator.create render_command");
     self.* = .{};
     __vulkan.load_instance_and_device();
-    __render_command.mutex.lock();
-    defer __render_command.mutex.unlock();
+    mutex.lock();
+    defer mutex.unlock();
 
     for (&self.*.__command_buffers) |*cmd| {
         cmd.* = __system.allocator.alloc(vk.CommandBuffer, __vulkan.get_swapchain_image_length()) catch
@@ -77,14 +81,14 @@ pub fn deinit(self: *Self) void {
         __system.allocator.free(cmd.*);
     }
     var i: usize = 0;
-    __render_command.mutex.lock();
+    mutex.lock();
     while (i < __render_command.render_cmd_list.?.items.len) : (i += 1) {
         if (__render_command.render_cmd_list.?.items[i] == self) {
             _ = __render_command.render_cmd_list.?.orderedRemove(i);
             break;
         }
     }
-    __render_command.mutex.unlock();
+    mutex.unlock();
     __system.allocator.destroy(self);
 }
 

@@ -457,6 +457,8 @@ fn cleanup_sync_object() void {
 
 var shape_list: ArrayList(*graphics.iobject) = undefined;
 
+var cmd_executed = false;
+
 fn recordCommandBuffer(commandBuffer: **render_command, fr: u32) void {
     if (commandBuffer.*.scene == null or commandBuffer.*.scene.?.len == 0) {
         return;
@@ -495,7 +497,19 @@ fn recordCommandBuffer(commandBuffer: **render_command, fr: u32) void {
         vkd.?.cmdSetScissor(cmd, 0, 1, @ptrCast(&scissor));
 
         shape_list.resize(0) catch unreachable;
-        for (commandBuffer.*.*.scene.?) |value| {
+
+        commandBuffer.*.*.objs_mutex.lock();
+        const objs = __system.allocator.dupe(*graphics.iobject, commandBuffer.*.*.scene.?) catch unreachable;
+        commandBuffer.*.*.objs_mutex.unlock();
+        defer __system.allocator.free(objs);
+
+        if (__system.cmd_op_wait.load(.acquire)) {
+            __system.cmd_op_wait.store(false, .release);
+            __vulkan_allocator.execute_and_wait_all_op();
+            cmd_executed = true;
+        }
+
+        for (objs) |value| {
             if (!value.*.is_shape_type()) {
                 value.*.__draw(cmd);
             } else {
@@ -2165,12 +2179,13 @@ pub fn drawFrame() void {
         }
         imageIndex = acquireNextImageKHR_result.image_index;
 
-        const cmds = std.heap.c_allocator.alloc(vk.CommandBuffer, graphics.render_cmd.?.len + 1) catch xfit.herrm("drawframe cmds alloc");
-        defer std.heap.c_allocator.free(cmds);
+        const cmds = __system.allocator.alloc(vk.CommandBuffer, graphics.render_cmd.?.len + 1) catch xfit.herrm("drawframe cmds alloc");
+        defer __system.allocator.free(cmds);
 
         cmds[0] = vkCommandBuffer[state.frame];
         var cmdidx: usize = 1;
 
+        render_command.mutex.lock();
         for (graphics.render_cmd.?) |*cmd| {
             if (@cmpxchgStrong(bool, &cmd.*.*.__refesh[state.frame], true, false, .monotonic, .monotonic) == null) {
                 recordCommandBuffer(cmd, @intCast(state.frame));
@@ -2179,6 +2194,13 @@ pub fn drawFrame() void {
                 cmds[cmdidx] = cmd.*.*.__command_buffers[state.frame][imageIndex];
                 cmdidx += 1;
             }
+        }
+        render_command.mutex.unlock();
+
+        if (!cmd_executed and __vulkan_allocator.execute_all_cmd_per_update.load(.monotonic)) {
+            __vulkan_allocator.execute_all_op();
+        } else {
+            cmd_executed = false;
         }
 
         const waitStages: vk.PipelineStageFlags = .{ .color_attachment_output_bit = true };
@@ -2219,7 +2241,6 @@ pub fn drawFrame() void {
 
         __vulkan_allocator.submit_mutex.lock();
         vkd.?.queueSubmit(vkGraphicsQueue, 1, @ptrCast(&submitInfo), vkInFlightFence[state.frame]) catch |e| xfit.herr3("__vulkan.drawFrame.queueSubmit", e);
-        __vulkan_allocator.submit_mutex.unlock();
 
         const swapChains = [_]vk.SwapchainKHR{vkSwapchain};
 
@@ -2230,7 +2251,6 @@ pub fn drawFrame() void {
             .p_swapchains = @ptrCast(&swapChains),
             .p_image_indices = @ptrCast(&imageIndex),
         };
-        __vulkan_allocator.submit_mutex.lock();
         const queuePresentKHR_result = vkd.?.queuePresentKHR(vkPresentQueue, &presentInfo) catch |e| {
             if (e == error.OutOfDateKHR) {
                 __vulkan_allocator.submit_mutex.unlock();
@@ -2394,9 +2414,13 @@ pub fn wait_device_idle() void {
     vkd.?.deviceWaitIdle() catch |e| xfit.herr3("__vulkan.deviceWaitIdle", e);
 }
 pub fn wait_graphics_idle() void {
+    __vulkan_allocator.submit_mutex.lock();
+    defer __vulkan_allocator.submit_mutex.unlock();
     vkd.?.queueWaitIdle(vkGraphicsQueue) catch |e| xfit.herr3("__vulkan.queueWaitIdle vkGraphicsQueue", e);
 }
 pub fn wait_present_idle() void {
+    __vulkan_allocator.submit_mutex.lock();
+    defer __vulkan_allocator.submit_mutex.unlock();
     vkd.?.queueWaitIdle(vkPresentQueue) catch |e| xfit.herr3("__vulkan.queueWaitIdle vkPresentQueue", e);
 }
 

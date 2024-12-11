@@ -147,6 +147,7 @@ pub var primary_monitor: *system.monitor_info = undefined;
 pub var current_monitor: ?*const system.monitor_info = null;
 
 pub var general_input_callback: ?input.general_input.CallbackFn = null;
+pub var cmd_op_wait: std.atomic.Value(bool) = std.atomic.Value(bool).init(false);
 
 pub fn init(_allocator: std.mem.Allocator, init_setting: *const xfit.init_setting) void {
     allocator = _allocator;
@@ -206,19 +207,12 @@ pub fn loop() void {
         };
     }
 
-    if (__vulkan_allocator.execute_all_cmd_per_update.load(.monotonic)) {
-        __vulkan_allocator.execute_all_op();
-    }
-
     if (!ispause) {
         __vulkan.drawFrame();
     }
 }
 
 pub fn destroy() void {
-    for (monitors.items) |*value| {
-        std.heap.c_allocator.free(value.*.name);
-    }
     monitors.deinit();
     allocator.free(title);
 }

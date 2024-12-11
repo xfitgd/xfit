@@ -31,6 +31,7 @@ __char_array: AutoHashMap(u21, char_data),
 __face: freetype.FT_Face = null,
 scale: f32 = scale_default,
 mutex: std.Thread.Mutex = .{},
+arena_allocator: *std.heap.ArenaAllocator,
 const scale_default: f32 = 256;
 
 fn handle_error(code: freetype.FT_Error) void {
@@ -54,8 +55,11 @@ pub fn init(_font_data: []const u8, _face_index: u32) !Self {
         start();
     }
     var font: Self = .{
-        .__char_array = AutoHashMap(u21, char_data).init(__system.allocator),
+        .arena_allocator = try __system.allocator.create(std.heap.ArenaAllocator),
+        .__char_array = undefined,
     };
+    font.arena_allocator.* = std.heap.ArenaAllocator.init(__system.allocator);
+    font.__char_array = AutoHashMap(u21, char_data).init(font.arena_allocator.allocator());
     const err = freetype.FT_New_Memory_Face(library, _font_data.ptr, @intCast(_font_data.len), @intCast(_face_index), &font.__face);
     if (err != freetype.FT_Err_Ok) {
         return font_error.load_error;
@@ -67,13 +71,8 @@ pub fn init(_font_data: []const u8, _face_index: u32) !Self {
 pub fn deinit(self: *Self) void {
     self.*.mutex.lock();
     defer self.*.mutex.unlock();
-    var it = self.*.__char_array.valueIterator();
-    while (it.next()) |v| {
-        if (v.*.raw_p != null) {
-            v.*.raw_p.?.deinit(__system.allocator);
-        }
-    }
-    self.*.__char_array.deinit();
+    self.arena_allocator.deinit();
+    __system.allocator.destroy(self.arena_allocator);
 }
 
 pub fn clear_char_array(self: *Self) void {
@@ -187,6 +186,7 @@ pub fn render_string2(_str: []const u8, _render_option: render_option2, allocato
     raw.colors = colorlist.items;
     const src = try allocator.create(graphics.shape_source);
     src.* = graphics.shape_source.init();
+    errdefer allocator.destroy(src);
     try src.*.build(allocator, raw, _render_option.option.flag, _render_option.option.color_flag);
     return src;
 }
@@ -349,7 +349,7 @@ fn _render_char(self: *Self, char: u21, _vertex_array: *[]graphics.shape_vertex_
                 poly.nodes[0].stroke_color = null;
                 poly.nodes[0].thickness = 0;
 
-                char_d2.raw_p = try poly.compute_polygon(__system.allocator); //높은 부하 작업 High load operations
+                char_d2.raw_p = try poly.compute_polygon(self.arena_allocator.allocator()); //높은 부하 작업 High load operations
             }
         }
         self.*.mutex.lock();
@@ -357,7 +357,7 @@ fn _render_char(self: *Self, char: u21, _vertex_array: *[]graphics.shape_vertex_
         char_d2.advance[1] = @as(f32, @floatFromInt(self.*.__face.*.glyph.*.advance.y)) / (64.0 * self.*.scale);
 
         self.*.__char_array.put(res, char_d2) catch |e| {
-            char_d2.raw_p.?.deinit(__system.allocator);
+            char_d2.raw_p.?.deinit(self.arena_allocator.allocator());
             return e;
         };
         char_d = &char_d2;

@@ -105,8 +105,6 @@ fn render_func() void {
         };
     }
 
-    __vulkan_allocator.execute_and_wait_all_op();
-
     while (!xfit.exiting()) {
         __system.loop();
     }
@@ -681,4 +679,8 @@ pub fn linux_close() void {
 
 pub fn linux_destroy() void {
     _ = c.XCloseDisplay(display);
+
+    for (__system.monitors.items) |m| {
+        std.heap.c_allocator.free(m.name);
+    }
 }

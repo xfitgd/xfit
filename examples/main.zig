@@ -302,23 +302,23 @@ pub fn xfit_init() !void {
 }
 
 fn mouse_move(pos: math.point) void {
-    g_rect_button.on_mouse_move(pos);
+    g_rect_button.on_mouse_move(pos, {}, .{});
 }
 fn mouse_down(pos: math.point) void {
-    g_rect_button.on_mouse_down(pos);
+    g_rect_button.on_mouse_down(pos, {}, .{});
 }
 fn mouse_up(pos: math.point) void {
-    g_rect_button.on_mouse_up(pos);
+    g_rect_button.on_mouse_up(pos, {}, .{});
 }
 
 fn touch_down(touch_idx: u32, pos: math.point) void {
-    g_rect_button.on_touch_down(touch_idx, pos);
+    g_rect_button.on_touch_down(touch_idx, pos, {}, .{});
 }
 fn touch_up(touch_idx: u32, pos: math.point) void {
-    g_rect_button.on_touch_up(touch_idx, pos);
+    g_rect_button.on_touch_up(touch_idx, pos, {}, .{});
 }
 fn touch_move(touch_idx: u32, pos: math.point) void {
-    g_rect_button.on_touch_move(touch_idx, pos);
+    g_rect_button.on_touch_move(touch_idx, pos, {}, .{});
 }
 
 var image_front: bool = false;
