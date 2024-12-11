@@ -293,22 +293,27 @@ const operation_node = union(enum) {
         res: *vulkan_res,
         address: []const u8,
         ires: res_union,
+        allocated: ?std.mem.Allocator = null,
     },
     copy_buffer: struct {
         src: *vulkan_res_node(.buffer),
         target: *vulkan_res_node(.buffer),
+        //allocated: ?std.mem.Allocator = null,
     },
     copy_buffer_to_image: struct {
         src: *vulkan_res_node(.buffer),
         target: *vulkan_res_node(.texture),
+        //allocated: ?std.mem.Allocator = null,
     },
     create_buffer: struct {
         buf: *vulkan_res_node(.buffer),
         data: ?[]const u8,
+        allocated: ?std.mem.Allocator = null,
     },
     create_texture: struct {
         buf: *vulkan_res_node(.texture),
         data: ?[]const u8,
+        allocated: ?std.mem.Allocator = null,
     },
     destroy_buffer: struct {
         buf: *vulkan_res_node(.buffer),
@@ -355,13 +360,15 @@ pub const res_union = union(enum) {
     }
 };
 
+const MAX_RES_UNION = 5;
+
 pub const descriptor_set = struct {
     layout: vk.DescriptorSetLayout,
     ///created inside update_descriptor_sets call
     __set: vk.DescriptorSet = .null_handle,
     size: []const descriptor_pool_size,
     bindings: []const c_uint,
-    __res: []res_union = undefined,
+    __res: [MAX_RES_UNION]res_union = undefined,
 };
 
 pub fn update_descriptor_sets(sets: []descriptor_set) void {
@@ -399,7 +406,7 @@ pub const frame_buffer = struct {
     }
 };
 
-fn execute_create_buffer(buf: *vulkan_res_node(.buffer), _data: ?[]const u8) void {
+fn execute_create_buffer(buf: *vulkan_res_node(.buffer), _data: ?[]const u8, allocated: ?std.mem.Allocator) void {
     if (buf.*.buffer_option.typ == .staging) {
         buf.*.buffer_option.use = .cpu;
         buf.*.buffer_option.single = false;
@@ -434,7 +441,7 @@ fn execute_create_buffer(buf: *vulkan_res_node(.buffer), _data: ?[]const u8) voi
             .typ = .staging,
             .single = false,
             .use_gcpu_mem = !buf.*.buffer_option.single,
-        }, _data);
+        }, _data, allocated);
     } else if (buf.*.buffer_option.typ == .staging) {
         if (_data == null) xfit.herrm("staging buffer data can't null");
     }
@@ -453,6 +460,7 @@ fn execute_create_buffer(buf: *vulkan_res_node(.buffer), _data: ?[]const u8) voi
                     .res = res,
                     .address = _data.?,
                     .ires = .{ .buf = buf },
+                    .allocated = allocated,
                 },
             });
         } else {
@@ -525,7 +533,7 @@ fn execute_copy_buffer_to_image(src: *vulkan_res_node(.buffer), target: *vulkan_
     __vulkan.vkd.?.cmdCopyBufferToImage(cmd, src.*.res, target.*.res, .transfer_dst_optimal, 1, @ptrCast(&region));
     __vulkan.transition_image_layout(cmd, target.*.res, 1, 0, target.*.texture_option.len, .transfer_dst_optimal, .shader_read_only_optimal);
 }
-fn execute_create_texture(buf: *vulkan_res_node(.texture), _data: ?[]const u8) void {
+fn execute_create_texture(buf: *vulkan_res_node(.texture), _data: ?[]const u8, allocated: ?std.mem.Allocator) void {
     const prop: vk.MemoryPropertyFlags = switch (buf.*.texture_option.use) {
         .gpu => .{ .device_local_bit = true },
         .cpu => .{ .host_cached_bit = true, .host_visible_bit = true },
@@ -608,7 +616,7 @@ fn execute_create_texture(buf: *vulkan_res_node(.texture), _data: ?[]const u8) v
             .typ = .staging,
             .single = false,
             .use_gcpu_mem = !buf.*.texture_option.single,
-        }, _data);
+        }, _data, allocated);
     }
     buf.*.res = __vulkan.vkd.?.createImage(&img_info, null) catch |e| xfit.herr3("execute_create_texture vkCreateImage", e);
 
@@ -639,6 +647,7 @@ fn execute_create_texture(buf: *vulkan_res_node(.texture), _data: ?[]const u8) v
                     .res = res,
                     .address = _data.?,
                     .ires = .{ .tex = buf },
+                    .allocated = allocated,
                 },
             });
         } else {
@@ -707,10 +716,15 @@ fn execute_update_descriptor_sets(sets: []descriptor_set) void {
             __vulkan.vkd.?.allocateDescriptorSets(&alloc_info, @ptrCast(&v.*.__set)) catch |e| xfit.herr3("execute_update_descriptor_sets allocateDescriptorSets", e);
         }
 
+        var cnt: usize = 0;
         var buf_cnt: usize = 0;
         var img_cnt: usize = 0;
         //v.res array must match v.size configuration.
-        for (v.__res) |r| {
+        for (v.size) |s| {
+            cnt += s.cnt;
+        }
+
+        for (v.__res[0..cnt]) |r| {
             if (r == .buf) {
                 buf_cnt += 1;
             } else if (r == .tex) {
@@ -721,7 +735,8 @@ fn execute_update_descriptor_sets(sets: []descriptor_set) void {
         const imgs = aallocator.alloc(vk.DescriptorImageInfo, img_cnt) catch unreachable;
         buf_cnt = 0;
         img_cnt = 0;
-        for (v.__res) |r| {
+
+        for (v.__res[0..cnt]) |r| {
             if (r == .buf) {
                 bufs[buf_cnt] = .{
                     .buffer = r.buf.*.res,
@@ -829,8 +844,8 @@ fn thread_func() void {
                 const data = slice.items(.data);
                 switch (tags[i]) {
                     //create.. execution, map_copy command can be added.
-                    .create_buffer => execute_create_buffer(data[i].create_buffer.buf, data[i].create_buffer.data),
-                    .create_texture => execute_create_texture(data[i].create_texture.buf, data[i].create_texture.data),
+                    .create_buffer => execute_create_buffer(data[i].create_buffer.buf, data[i].create_buffer.data, data[i].create_buffer.allocated),
+                    .create_texture => execute_create_texture(data[i].create_texture.buf, data[i].create_texture.data, data[i].create_texture.allocated),
                     .__register_descriptor_pool => execute_register_descriptor_pool(data[i].__register_descriptor_pool.__size),
                     else => {
                         continue;
@@ -979,11 +994,11 @@ fn append_op(node: operation_node) void {
     mutex.lock();
     defer mutex.unlock();
 
-    if (node == .__update_descriptor_sets) {
-        for (node.__update_descriptor_sets.sets) |*v| {
-            v.*.__res = aallocator.dupe(res_union, v.*.__res) catch unreachable;
-        }
-    }
+    // if (node == .__update_descriptor_sets) {
+    //     for (node.__update_descriptor_sets.sets) |*v| {
+    //         v.*.__res = aallocator.dupe(res_union, v.*.__res) catch unreachable;
+    //     }
+    // }
     op_queue.append(__system.allocator, node) catch xfit.herrm("self.op_queue.append");
 }
 fn append_op_save(node: operation_node) void {
@@ -1019,8 +1034,8 @@ pub fn vulkan_res_node(_res_type: res_type) type {
             if (_res_type == .buffer) {
                 self.*.buffer_option = option;
                 self.*.builded = true;
-                const map_data = aallocator.dupe(u8, _data) catch unreachable;
-                append_op(.{ .create_buffer = .{ .buf = self, .data = map_data } });
+                const map_data = __system.allocator.dupe(u8, _data) catch unreachable;
+                append_op(.{ .create_buffer = .{ .buf = self, .data = map_data, .allocated = __system.allocator } });
             } else {
                 @compileError("_res_type need buffer");
             }
@@ -1040,17 +1055,17 @@ pub fn vulkan_res_node(_res_type: res_type) type {
                 self.*.sampler = _sampler;
                 self.*.texture_option = option;
                 self.*.builded = true;
-                const map_data = aallocator.dupe(u8, _data) catch unreachable;
-                append_op(.{ .create_texture = .{ .buf = self, .data = map_data, .allocated = true } });
+                const map_data = __system.allocator.dupe(u8, _data) catch unreachable;
+                append_op(.{ .create_texture = .{ .buf = self, .data = map_data, .allocated = __system.allocator } });
             } else {
                 @compileError("_res_type need image");
             }
         }
-        fn __create_buffer(self: *vulkan_res_node_Self, option: buffer_create_option, _data: ?[]const u8) void {
+        fn __create_buffer(self: *vulkan_res_node_Self, option: buffer_create_option, _data: ?[]const u8, allocated: ?std.mem.Allocator) void {
             if (_res_type == .buffer) {
                 self.*.buffer_option = option;
                 self.*.builded = true;
-                execute_create_buffer(self, _data);
+                execute_create_buffer(self, _data, allocated);
             } else {
                 @compileError("_res_type need buffer");
             }
@@ -1072,7 +1087,7 @@ pub fn vulkan_res_node(_res_type: res_type) type {
                 @compileError("_res_type need image");
             }
         }
-        fn map_copy(self: *vulkan_res_node_Self, _out_data: []const u8) void {
+        fn map_copy(self: *vulkan_res_node_Self, _out_data: []const u8, allocated: ?std.mem.Allocator) void {
             if (self.*.pvulkan_buffer == null) return;
             if (_res_type == .buffer) {
                 append_op(.{
@@ -1080,6 +1095,7 @@ pub fn vulkan_res_node(_res_type: res_type) type {
                         .res = self.*.pvulkan_buffer.?,
                         .ires = .{ .buf = self },
                         .address = _out_data,
+                        .allocated = allocated,
                     },
                 });
             } else if (_res_type == .texture) {
@@ -1106,8 +1122,13 @@ pub fn vulkan_res_node(_res_type: res_type) type {
         // }
         ///! unlike copy_update, _data cannot be a temporary variable.
         pub fn map_update(self: *vulkan_res_node_Self, _data: anytype) void {
-            const u8data = mem.obj_to_u8arrC(_data);
-            self.*.map_copy(u8data);
+            var u8data: []const u8 = undefined;
+            if (@typeInfo(@TypeOf(_data)) == .pointer and @typeInfo(@TypeOf(_data)).pointer.size == .One) {
+                u8data = @as([*]const u8, @ptrCast(_data))[0..@sizeOf(@TypeOf(_data.*))];
+            } else {
+                u8data = std.mem.sliceAsBytes(_data);
+            }
+            self.*.map_copy(u8data, null);
         }
         pub fn copy_update(self: *vulkan_res_node_Self, _data: anytype) void {
             var u8data: []const u8 = undefined;
@@ -1117,9 +1138,9 @@ pub fn vulkan_res_node(_res_type: res_type) type {
                 u8data = std.mem.sliceAsBytes(_data);
             }
 
-            const map_data = aallocator.dupe(u8, u8data) catch unreachable;
+            const map_data = __system.allocator.dupe(u8, u8data) catch unreachable;
 
-            self.*.map_copy(map_data);
+            self.*.map_copy(map_data, __system.allocator);
         }
         pub fn clean(self: *vulkan_res_node_Self, callback: ?*const fn (caller: *anyopaque) void, data: anytype) void {
             self.*.builded = false;
@@ -1257,6 +1278,9 @@ const vulkan_res = struct {
             const st = (nd.*.data.idx) * self.*.cell_size - self.*.map_start;
             //const en = (nd.*.data.idx + nd.*.data.size - start) * self.*.cell_size;
             @memcpy(self.*.map_data[st..(st + copy.address.len)], copy.address[0..copy.address.len]);
+            if (v.map_copy.allocated != null) {
+                v.map_copy.allocated.?.free(copy.address);
+            }
         }
         if (self.*.cached) {
             __vulkan.vkd.?.flushMappedMemoryRanges(@intCast(ranges.len), ranges.ptr) catch unreachable;

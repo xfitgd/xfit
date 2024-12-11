@@ -500,7 +500,7 @@ pub const texture = struct {
             .use_gcpu_mem = false,
         }, self.sampler, self.pixels.?);
         var __set_res: [1]res_union = .{.{ .tex = &self.__image }};
-        self.__set.__res = __set_res[0..1];
+        @memcpy(self.*.__set.__res[0..1], __set_res[0..1]);
         __vulkan_allocator.update_descriptor_sets((&self.__set)[0..1]);
     }
     pub inline fn deinit(self: *Self) void {
@@ -570,7 +570,7 @@ pub const texture_array = struct {
             .use_gcpu_mem = use_gcpu_mem,
         }, self.sampler, self.pixels.?);
         var __set_res: [1]res_union = .{.{ .tex = &self.__image }};
-        self.__set.__res = __set_res[0..1];
+        @memcpy(self.*.__set.__res[0..1], __set_res[0..1]);
         __vulkan_allocator.update_descriptor_sets((&self.__set)[0..1]);
     }
 
@@ -650,7 +650,7 @@ pub const tile_texture_array = struct {
             .use_gcpu_mem = use_gcpu_mem,
         }, self.sampler, self.alloc_pixels);
         var __set_res: [1]res_union = .{.{ .tex = &self.__image }};
-        self.__set.__res = __set_res[0..1];
+        @memcpy(self.*.__set.__res[0..1], __set_res[0..1]);
         __vulkan_allocator.update_descriptor_sets((&self.__set)[0..1]);
     }
 
@@ -712,8 +712,6 @@ pub const shape_source = struct {
             .size = single_uniform_pool_sizes[0..1],
             .layout = __vulkan.quad_shape_2d_pipeline_set.descriptorSetLayout,
         });
-        const ress = try _allocator.alloc([1]res_union, self.*.__raw.?.__color_sets.len);
-        defer _allocator.free(ress);
 
         for (
             self.*.__raw.?.vertices,
@@ -723,10 +721,8 @@ pub const shape_source = struct {
             _raw.vertices,
             _raw.indices,
             _raw.colors,
-            ress,
-        ) |*v, *i, *u, *s, vv, ii, cc, *r| {
-            r.* = .{res_union{ .buf = u }};
-            s.*.__res = r.*[0..r.*.len];
+        ) |*v, *i, *u, *s, vv, ii, cc| {
+            s.*.__res[0] = .{ .buf = u };
             v.* = vertices(shape_vertex_2d).init();
             i.* = indices32.init();
             v.*.build(vv, _flag);
@@ -816,7 +812,7 @@ pub fn shape_(_msaa: bool) type {
                 .{ .buf = &self.*.transform.camera.*.__uniform },
                 .{ .buf = &self.*.transform.projection.*.__uniform },
             };
-            self.*.__set.__res = __set_res[0..3];
+            @memcpy(self.*.__set.__res[0..3], __set_res[0..3]);
             __vulkan_allocator.update_descriptor_sets((&self.*.__set)[0..1]);
         }
         pub fn build(self: *Self) void {
@@ -918,7 +914,7 @@ pub const image = struct {
             .{ .buf = &self.*.transform.projection.*.__uniform },
             .{ .buf = &self.*.color_tran.*.__uniform },
         };
-        self.*.__set.__res = __set_res[0..4];
+        @memcpy(self.*.__set.__res[0..4], __set_res[0..4]);
         __vulkan_allocator.update_descriptor_sets((&self.*.__set)[0..1]);
     }
     pub fn build(self: *Self) void {
@@ -1045,7 +1041,7 @@ pub const animate_image = struct {
             .{ .buf = &self.*.color_tran.*.__uniform },
             .{ .buf = &self.*.__frame_uniform },
         };
-        self.*.__set.__res = __set_res[0..5];
+        @memcpy(self.*.__set.__res[0..5], __set_res[0..5]);
         __vulkan_allocator.update_descriptor_sets((&self.*.__set)[0..1]);
     }
     pub fn build(self: *Self) void {
@@ -1132,7 +1128,7 @@ pub const tile_image = struct {
             .{ .buf = &self.*.color_tran.*.__uniform },
             .{ .buf = &self.*.__tile_uniform },
         };
-        self.*.__set.__res = __set_res[0..5];
+        @memcpy(self.*.__set.__res[0..5], __set_res[0..5]);
         __vulkan_allocator.update_descriptor_sets((&self.*.__set)[0..1]);
     }
     pub fn build(self: *Self) void {
