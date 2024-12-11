@@ -26,7 +26,7 @@ const EXAMPLES = enum(usize) {
 };
 
 fn callback(b: *std.Build, result: *std.Build.Step.Compile, target: std.Build.ResolvedTarget) void {
-    //TODO add user custom library and etc.. here.
+    //TODO Add custom libraries, windows resources, etc. here.
     _ = b;
     _ = result;
     _ = target;
