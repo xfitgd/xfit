@@ -148,6 +148,8 @@ const iobject_type = enum {
     _tile_image,
     _pixel_shape,
     _pixel_button,
+    _group,
+    _shape_group,
     //_sprite_image,
 };
 pub const iobject = union(iobject_type) {
@@ -159,47 +161,59 @@ pub const iobject = union(iobject_type) {
     _tile_image: tile_image,
     _pixel_shape: pixel_shape,
     _pixel_button: components.pixel_button,
+    _group: group,
+    _shape_group: shape_group,
 
     pub inline fn deinit(self: *Self) void {
         switch (self.*) {
+            inline ._group, ._shape_group => unreachable,
             inline else => |*case| case.*.deinit(),
         }
     }
     pub inline fn deinit_callback(self: *Self, callback: ?*const fn (caller: *anyopaque) void, data: anytype) void {
         switch (self.*) {
+            inline ._group, ._shape_group => unreachable,
             inline else => |*case| case.*.deinit_callback(callback, data),
         }
     }
     pub inline fn build(self: *Self) void {
         switch (self.*) {
+            inline ._group, ._shape_group => unreachable,
             inline else => |*case| case.*.build(),
         }
     }
     pub inline fn update_uniforms(self: *Self) void {
         switch (self.*) {
+            inline ._group, ._shape_group => unreachable,
             inline else => |*case| case.*.update_uniforms(),
         }
     }
     pub inline fn update(self: *Self) void {
         switch (self.*) {
             inline ._button, ._pixel_button => |*case| case.*.update(),
+            inline ._group, ._shape_group => unreachable,
             else => {},
         }
     }
-    pub inline fn __draw(self: *Self, cmd: vk.CommandBuffer) void {
+    pub inline fn draw(self: *Self, cmd: usize) void {
         switch (self.*) {
-            inline else => |*case| case.*.__draw(cmd),
+            inline ._group, ._shape_group => unreachable,
+            inline else => |*case| case.*.draw(cmd),
         }
     }
-    pub inline fn ptransform(self: *Self) *transform {
+    pub fn ptransform(self: *Self) *transform {
         return switch (self.*) {
             inline ._button, ._pixel_button => |*case| &case.*.shape.transform,
+            inline ._group, ._shape_group => |*case| case.*.main.?.*.ptransform(),
             inline else => |*case| &case.*.transform,
         };
     }
     pub inline fn is_shape_type(self: *Self) bool {
         return switch (self.*) {
-            ._shape, ._button => true,
+            ._shape,
+            ._button,
+            ._shape_group,
+            => true,
             else => false,
         };
     }
@@ -830,15 +844,15 @@ pub fn shape_(_msaa: bool) type {
         pub fn deinit_callback(self: *Self, callback: ?*const fn (caller: *anyopaque) void, data: anytype) void {
             self.*.transform.__deinit(callback, data);
         }
-        pub fn __draw(self: *Self, cmd: vk.CommandBuffer) void {
+        pub fn draw(self: *Self, cmd: usize) void {
             self.*.transform.__check_init.check_inited();
             __vulkan.load_instance_and_device();
             const raw = self.*.src.*.__raw.?;
             for (raw.vertices, raw.indices, raw.__color_sets) |v, i, s| {
-                __vulkan.vkd.?.cmdBindPipeline(cmd, .graphics, if (_msaa) __vulkan.shape_color_2d_pipeline_set.pipeline else __vulkan.pixel_shape_color_2d_pipeline_set.pipeline);
+                __vulkan.vkd.?.cmdBindPipeline(@enumFromInt(cmd), .graphics, if (_msaa) __vulkan.shape_color_2d_pipeline_set.pipeline else __vulkan.pixel_shape_color_2d_pipeline_set.pipeline);
 
                 __vulkan.vkd.?.cmdBindDescriptorSets(
-                    cmd,
+                    @enumFromInt(cmd),
                     .graphics,
                     __vulkan.shape_color_2d_pipeline_set.pipelineLayout,
                     0,
@@ -849,11 +863,11 @@ pub fn shape_(_msaa: bool) type {
                 );
 
                 const offsets: vk.DeviceSize = 0;
-                __vulkan.vkd.?.cmdBindVertexBuffers(cmd, 0, 1, @ptrCast(&v.node.res), @ptrCast(&offsets));
+                __vulkan.vkd.?.cmdBindVertexBuffers(@enumFromInt(cmd), 0, 1, @ptrCast(&v.node.res), @ptrCast(&offsets));
 
-                __vulkan.vkd.?.cmdBindIndexBuffer(cmd, i.node.res, 0, .uint32);
+                __vulkan.vkd.?.cmdBindIndexBuffer(@enumFromInt(cmd), i.node.res, 0, .uint32);
                 __vulkan.vkd.?.cmdDrawIndexed(
-                    cmd,
+                    @enumFromInt(cmd),
                     i.node.buffer_option.len / get_idx_type_size(i.idx_type),
                     1,
                     0,
@@ -861,10 +875,10 @@ pub fn shape_(_msaa: bool) type {
                     0,
                 );
 
-                __vulkan.vkd.?.cmdBindPipeline(cmd, .graphics, if (_msaa) __vulkan.quad_shape_2d_pipeline_set.pipeline else __vulkan.pixel_quad_shape_2d_pipeline_set.pipeline);
+                __vulkan.vkd.?.cmdBindPipeline(@enumFromInt(cmd), .graphics, if (_msaa) __vulkan.quad_shape_2d_pipeline_set.pipeline else __vulkan.pixel_quad_shape_2d_pipeline_set.pipeline);
 
                 __vulkan.vkd.?.cmdBindDescriptorSets(
-                    cmd,
+                    @enumFromInt(cmd),
                     .graphics,
                     __vulkan.quad_shape_2d_pipeline_set.pipelineLayout,
                     0,
@@ -873,7 +887,7 @@ pub fn shape_(_msaa: bool) type {
                     0,
                     null,
                 );
-                __vulkan.vkd.?.cmdDraw(cmd, 6, 1, 0, 0);
+                __vulkan.vkd.?.cmdDraw(@enumFromInt(cmd), 6, 1, 0, 0);
             }
         }
     };
@@ -928,14 +942,14 @@ pub const image = struct {
         self.*.update_uniforms();
         __system.cmd_op_wait.store(true, .release);
     }
-    pub fn __draw(self: *Self, cmd: vk.CommandBuffer) void {
+    pub fn draw(self: *Self, cmd: usize) void {
         self.*.transform.__check_init.check_inited();
         self.*.src.*.__check_init.check_inited();
         __vulkan.load_instance_and_device();
-        __vulkan.vkd.?.cmdBindPipeline(cmd, .graphics, __vulkan.tex_2d_pipeline_set.pipeline);
+        __vulkan.vkd.?.cmdBindPipeline(@enumFromInt(cmd), .graphics, __vulkan.tex_2d_pipeline_set.pipeline);
 
         __vulkan.vkd.?.cmdBindDescriptorSets(
-            cmd,
+            @enumFromInt(cmd),
             .graphics,
             __vulkan.tex_2d_pipeline_set.pipelineLayout,
             0,
@@ -945,7 +959,7 @@ pub const image = struct {
             null,
         );
 
-        __vulkan.vkd.?.cmdDraw(cmd, 6, 1, 0, 0);
+        __vulkan.vkd.?.cmdDraw(@enumFromInt(cmd), 6, 1, 0, 0);
     }
     pub fn init(_src: *texture) Self {
         const self = Self{
@@ -1063,14 +1077,14 @@ pub const animate_image = struct {
         self.*.update_uniforms();
         __system.cmd_op_wait.store(true, .release);
     }
-    pub fn __draw(self: *Self, cmd: vk.CommandBuffer) void {
+    pub fn draw(self: *Self, cmd: usize) void {
         self.*.transform.__check_init.check_inited();
         self.*.src.*.__check_init.check_inited();
         __vulkan.load_instance_and_device();
-        __vulkan.vkd.?.cmdBindPipeline(cmd, .graphics, __vulkan.animate_tex_2d_pipeline_set.pipeline);
+        __vulkan.vkd.?.cmdBindPipeline(@enumFromInt(cmd), .graphics, __vulkan.animate_tex_2d_pipeline_set.pipeline);
 
         __vulkan.vkd.?.cmdBindDescriptorSets(
-            cmd,
+            @enumFromInt(cmd),
             .graphics,
             __vulkan.animate_tex_2d_pipeline_set.pipelineLayout,
             0,
@@ -1080,7 +1094,7 @@ pub const animate_image = struct {
             null,
         );
 
-        __vulkan.vkd.?.cmdDraw(cmd, 6, 1, 0, 0);
+        __vulkan.vkd.?.cmdDraw(@enumFromInt(cmd), 6, 1, 0, 0);
     }
     pub fn init(_src: *texture_array) Self {
         const self = Self{
@@ -1095,6 +1109,22 @@ pub const animate_image = struct {
         return self;
     }
 };
+pub const group = group_(false);
+pub const shape_group = group_(true);
+
+pub fn group_(comptime _is_shape: bool) type {
+    return struct {
+        const Self = @This();
+        pub const is_shape = _is_shape;
+
+        main: ?*iobject = null,
+        draw_fn: ?*const fn (self: *Self, cmd: usize) void = null,
+
+        pub fn group_draw(self: *Self, cmd: usize) void {
+            self.*.draw_fn.?(self, cmd);
+        }
+    };
+}
 pub const tile_image = struct {
     const Self = @This();
 
@@ -1151,14 +1181,14 @@ pub const tile_image = struct {
         self.*.update_uniforms();
         __system.cmd_op_wait.store(true, .release);
     }
-    pub fn __draw(self: *Self, cmd: vk.CommandBuffer) void {
+    pub fn draw(self: *Self, cmd: usize) void {
         self.*.transform.__check_init.check_inited();
         self.*.src.*.__check_init.check_inited();
         __vulkan.load_instance_and_device();
-        __vulkan.vkd.?.cmdBindPipeline(cmd, .graphics, __vulkan.animate_tex_2d_pipeline_set.pipeline);
+        __vulkan.vkd.?.cmdBindPipeline(@enumFromInt(cmd), .graphics, __vulkan.animate_tex_2d_pipeline_set.pipeline);
 
         __vulkan.vkd.?.cmdBindDescriptorSets(
-            cmd,
+            @enumFromInt(cmd),
             .graphics,
             __vulkan.animate_tex_2d_pipeline_set.pipelineLayout,
             0,
@@ -1168,7 +1198,7 @@ pub const tile_image = struct {
             null,
         );
 
-        __vulkan.vkd.?.cmdDraw(cmd, 6, 1, 0, 0);
+        __vulkan.vkd.?.cmdDraw(@enumFromInt(cmd), 6, 1, 0, 0);
     }
     pub fn init(_tile_idx: u32, _src: *tile_texture_array) Self {
         const self = Self{

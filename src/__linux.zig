@@ -584,6 +584,9 @@ pub fn linux_loop() void {
                 const keyr = c.XLookupKeysym(&event.xkey, 0);
                 if (keyr > 0xffff) continue;
                 var keyv: u16 = @intCast(keyr);
+                if (keyv >= c.XK_a and keyv <= c.XK_z) { //If lower case, change it
+                    keyv -= 0x20;
+                }
                 const key: input.key = @enumFromInt(keyv);
                 if (keyv > 0xff and keyv < 0xff00) {
                     @branchHint(.cold);
@@ -601,6 +604,9 @@ pub fn linux_loop() void {
                 const keyr = c.XLookupKeysym(&event.xkey, 0);
                 if (keyr > 0xffff) continue;
                 var keyv: u16 = @intCast(keyr);
+                if (keyv >= c.XK_a and keyv <= c.XK_z) { //If lower case, change it
+                    keyv -= 0x20;
+                }
                 const key: input.key = @enumFromInt(keyv);
                 if (keyv > 0xff and keyv < 0xff00) {
                     @branchHint(.cold);

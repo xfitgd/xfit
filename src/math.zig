@@ -90,6 +90,14 @@ pub fn rect_(comptime T: type) type {
                 .bottom = _bottom,
             };
         }
+        pub fn initXY(_xy: pointT, _size: pointT) Self {
+            return Self{
+                .left = _xy[0] - _size[0] / 2,
+                .right = _xy[0] + _size[0] / 2,
+                .top = _xy[1] + _size[1] / 2,
+                .bottom = _xy[1] - _size[1] / 2,
+            };
+        }
         pub fn flipY(self: Self) Self {
             return .{
                 .left = self.left,
@@ -159,6 +167,12 @@ pub fn rect_(comptime T: type) type {
                 .top = p1[1],
                 .bottom = p2[1],
             };
+        }
+        pub fn is_rect_in(self: Self, other: Self) bool {
+            return self.left <= other.right and
+                self.right >= other.left and
+                self.top >= other.bottom and
+                self.bottom <= other.top;
         }
         pub fn is_point_in(self: Self, pt: pointT) bool {
             return self.left <= pt[0] and self.right >= pt[0] and self.top >= pt[1] and self.bottom <= pt[1];

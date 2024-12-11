@@ -511,7 +511,11 @@ fn recordCommandBuffer(commandBuffer: **render_command, fr: u32) void {
 
         for (objs) |value| {
             if (!value.*.is_shape_type()) {
-                value.*.__draw(cmd);
+                if (value.* == ._group) {
+                    value.*._group.group_draw(@intFromEnum(cmd));
+                } else {
+                    value.*.draw(@intFromEnum(cmd));
+                }
             } else {
                 shape_list.append(value) catch unreachable;
             }
@@ -533,7 +537,11 @@ fn recordCommandBuffer(commandBuffer: **render_command, fr: u32) void {
             renderPassInfo2.render_pass = vkRenderPassSample;
             vkd.?.cmdBeginRenderPass(cmd, &renderPassInfo2, .@"inline");
             for (shape_list.items) |value| {
-                value.*.__draw(cmd);
+                if (value.* == ._shape_group) {
+                    value.*._group.group_draw(@intFromEnum(cmd));
+                } else {
+                    value.*.draw(@intFromEnum(cmd));
+                }
             }
             vkd.?.cmdEndRenderPass(cmd);
 

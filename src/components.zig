@@ -243,8 +243,8 @@ pub fn button_(_msaa: bool) type {
         pub inline fn deinit_callback(self: *Self, callback: ?*const fn (caller: *anyopaque) void, data: anytype) void {
             self.*.shape.deinit_callback(callback, data);
         }
-        pub fn __draw(self: *Self, cmd: vk.CommandBuffer) void {
-            self.*.shape.__draw(cmd);
+        pub fn draw(self: *Self, cmd: usize) void {
+            self.*.shape.draw(cmd);
         }
     };
 }
