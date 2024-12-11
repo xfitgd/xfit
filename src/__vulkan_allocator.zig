@@ -25,7 +25,7 @@ pub var supported_noncache_local: bool = false;
 
 pub var execute_all_cmd_per_update: std.atomic.Value(bool) = std.atomic.Value(bool).init(true);
 var arena_allocator: std.heap.ArenaAllocator = undefined;
-var th_arena_allocator: std.heap.ThreadSafeAllocator = undefined;
+//var th_arena_allocator: std.heap.ThreadSafeAllocator = undefined; if need this use later
 var aallocator: std.mem.Allocator = undefined;
 
 pub fn init_block_len() void {
@@ -143,10 +143,7 @@ pub fn init() void {
     @memset(memory_idx_counts, 0);
 
     arena_allocator = std.heap.ArenaAllocator.init(__system.allocator);
-    th_arena_allocator = .{
-        .child_allocator = arena_allocator.allocator(),
-    };
-    aallocator = th_arena_allocator.allocator();
+    aallocator = arena_allocator.allocator();
 
     // ! use vk.VK_COMMAND_POOL_CREATE_TRANSIENT_BIT, android will crash(?)
     const poolInfo: vk.CommandPoolCreateInfo = .{
@@ -195,9 +192,9 @@ pub fn deinit() void {
     }
     set_list.deinit();
     descriptor_pools.deinit();
-    th_arena_allocator.mutex.lock();
+    //th_arena_allocator.mutex.lock();
     arena_allocator.deinit();
-    th_arena_allocator.mutex.unlock();
+    //th_arena_allocator.mutex.unlock();
 
     __vulkan.vkd.?.destroyCommandPool(cmd_pool, null);
 }
@@ -920,9 +917,9 @@ fn thread_func() void {
             __vulkan.vkd.?.queueWaitIdle(__vulkan.vkGraphicsQueue) catch |e| xfit.herr3("__vulkan_allocator thread_func.queueWaitIdle", e);
         }
 
-        th_arena_allocator.mutex.lock();
+        //th_arena_allocator.mutex.lock();
         if (!arena_allocator.reset(.retain_capacity)) unreachable;
-        th_arena_allocator.mutex.unlock();
+        //th_arena_allocator.mutex.unlock();
 
         {
             var i: usize = 0;
