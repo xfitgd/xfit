@@ -91,6 +91,14 @@ pub fn rect_(comptime T: type) type {
             };
         }
         pub fn initXY(_xy: pointT, _size: pointT) Self {
+            if (@typeInfo(T) != .float) {
+                return Self{
+                    .left = _xy[0] - @divFloor(_size[0], 2),
+                    .right = _xy[0] + @divFloor(_size[0], 2),
+                    .top = _xy[1] + @divFloor(_size[1], 2),
+                    .bottom = _xy[1] - @divFloor(_size[1], 2),
+                };
+            }
             return Self{
                 .left = _xy[0] - _size[0] / 2,
                 .right = _xy[0] + _size[0] / 2,
