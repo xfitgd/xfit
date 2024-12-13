@@ -24,7 +24,7 @@ var standard_target: std.Build.ResolvedTarget = undefined;
 
 ///? const src_path = b.dependency("xfit_build", .{}).*.path(".").getPath(b);
 pub fn build(b: *std.Build) !void {
-    yaml = b.dependency("zig-yaml", .{});
+    // yaml = b.dependency("zig-yaml", .{});
     xml = b.dependency("xml", .{});
     gltf = b.dependency("zgltf", .{});
 
@@ -47,7 +47,7 @@ pub fn build(b: *std.Build) !void {
         .link_libc = true,
         .pic = true,
     });
-    unit_tests.root_module.addImport("yaml", yaml.module("yaml"));
+    // unit_tests.root_module.addImport("yaml", yaml.module("yaml"));
     unit_tests.root_module.addImport("xml", xml.module("xml"));
     unit_tests.root_module.addImport("gltf", gltf.module("zgltf"));
 
@@ -365,9 +365,9 @@ pub fn run(
 
         result.root_module.addImport("xfit", xfit);
 
-        result.root_module.addImport("yaml", yaml.module("yaml"));
+        //result.root_module.addImport("yaml", yaml.module("yaml"));
         result.root_module.addImport("xml", xml.module("xml"));
-        xfit.addImport("yaml", yaml.module("yaml"));
+        //xfit.addImport("yaml", yaml.module("yaml"));
         xfit.addImport("xml", xml.module("xml"));
 
         xfit.addIncludePath(get_lazypath(b, try std.fmt.allocPrint(arena_allocator.allocator(), "{s}/include", .{engine_path})));

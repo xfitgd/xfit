@@ -27,25 +27,33 @@ pub const ianimate_object = struct {
                 .v = iobject.vtable.make(T),
             };
         }
-        pub const find = graphics.iobject.vtable.find;
+        pub inline fn has___xfit_vtable(comptime T: type) bool {
+            return iobject.vtable.__has___xfit_vtable(T, vtable);
+        }
     };
-
-    pub fn deinit(self: ianimate_object) void {
-        self.v.*.v.deinit(self.target);
+    pub inline fn eql_type(self: *const ianimate_object, comptime T: type) bool {
+        return iobject.__eql_type(self, T, vtable);
     }
-    pub fn prev_frame(self: ianimate_object) void {
+    pub inline fn eql_objs_type(self: *const ianimate_object, target: *const ianimate_object) bool {
+        return iobject.__eql_objs_type(self, target);
+    }
+
+    pub fn deinit(self: *const ianimate_object) void {
+        self.v.*.v.deinit.?(self.target);
+    }
+    pub fn prev_frame(self: *const ianimate_object) void {
         self.v.*.prev_frame(self.target);
     }
-    pub fn next_frame(self: ianimate_object) void {
+    pub fn next_frame(self: *const ianimate_object) void {
         self.v.*.next_frame(self.target);
     }
-    pub fn set_frame(self: ianimate_object, _frame: u32) void {
+    pub fn set_frame(self: *const ianimate_object, _frame: u32) void {
         self.v.*.set_frame(self.target, _frame);
     }
-    pub fn cur_frame(self: ianimate_object) u32 {
+    pub fn cur_frame(self: *const ianimate_object) u32 {
         return self.v.*.cur_frame(self.target);
     }
-    pub fn get_frame_count_build(self: ianimate_object) u32 {
+    pub fn get_frame_count_build(self: *const ianimate_object) u32 {
         return self.v.*.get_frame_count_build(self.target);
     }
     pub fn init(_obj_ptr: anytype) ianimate_object {
