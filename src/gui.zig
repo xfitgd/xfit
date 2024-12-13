@@ -10,7 +10,7 @@ const iobject = graphics.iobject;
 
 pub const icomponent = struct {
     com: component,
-    obj: *iobject,
+    obj: iobject,
 
     fn base_mat(self: icomponent, mul: point) ?matrix {
         if (!math.compare(self.com.center_pt, .{ 0, 0 })) {
@@ -111,7 +111,7 @@ pub const icomponent = struct {
 
     pub fn size(self: icomponent) void {
         init(self);
-        self.obj.*.ptransform().*.copy_update();
+        self.obj.ptransform().*.copy_update();
     }
     pub fn get_rect(self: icomponent, _size: point, _CANVAS_W: f32, _CANVAS_H: f32) math.rect {
         const transform: *graphics.transform = self.obj.ptransform();
