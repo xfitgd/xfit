@@ -160,6 +160,7 @@ pub const iobject = struct {
         __xfit_is_shape_type: bool,
 
         pub fn make(comptime T: type) vtable {
+            if (!@inComptime()) unreachable;
             return .{
                 .deinit = if (@hasDecl(T, "deinit")) @ptrCast(&T.deinit) else null,
                 .build = if (@hasDecl(T, "build")) @ptrCast(&T.build) else null,
