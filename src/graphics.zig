@@ -171,25 +171,27 @@ pub const iobject = struct {
             };
         }
         pub inline fn __has___xfit_vtable(comptime T: type, comptime vtable_T: type) bool {
-            return @hasDecl(T, "__xfit_vtable") and @TypeOf(T.__xfit_vtable) == vtable_T;
+            if (!@inComptime()) unreachable;
+            return @hasDecl(T, "__xfit_vtable") and comptime __find(&T.__xfit_vtable, vtable_T) != null;
         }
         pub inline fn has___xfit_vtable(comptime T: type) bool {
-            return __has___xfit_vtable(T, vtable);
+            return comptime __has___xfit_vtable(T, vtable);
         }
         fn __find(_vtable: anytype, comptime return_vtable_T: type) ?*const return_vtable_T {
+            if (!@inComptime()) unreachable;
             if (@TypeOf(_vtable.*) == return_vtable_T) return _vtable;
             if (@typeInfo(@TypeOf(_vtable.*)) != .@"struct") return null;
 
             inline for (std.meta.fields(@TypeOf(_vtable.*))) |v| {
-                const result = __find(&@field(_vtable.*, v.name), return_vtable_T);
+                const result = comptime __find(&@field(_vtable.*, v.name), return_vtable_T);
                 if (result != null) return result;
             }
             return null;
         }
     };
     pub inline fn __eql_type(self: anytype, comptime T: type, comptime vtable_T: type) bool {
-        if (!vtable_T.has___xfit_vtable(T)) return false;
-        const res = vtable.__find(&T.__xfit_vtable, vtable_T);
+        if (!comptime vtable_T.has___xfit_vtable(T)) return false;
+        const res = comptime vtable.__find(&T.__xfit_vtable, vtable_T);
         return res != null and res.? == self.*.v;
     }
     pub inline fn __eql_objs_type(self: anytype, target: anytype) bool {
@@ -225,10 +227,10 @@ pub const iobject = struct {
     }
 
     pub fn __init(_obj_ptr: anytype, comptime return_T: type) return_T {
-        if (!vtable.has___xfit_vtable(@TypeOf(_obj_ptr.*))) @compileError("must has __xfit_vtable!");
+        if (!comptime return_T.vtable.has___xfit_vtable(@TypeOf(_obj_ptr.*))) @compileError("must has __xfit_vtable!");
         var self: return_T = undefined;
         self.target = @ptrCast(@alignCast(_obj_ptr));
-        self.v = return_T.vtable.__find(&@TypeOf(_obj_ptr.*).__xfit_vtable, return_T.vtable).?;
+        self.v = comptime iobject.vtable.__find(&@TypeOf(_obj_ptr.*).__xfit_vtable, return_T.vtable).?;
 
         return self;
     }

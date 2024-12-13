@@ -28,7 +28,7 @@ pub const ianimate_object = struct {
             };
         }
         pub inline fn has___xfit_vtable(comptime T: type) bool {
-            return iobject.vtable.__has___xfit_vtable(T, vtable);
+            return comptime iobject.vtable.__has___xfit_vtable(T, vtable);
         }
     };
     pub inline fn eql_type(self: *const ianimate_object, comptime T: type) bool {
