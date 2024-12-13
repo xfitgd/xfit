@@ -35,7 +35,7 @@ var arena_alloc: std.mem.Allocator = undefined;
 const matrix = math.matrix;
 const iarea = collision.iarea;
 
-pub var objects: ArrayList(*graphics.iobject) = undefined;
+pub var objects: ArrayList(graphics.iobject) = undefined;
 
 pub var g_proj: graphics.projection = .{};
 pub var g_camera: graphics.camera = undefined;
@@ -58,10 +58,7 @@ var color_trans: graphics.color_transform = undefined;
 const player = animator.player;
 const animate_object = animator.animate_object;
 
-var anim: player = .{
-    .target_fps = 10,
-    .obj = .{ .obj = undefined },
-};
+var anim: player = undefined;
 
 pub const CANVAS_W: f32 = 1280;
 pub const CANVAS_H: f32 = 720;
@@ -77,16 +74,15 @@ fn error_func(text: []u8, stack_trace: []u8) void {
     _ = fs.write(stack_trace) catch return;
 }
 
-var g_rect_button: *components.button = undefined;
 var move_callback_thread: std.Thread = undefined;
 
-var text_shape: *graphics.iobject = undefined;
-var rect_button: *graphics.iobject = undefined;
+var text_shape: graphics.shape = undefined;
+var rect_button: components.button = undefined;
 
-var github_shape: *graphics.iobject = undefined;
+var github_shape: graphics.shape = undefined;
 
-var img: *graphics.iobject = undefined;
-var anim_img: *graphics.iobject = undefined;
+var img: graphics.image = undefined;
+var anim_img: graphics.animate_image = undefined;
 
 pub fn xfit_init() !void {
     //lua test
@@ -117,15 +113,8 @@ pub fn xfit_init() !void {
     g_camera.build();
     //
 
-    //alloc and set iobjects
-    objects = ArrayList(*graphics.iobject).init(arena_alloc);
-    const iobjs = try arena_alloc.alloc(graphics.iobject, 5);
-
-    text_shape = &iobjs[0];
-    rect_button = &iobjs[1];
-    img = &iobjs[2];
-    anim_img = &iobjs[3];
-    github_shape = &iobjs[4];
+    //alloc objects
+    objects = ArrayList(graphics.iobject).init(arena_alloc);
     //
 
     //graphics.set_render_clear_color(.{ 1, 1, 1, 0 });
@@ -151,13 +140,13 @@ pub fn xfit_init() !void {
     };
     color_trans.build(.gpu);
 
-    img.* = .{ ._image = graphics.image.init(&image_src) };
+    img = graphics.image.init(&image_src);
 
-    img.*._image.color_tran = &color_trans;
-    img.*._image.transform.camera = &g_camera;
-    img.*._image.transform.projection = &g_proj;
-    img.*._image.transform.model = math.matrix_multiply(math.matrix_scaling(f32, 2, 2, 1.0), math.matrix_translation(f32, 0, 0, 0.7));
-    img.*.build();
+    img.color_tran = &color_trans;
+    img.transform.camera = &g_camera;
+    img.transform.projection = &g_proj;
+    img.transform.model = math.matrix_multiply(math.matrix_scaling(f32, 2, 2, 1.0), math.matrix_translation(f32, 0, 0, 0.7));
+    img.build();
     //
 
     //load and decode wasp.webp
@@ -171,14 +160,17 @@ pub fn xfit_init() !void {
     img_decoder.decode(data, anim_pixels) catch |e| xfit.herr3("wasp.webp decode", e);
     anim_image_src.build(img_decoder.width(), img_decoder.height(), img_decoder.frame_count(), anim_pixels);
 
-    anim_img.* = .{ ._anim_image = graphics.animate_image.init(&anim_image_src) };
+    anim_img = graphics.animate_image.init(&anim_image_src);
 
-    anim_img.*._anim_image.transform.camera = &g_camera;
-    anim_img.*._anim_image.transform.projection = &g_proj;
-    anim_img.*._anim_image.transform.model = math.matrix_translation(f32, 300, -200, 0);
-    anim_img.*.build();
+    anim_img.transform.camera = &g_camera;
+    anim_img.transform.projection = &g_proj;
+    anim_img.transform.model = math.matrix_translation(f32, 300, -200, 0);
+    anim_img.build();
 
-    anim.obj.obj = anim_img;
+    anim = .{
+        .target_fps = 10,
+        .obj = animator.ianimate_object.init(&anim_img),
+    };
     anim.play();
     //
 
@@ -206,13 +198,13 @@ pub fn xfit_init() !void {
         },
     };
     shape_src = try font.render_string2("Hello World!\n안녕하세요. break;", option2, arena_alloc);
-    text_shape.* = .{ ._shape = graphics.shape.init(shape_src) };
+    text_shape = graphics.shape.init(shape_src);
 
-    text_shape.*._shape.transform.camera = &g_camera;
-    text_shape.*._shape.transform.projection = &g_proj;
+    text_shape.transform.camera = &g_camera;
+    text_shape.transform.projection = &g_proj;
 
-    text_shape.*._shape.transform.model = math.matrix_multiply(math.matrix_scaling(f32, 5.0, 5.0, 1.0), math.matrix_translation(f32, -200.0, 0.0, 0.5));
-    text_shape.*.build();
+    text_shape.transform.model = math.matrix_multiply(math.matrix_scaling(f32, 5.0, 5.0, 1.0), math.matrix_translation(f32, -200.0, 0.0, 0.5));
+    text_shape.build();
     //
 
     //build button
@@ -227,12 +219,10 @@ pub fn xfit_init() !void {
     rect_button_src = graphics.shape_source.init();
     try rect_button_src.build(arena_alloc, concat_button_src, .gpu, .cpu);
 
-    rect_button.* = .{ ._button = try components.button.init(&rect_button_src, .{ .rect = math.rect.calc_with_canvas(button_area_rect, CANVAS_W, CANVAS_H) }, button_src[0]) };
-    rect_button.*._button.shape.transform.camera = &g_camera;
-    rect_button.*._button.shape.transform.projection = &g_proj;
-    rect_button.*.build();
-
-    g_rect_button = &rect_button.*._button;
+    rect_button = try components.button.init(&rect_button_src, .{ .rect = math.rect.calc_with_canvas(button_area_rect, CANVAS_W, CANVAS_H) }, button_src[0]);
+    rect_button.shape.transform.camera = &g_camera;
+    rect_button.shape.transform.projection = &g_proj;
+    rect_button.build();
 
     //
 
@@ -250,22 +240,22 @@ pub fn xfit_init() !void {
     github_shape_src = graphics.shape_source.init();
     try github_shape_src.build(arena_alloc, github_shape_raw, .gpu, .cpu);
 
-    github_shape.* = .{ ._shape = graphics.shape.init(&github_shape_src) };
-    github_shape.*._shape.transform.camera = &g_camera;
-    github_shape.*._shape.transform.projection = &g_proj;
-    github_shape.*._shape.transform.model = math.matrix_multiply(
+    github_shape = graphics.shape.init(&github_shape_src);
+    github_shape.transform.camera = &g_camera;
+    github_shape.transform.projection = &g_proj;
+    github_shape.transform.model = math.matrix_multiply(
         math.matrix_scaling(f32, 2, 2, 1),
         math.matrix_translation(f32, -450, 0, 0),
     );
-    github_shape.*.build();
+    github_shape.build();
     //
 
     //append objects
-    try objects.append(img);
-    try objects.append(text_shape);
-    try objects.append(anim_img);
-    try objects.append(rect_button);
-    try objects.append(github_shape);
+    try objects.append(graphics.iobject.init(&img));
+    try objects.append(graphics.iobject.init(&text_shape));
+    try objects.append(graphics.iobject.init(&anim_img));
+    try objects.append(graphics.iobject.init(&rect_button.shape));
+    try objects.append(graphics.iobject.init(&github_shape));
     //
 
     cmd = render_command.init();
@@ -302,23 +292,23 @@ pub fn xfit_init() !void {
 }
 
 fn mouse_move(pos: math.point) void {
-    g_rect_button.on_mouse_move(pos, {}, .{});
+    rect_button.on_mouse_move(pos, {}, .{});
 }
 fn mouse_down(pos: math.point) void {
-    g_rect_button.on_mouse_down(pos, {}, .{});
+    rect_button.on_mouse_down(pos, {}, .{});
 }
 fn mouse_up(pos: math.point) void {
-    g_rect_button.on_mouse_up(pos, {}, .{});
+    rect_button.on_mouse_up(pos, {}, .{});
 }
 
 fn touch_down(touch_idx: u32, pos: math.point) void {
-    g_rect_button.on_touch_down(touch_idx, pos, {}, .{});
+    rect_button.on_touch_down(touch_idx, pos, {}, .{});
 }
 fn touch_up(touch_idx: u32, pos: math.point) void {
-    g_rect_button.on_touch_up(touch_idx, pos, {}, .{});
+    rect_button.on_touch_up(touch_idx, pos, {}, .{});
 }
 fn touch_move(touch_idx: u32, pos: math.point) void {
-    g_rect_button.on_touch_move(touch_idx, pos, {}, .{});
+    rect_button.on_touch_move(touch_idx, pos, {}, .{});
 }
 
 var image_front: bool = false;
@@ -384,11 +374,11 @@ pub fn xfit_update() !void {
     update_mutex.lock();
 
     shape_src.*.copy_color_update(0, &[_]math.vector{.{ 1, 1, 1, shape_alpha }});
-    text_shape.*._shape.transform.model = math.matrix_multiply(math.matrix_scaling(f32, 5, 5, 1.0), math.matrix_translation(f32, -200 + dx, 0, 0.5));
+    text_shape.transform.model = math.matrix_multiply(math.matrix_scaling(f32, 5, 5, 1.0), math.matrix_translation(f32, -200 + dx, 0, 0.5));
     update_mutex.unlock();
 
-    text_shape.*._shape.transform.copy_update();
-    rect_button.*.update();
+    text_shape.transform.copy_update();
+    rect_button.update();
 
     anim.update(xfit.dt());
 }
@@ -398,7 +388,7 @@ pub fn xfit_size() !void {
 
     g_proj.copy_update();
 
-    g_rect_button.*.area.rect = math.rect.calc_with_canvas(button_area_rect, CANVAS_W, CANVAS_H);
+    rect_button.area.rect = math.rect.calc_with_canvas(button_area_rect, CANVAS_W, CANVAS_H);
 }
 
 ///before system clean
@@ -415,7 +405,7 @@ pub fn xfit_destroy() !void {
     g_camera.deinit();
     g_proj.deinit();
 
-    for (objects.items) |value| {
+    for (objects.items) |*value| {
         value.*.deinit();
     }
 

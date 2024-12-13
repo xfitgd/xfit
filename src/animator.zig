@@ -5,56 +5,56 @@ const xfit = @import("xfit.zig");
 const animate_image = graphics.animate_image;
 const iobject = graphics.iobject;
 
-pub const animate_object = struct {
-    obj: *iobject,
+pub const ianimate_object = struct {
+    target: *anyopaque,
+    v: *const vtable,
 
-    pub inline fn prev_frame(self: *animate_object) void {
-        switch (self.obj.*) {
-            inline ._anim_image => |*case| case.*.prev_frame(),
-            else => xfit.print_error("WARN animate_object.prev_frame not support\n", .{}),
+    pub const vtable = struct {
+        v: iobject.vtable,
+        prev_frame: *const fn (self: *anyopaque) void,
+        next_frame: *const fn (self: *anyopaque) void,
+        set_frame: *const fn (self: *anyopaque, _frame: u32) void,
+        cur_frame: *const fn (self: *anyopaque) u32,
+        get_frame_count_build: *const fn (self: *anyopaque) u32,
+
+        pub fn make(comptime T: type) vtable {
+            return .{
+                .prev_frame = @ptrCast(&T.prev_frame),
+                .next_frame = @ptrCast(&T.next_frame),
+                .set_frame = @ptrCast(&T.set_frame),
+                .cur_frame = @ptrCast(&T.cur_frame),
+                .get_frame_count_build = @ptrCast(&T.get_frame_count_build),
+                .v = iobject.vtable.make(T),
+            };
         }
+        pub const find = graphics.iobject.vtable.find;
+    };
+
+    pub fn deinit(self: ianimate_object) void {
+        self.v.*.v.deinit(self.target);
     }
-    pub inline fn map_update_frame(self: *animate_object) void {
-        switch (self.obj.*) {
-            inline ._anim_image => |*case| case.*.map_update_frame(),
-            else => xfit.print_error("WARN animate_object.map_update_frame not support\n", .{}),
-        }
+    pub fn prev_frame(self: ianimate_object) void {
+        self.v.*.prev_frame(self.target);
     }
-    pub inline fn next_frame(self: *animate_object) void {
-        switch (self.obj.*) {
-            inline ._anim_image => |*case| case.*.next_frame(),
-            else => xfit.print_error("WARN animate_object.next_frame not support\n", .{}),
-        }
+    pub fn next_frame(self: ianimate_object) void {
+        self.v.*.next_frame(self.target);
     }
-    pub inline fn set_frame(self: *animate_object, _frame: u32) void {
-        switch (self.obj.*) {
-            inline ._anim_image => |*case| case.*.set_frame(_frame),
-            else => xfit.print_error("WARN animate_object.set_frame not support\n", .{}),
-        }
+    pub fn set_frame(self: ianimate_object, _frame: u32) void {
+        self.v.*.set_frame(self.target, _frame);
     }
-    pub inline fn cur_frame(self: *animate_object) u32 {
-        switch (self.obj.*) {
-            inline ._anim_image => |*case| return case.*.frame,
-            else => xfit.print_error("WARN animate_object.cur_frame not support\n", .{}),
-        }
-        return 0;
+    pub fn cur_frame(self: ianimate_object) u32 {
+        return self.v.*.cur_frame(self.target);
     }
-    pub inline fn get_tex_count_build(self: *animate_object) u32 {
-        switch (self.obj.*) {
-            inline ._anim_image => |*case| return case.*.src.*.get_tex_count_build(),
-            else => xfit.print_error("WARN animate_object.get_tex_count_build not support\n", .{}),
-        }
-        return 0;
+    pub fn get_frame_count_build(self: ianimate_object) u32 {
+        return self.v.*.get_frame_count_build(self.target);
     }
-    pub inline fn update(self: *animate_object) void {
-        switch (self.obj.*) {
-            inline else => |*case| case.*.update(),
-        }
+    pub fn init(_obj_ptr: anytype) ianimate_object {
+        return iobject.__init(_obj_ptr, ianimate_object);
     }
 };
 
 pub const multi_player = struct {
-    objs: []animate_object,
+    objs: []ianimate_object,
     playing: bool = false,
     target_fps: f32 = 30,
     __playing_dt: f32 = 0,
@@ -67,7 +67,7 @@ pub const multi_player = struct {
             while (self.*.__playing_dt >= 1 / self.*.target_fps) : (self.*.__playing_dt -= 1 / self.*.target_fps) {
                 var isp: bool = false;
                 for (self.*.objs) |*v| {
-                    if (self.*.loop or v.*.cur_frame() < v.*.get_tex_count_build() - 1) {
+                    if (self.*.loop or v.*.cur_frame() < v.*.get_frame_count_build() - 1) {
                         v.*.next_frame();
                         isp = true;
                     }
@@ -104,7 +104,7 @@ pub const multi_player = struct {
 };
 
 pub const player = struct {
-    obj: animate_object,
+    obj: ianimate_object,
     playing: bool = false,
     target_fps: f64 = 30,
     __playing_dt: f64 = 0,
@@ -115,7 +115,7 @@ pub const player = struct {
             const dt: f64 = _dt;
             self.*.__playing_dt += dt;
             while (self.*.__playing_dt >= 1 / self.*.target_fps) : (self.*.__playing_dt -= 1 / self.*.target_fps) {
-                if (self.*.loop or self.*.obj.cur_frame() < self.*.obj.get_tex_count_build() - 1) {
+                if (self.*.loop or self.*.obj.cur_frame() < self.*.obj.get_frame_count_build() - 1) {
                     self.*.obj.next_frame();
                 } else {
                     self.*.stop();

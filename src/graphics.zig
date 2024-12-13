@@ -5,6 +5,7 @@ const window = @import("window.zig");
 const __system = @import("__system.zig");
 const xfit = @import("xfit.zig");
 const img_util = @import("image_util.zig");
+const animator = @import("animator.zig");
 
 const dbg = xfit.dbg;
 
@@ -140,82 +141,79 @@ pub const tile_image_uniform_pool_sizes: [3]descriptor_pool_size = .{
 };
 //pub const tile_image_uniform_pool_binding: [3]c_uint = .{ 0, 3, 4 };
 
-const iobject_type = enum {
-    _shape,
-    _image,
-    _anim_image,
-    _button,
-    _tile_image,
-    _pixel_shape,
-    _pixel_button,
-    _group,
-    _shape_group,
-    //_sprite_image,
-};
-pub const iobject = union(iobject_type) {
-    const Self = @This();
-    _shape: shape,
-    _image: image,
-    _anim_image: animate_image,
-    _button: components.button,
-    _tile_image: tile_image,
-    _pixel_shape: pixel_shape,
-    _pixel_button: components.pixel_button,
-    _group: group,
-    _shape_group: shape_group,
+const SelfFile = @This();
 
-    pub inline fn deinit(self: *Self) void {
-        switch (self.*) {
-            inline ._group, ._shape_group => unreachable,
-            inline else => |*case| case.*.deinit(),
+pub const iobject = struct {
+    target: *anyopaque,
+    v: *const vtable,
+
+    pub const vtable = struct {
+        //need functions + __xfit_vtable
+        deinit: ?*const fn (self: *anyopaque) void,
+        build: ?*const fn (self: *anyopaque) void,
+        update_uniforms: ?*const fn (self: *anyopaque) void,
+        update: ?*const fn (self: *anyopaque) void,
+        draw: *const fn (self: *anyopaque, cmd: usize) void,
+        ptransform: ?*const fn (self: *anyopaque) *transform,
+        //
+        ///if obj has const  __xfit_is_shape_type: bool = true, setting true
+        __xfit_is_shape_type: bool,
+
+        pub fn make(comptime T: type) vtable {
+            return .{
+                .deinit = if (@hasDecl(T, "deinit")) @ptrCast(&T.deinit) else null,
+                .build = if (@hasDecl(T, "build")) @ptrCast(&T.build) else null,
+                .update_uniforms = if (@hasDecl(T, "update_uniforms")) @ptrCast(&T.update_uniforms) else null,
+                .update = if (@hasDecl(T, "update")) @ptrCast(&T.update) else null,
+                .draw = @ptrCast(&T.draw),
+                .ptransform = if (@hasDecl(T, "ptransform")) @ptrCast(&T.ptransform) else null,
+                .__xfit_is_shape_type = @hasDecl(T, "__xfit_is_shape_type") and T.__xfit_is_shape_type,
+            };
         }
-    }
-    pub inline fn deinit_callback(self: *Self, callback: ?*const fn (caller: *anyopaque) void, data: anytype) void {
-        switch (self.*) {
-            inline ._group, ._shape_group => unreachable,
-            inline else => |*case| case.*.deinit_callback(callback, data),
+        pub fn find(_vtable: anytype, comptime return_vtable_T: type) ?*const return_vtable_T {
+            if (@TypeOf(_vtable.*) == return_vtable_T) return _vtable;
+            if (@typeInfo(@TypeOf(_vtable.*)) != .@"struct") return null;
+
+            inline for (std.meta.fields(@TypeOf(_vtable.*))) |v| {
+                const result = find(&@field(_vtable.*, v.name), return_vtable_T);
+                if (result != null) return result;
+            }
+            return null;
         }
+    };
+
+    pub fn deinit(self: *const iobject) void {
+        self.v.*.deinit.?(self.target);
     }
-    pub inline fn build(self: *Self) void {
-        switch (self.*) {
-            inline ._group, ._shape_group => unreachable,
-            inline else => |*case| case.*.build(),
-        }
+    pub fn build(self: *const iobject) void {
+        self.v.*.build.?(self.target);
     }
-    pub inline fn update_uniforms(self: *Self) void {
-        switch (self.*) {
-            inline ._group, ._shape_group => unreachable,
-            inline else => |*case| case.*.update_uniforms(),
-        }
+    pub fn update_uniforms(self: *const iobject) void {
+        self.v.*.update_uniforms.?(self.target);
     }
-    pub inline fn update(self: *Self) void {
-        switch (self.*) {
-            inline ._button, ._pixel_button => |*case| case.*.update(),
-            inline ._group, ._shape_group => unreachable,
-            else => {},
-        }
+    pub fn update(self: *const iobject) void {
+        self.v.*.update.?(self.target);
     }
-    pub inline fn draw(self: *Self, cmd: usize) void {
-        switch (self.*) {
-            inline ._group, ._shape_group => unreachable,
-            inline else => |*case| case.*.draw(cmd),
-        }
+    pub fn draw(self: *const iobject, cmd: usize) void {
+        self.v.*.draw.?(self.target, cmd);
     }
-    pub fn ptransform(self: *Self) *transform {
-        return switch (self.*) {
-            inline ._button, ._pixel_button => |*case| &case.*.shape.transform,
-            inline ._group, ._shape_group => |*case| case.*.main.?.*.ptransform(),
-            inline else => |*case| &case.*.transform,
-        };
+    pub fn ptransform(self: *const iobject) *transform {
+        return self.v.*.ptransform.?(self.target);
     }
-    pub inline fn is_shape_type(self: *Self) bool {
-        return switch (self.*) {
-            ._shape,
-            ._button,
-            ._shape_group,
-            => true,
-            else => false,
-        };
+    pub fn is_shape_type(self: *const iobject) bool {
+        return self.v.*.__xfit_is_shape_type;
+    }
+
+    pub fn __init(_obj_ptr: anytype, comptime return_T: type) return_T {
+        var self: return_T = undefined;
+        self.target = @ptrCast(@alignCast(_obj_ptr));
+        self.v = return_T.vtable.find(&@TypeOf(_obj_ptr.*).__xfit_vtable, return_T.vtable).?;
+
+        return self;
+    }
+
+    pub fn init(_obj_ptr: anytype) iobject {
+        return __init(_obj_ptr, iobject);
     }
 };
 
@@ -809,6 +807,8 @@ pub const shape_source = struct {
 pub fn shape_(_msaa: bool) type {
     return struct {
         const Self = @This();
+        pub const __xfit_vtable: iobject.vtable = iobject.vtable.make(Self);
+        pub const __xfit_is_shape_type = _msaa;
 
         transform: transform = .{},
         src: *shape_source,
@@ -823,6 +823,9 @@ pub fn shape_(_msaa: bool) type {
                 },
                 .src = _src,
             };
+        }
+        pub fn ptransform(self: *Self) *transform {
+            return &self.*.transform;
         }
         pub fn update_uniforms(self: *Self) void {
             var __set_res: [3]res_union = .{
@@ -914,12 +917,16 @@ pub fn get_idx_type_size(typ: index_type) c_uint {
 
 pub const image = struct {
     const Self = @This();
+    pub const __xfit_vtable: iobject.vtable = iobject.vtable.make(Self);
 
     transform: transform = .{},
     src: *texture,
     color_tran: *color_transform,
     __set: descriptor_set,
 
+    pub fn ptransform(self: *Self) *transform {
+        return &self.*.transform;
+    }
     pub fn deinit(self: *Self) void {
         self.*.transform.__deinit(null, {});
     }
@@ -1004,6 +1011,7 @@ pub fn pixel_perfect_point(img: anytype, _p: point, _canvas_w: f32, _canvas_h: f
 }
 pub const animate_image = struct {
     const Self = @This();
+    pub const __xfit_vtable: animator.ianimate_object.vtable = animator.ianimate_object.vtable.make(Self);
 
     transform: transform = .{},
 
@@ -1013,6 +1021,9 @@ pub const animate_image = struct {
     __set: descriptor_set,
     frame: u32 = 0,
 
+    pub fn ptransform(self: *Self) *transform {
+        return &self.*.transform;
+    }
     pub fn deinit(self: *Self) void {
         self.*.transform.__deinit(null, {});
         self.*.__frame_uniform.clean(null, {});
@@ -1029,6 +1040,12 @@ pub const animate_image = struct {
         }
         self.*.frame = (self.*.frame + 1) % self.*.src.*.get_tex_count_build();
         copy_update_frame(self);
+    }
+    pub fn get_frame_count_build(self: *Self) u32 {
+        return self.*.src.*.__image.texture_option.len;
+    }
+    pub fn cur_frame(self: *Self) u32 {
+        return self.*.frame;
     }
     pub fn prev_frame(self: *Self) void {
         if (!self.*.__frame_uniform.is_build() or self.*.src.*.get_tex_count_build() == 0) return;
@@ -1109,24 +1126,10 @@ pub const animate_image = struct {
         return self;
     }
 };
-pub const group = group_(false);
-pub const shape_group = group_(true);
 
-pub fn group_(comptime _is_shape: bool) type {
-    return struct {
-        const Self = @This();
-        pub const is_shape = _is_shape;
-
-        main: ?*iobject = null,
-        draw_fn: ?*const fn (self: *Self, cmd: usize) void = null,
-
-        pub fn group_draw(self: *Self, cmd: usize) void {
-            self.*.draw_fn.?(self, cmd);
-        }
-    };
-}
 pub const tile_image = struct {
     const Self = @This();
+    pub const __xfit_vtable: iobject.vtable = iobject.vtable.make(tile_image);
 
     transform: transform = .{},
 
@@ -1136,6 +1139,9 @@ pub const tile_image = struct {
     __set: descriptor_set,
     tile_idx: u32 = undefined,
 
+    pub fn ptransform(self: *Self) *transform {
+        return &self.*.transform;
+    }
     pub fn deinit(self: *Self) void {
         self.*.transform.__deinit(null, {});
         self.*.__tile_uniform.clean(null, {});

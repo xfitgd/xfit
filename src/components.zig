@@ -217,6 +217,9 @@ pub fn button_(_msaa: bool) type {
 
             return .{ raw_polygons[0], out };
         }
+        pub fn ptransform(self: *Self) *transform {
+            return &self.*.shape.transform;
+        }
         pub fn update(self: *Self) void {
             for (self.*.sets, 0..) |*s, i| {
                 const state = s.*.__updated_state.load(.monotonic);

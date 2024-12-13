@@ -499,7 +499,7 @@ fn recordCommandBuffer(commandBuffer: **render_command, fr: u32) void {
         shape_list.resize(0) catch unreachable;
 
         commandBuffer.*.*.objs_mutex.lock();
-        const objs = __system.allocator.dupe(*graphics.iobject, commandBuffer.*.*.scene.?) catch unreachable;
+        const objs = __system.allocator.dupe(graphics.iobject, commandBuffer.*.*.scene.?) catch unreachable;
         commandBuffer.*.*.objs_mutex.unlock();
         defer __system.allocator.free(objs);
 
@@ -509,13 +509,9 @@ fn recordCommandBuffer(commandBuffer: **render_command, fr: u32) void {
             cmd_executed = true;
         }
 
-        for (objs) |value| {
-            if (!value.*.is_shape_type()) {
-                if (value.* == ._group) {
-                    value.*._group.group_draw(@intFromEnum(cmd));
-                } else {
-                    value.*.draw(@intFromEnum(cmd));
-                }
+        for (objs) |*value| {
+            if (!value.*.v.*.__xfit_is_shape_type) {
+                value.*.v.*.draw(value.*.target, @intFromEnum(cmd));
             } else {
                 shape_list.append(value) catch unreachable;
             }
@@ -537,11 +533,7 @@ fn recordCommandBuffer(commandBuffer: **render_command, fr: u32) void {
             renderPassInfo2.render_pass = vkRenderPassSample;
             vkd.?.cmdBeginRenderPass(cmd, &renderPassInfo2, .@"inline");
             for (shape_list.items) |value| {
-                if (value.* == ._shape_group) {
-                    value.*._group.group_draw(@intFromEnum(cmd));
-                } else {
-                    value.*.draw(@intFromEnum(cmd));
-                }
+                value.*.v.*.draw(value.target, @intFromEnum(cmd));
             }
             vkd.?.cmdEndRenderPass(cmd);
 

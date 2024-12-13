@@ -23,7 +23,7 @@ pub var mutex: std.Thread.Mutex = .{};
 
 __refesh: [MAX_FRAME]bool = .{true} ** MAX_FRAME,
 __command_buffers: [MAX_FRAME][]vk.CommandBuffer = undefined,
-scene: ?[]*graphics.iobject = null,
+scene: ?[]graphics.iobject = null,
 offscreen_image: ?*graphics.image = null,
 ///!you have to lock this add or modify iobject 'scene'
 objs_mutex: std.Thread.Mutex = .{},
