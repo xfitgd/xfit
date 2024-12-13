@@ -34,9 +34,8 @@ pub fn init() *Self {
         xfit.herrm("__system.allocator.create render_command");
     self.* = .{};
     __vulkan.load_instance_and_device();
-    mutex.lock();
-    defer mutex.unlock();
 
+    mutex.lock(); //allocateCommandBuffers need thread safe
     for (&self.*.__command_buffers) |*cmd| {
         cmd.* = __system.allocator.alloc(vk.CommandBuffer, __vulkan.get_swapchain_image_length()) catch
             xfit.herrm("render_command.__command_buffers.alloc");
@@ -52,6 +51,7 @@ pub fn init() *Self {
     }
 
     __render_command.render_cmd_list.?.append(self) catch xfit.herrm(" render_cmd_list.append(&self)");
+    mutex.unlock();
     return self;
 }
 // pub fn __refresh_cmds(self: *Self) void {
@@ -92,7 +92,7 @@ pub fn deinit(self: *Self) void {
     __system.allocator.destroy(self);
 }
 
-///call when scene(composition) in render_command changes
+///call when 'scene'(composition) in render_command changes
 ///no need to call when iobject internal resource values change
 pub fn refresh(self: *Self) void {
     for (&self.*.__refesh) |*v| {

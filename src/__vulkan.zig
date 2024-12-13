@@ -503,8 +503,7 @@ fn recordCommandBuffer(commandBuffer: **render_command, fr: u32) void {
         commandBuffer.*.*.objs_mutex.unlock();
         defer __system.allocator.free(objs);
 
-        if (__system.cmd_op_wait.load(.acquire)) {
-            __system.cmd_op_wait.store(false, .release);
+        if (__system.cmd_op_wait.cmpxchgStrong(true, false, .acq_rel, .monotonic) == null) {
             __vulkan_allocator.execute_and_wait_all_op();
             cmd_executed = true;
         }
