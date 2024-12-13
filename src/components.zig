@@ -54,6 +54,8 @@ pub const button_sets = struct {
 pub fn button_(_msaa: bool) type {
     return struct {
         const Self = @This();
+        pub const __xfit_vtable: iobject.vtable = iobject.vtable.make(Self);
+        pub const __xfit_is_shape_type = _msaa;
 
         shape: shape_(_msaa),
         area: iarea,

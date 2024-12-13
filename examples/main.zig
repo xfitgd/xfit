@@ -254,7 +254,7 @@ pub fn xfit_init() !void {
     try objects.append(graphics.iobject.init(&img));
     try objects.append(graphics.iobject.init(&text_shape));
     try objects.append(graphics.iobject.init(&anim_img));
-    try objects.append(graphics.iobject.init(&rect_button.shape));
+    try objects.append(graphics.iobject.init(&rect_button));
     try objects.append(graphics.iobject.init(&github_shape));
     //
 
