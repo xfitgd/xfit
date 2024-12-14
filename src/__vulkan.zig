@@ -498,9 +498,9 @@ fn recordCommandBuffer(commandBuffer: **render_command, fr: u32) void {
 
         shape_list.resize(0) catch unreachable;
 
-        commandBuffer.*.*.objs_lock.lockShared();
+        commandBuffer.*.*.objs_lock.lock();
         const objs = __system.allocator.dupe(graphics.iobject, commandBuffer.*.*.scene.?) catch unreachable;
-        commandBuffer.*.*.objs_lock.unlockShared();
+        commandBuffer.*.*.objs_lock.unlock();
         defer __system.allocator.free(objs);
 
         if (__system.cmd_op_wait.cmpxchgStrong(true, false, .acq_rel, .monotonic) == null) {
