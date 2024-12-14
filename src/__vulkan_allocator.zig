@@ -25,9 +25,6 @@ pub var supported_noncache_local: bool = false;
 
 pub var execute_all_cmd_per_update: std.atomic.Value(bool) = std.atomic.Value(bool).init(true);
 var arena_allocator: std.heap.ArenaAllocator = undefined;
-var th_arena_allocator: std.heap.ThreadSafeAllocator = undefined;
-var th_allocator: std.mem.Allocator = undefined;
-var arena_allocator2: std.heap.ArenaAllocator = undefined;
 var aallocator: std.mem.Allocator = undefined;
 
 pub fn init_block_len() void {
@@ -119,6 +116,7 @@ var g_thread: std.Thread = undefined;
 var op_queue: MultiArrayList(operation_node) = undefined;
 var op_save_queue: MultiArrayList(operation_node) = undefined;
 var op_map_queue: MultiArrayList(operation_node) = undefined;
+var op_alloc_queue: MultiArrayList(operation_node) = undefined;
 var staging_buf_queue: MemoryPoolExtra(vulkan_res_node(.buffer), .{}) = undefined;
 var mutex: std.Thread.Mutex = .{};
 pub var submit_mutex: std.Thread.Mutex = .{};
@@ -136,6 +134,7 @@ pub fn init() void {
     buffer_ids = ArrayList(*vulkan_res).init(__system.allocator);
     memory_idx_counts = __system.allocator.alloc(u16, __vulkan.mem_prop.memory_type_count) catch |e| xfit.herr3("__vulkan_allocator init alloc memory_idx_counts", e);
     op_queue = MultiArrayList(operation_node){};
+    op_alloc_queue = MultiArrayList(operation_node){};
     op_save_queue = MultiArrayList(operation_node){};
     op_map_queue = MultiArrayList(operation_node){};
     staging_buf_queue = MemoryPoolExtra(vulkan_res_node(.buffer), .{}).init(__system.allocator);
@@ -145,10 +144,7 @@ pub fn init() void {
     @memset(memory_idx_counts, 0);
 
     arena_allocator = std.heap.ArenaAllocator.init(__system.allocator);
-    arena_allocator2 = std.heap.ArenaAllocator.init(__system.allocator);
     aallocator = arena_allocator.allocator();
-    th_arena_allocator = .{ .child_allocator = arena_allocator2.allocator() };
-    th_allocator = th_arena_allocator.allocator();
 
     // ! use vk.VK_COMMAND_POOL_CREATE_TRANSIENT_BIT, android will crash(?)
     const poolInfo: vk.CommandPoolCreateInfo = .{
@@ -177,6 +173,8 @@ pub fn deinit() void {
     mutex.unlock();
     g_thread.join();
 
+    op_allocated_free(&op_alloc_queue);
+
     for (buffer_ids.items) |value| {
         value.*.deinit2(); // ! don't call vulkan_res.deinit separately
     }
@@ -185,6 +183,7 @@ pub fn deinit() void {
     __system.allocator.free(memory_idx_counts);
     op_queue.deinit(__system.allocator);
     op_save_queue.deinit(__system.allocator);
+    op_alloc_queue.deinit(__system.allocator);
     op_map_queue.deinit(__system.allocator);
     staging_buf_queue.deinit();
 
@@ -199,9 +198,6 @@ pub fn deinit() void {
     descriptor_pools.deinit();
 
     arena_allocator.deinit();
-    th_arena_allocator.mutex.lock();
-    arena_allocator2.deinit();
-    th_arena_allocator.mutex.unlock();
 
     __vulkan.vkd.?.destroyCommandPool(cmd_pool, null);
 }
@@ -859,6 +855,21 @@ fn thread_func() void {
                 slice.set(i, .{ .void = {} });
             }
         }
+
+        if (op_alloc_queue.len > 0) {
+            var i: usize = 0;
+            const slice = op_alloc_queue.slice();
+            const tags = slice.items(.tags);
+            while (i < op_alloc_queue.len) : (i += 1) {
+                switch (tags[i]) {
+                    .create_buffer, .create_texture => {
+                        tags[i] = .void;
+                    },
+                    else => {},
+                }
+            }
+        }
+
         save_to_map_queue(&nres);
 
         while (op_map_queue.len > 0) {
@@ -868,6 +879,7 @@ fn thread_func() void {
             nres = null;
             save_to_map_queue(&nres);
         }
+        op_allocated_free(&op_alloc_queue);
 
         var have_cmd: bool = false;
         {
@@ -905,7 +917,6 @@ fn thread_func() void {
                     },
                     else => continue,
                 }
-                tags[i] = .void;
             }
             if (set_list.items.len > 0) {
                 __vulkan.vkd.?.updateDescriptorSets(@intCast(set_list.items.len), set_list.items.ptr, 0, null);
@@ -945,32 +956,7 @@ fn thread_func() void {
 
         mutex.lock();
         if (exited) {
-            if (op_queue.len > 0) {
-                var i: usize = 0;
-                const slice = op_queue.slice();
-                const tags = slice.items(.tags);
-                const data = slice.items(.data);
-                while (i < op_queue.len) : (i += 1) {
-                    switch (tags[i]) {
-                        .map_copy => {
-                            if (data[i].map_copy.allocated != null) {
-                                data[i].map_copy.allocated.?.free(data[i].map_copy.address);
-                            }
-                        },
-                        .create_buffer => {
-                            if (data[i].create_buffer.allocated != null and data[i].create_buffer.data != null) {
-                                data[i].create_buffer.allocated.?.free(data[i].create_buffer.data.?);
-                            }
-                        },
-                        .create_texture => {
-                            if (data[i].create_texture.allocated != null and data[i].create_texture.data != null) {
-                                data[i].create_texture.allocated.?.free(data[i].create_texture.data.?);
-                            }
-                        },
-                        else => {},
-                    }
-                }
-            }
+            op_allocated_free(&op_alloc_queue);
             finish_cond.broadcast();
             mutex.unlock();
             break;
@@ -981,6 +967,37 @@ fn thread_func() void {
         if (!staging_buf_queue.reset(.retain_capacity)) unreachable;
         op_save_queue.resize(__system.allocator, 0) catch unreachable;
     }
+}
+fn op_allocated_free(_op: *MultiArrayList(operation_node)) void {
+    mutex.lock();
+    defer mutex.unlock();
+    if (_op.*.len > 0) {
+        var i: usize = 0;
+        const slice = _op.*.slice();
+        const tags = slice.items(.tags);
+        const data = slice.items(.data);
+        while (i < _op.*.len) : (i += 1) {
+            switch (tags[i]) {
+                .map_copy => {
+                    if (data[i].map_copy.allocated != null) {
+                        data[i].map_copy.allocated.?.free(data[i].map_copy.address);
+                    }
+                },
+                .create_buffer => {
+                    if (data[i].create_buffer.allocated != null and data[i].create_buffer.data != null) {
+                        data[i].create_buffer.allocated.?.free(data[i].create_buffer.data.?);
+                    }
+                },
+                .create_texture => {
+                    if (data[i].create_texture.allocated != null and data[i].create_texture.data != null) {
+                        data[i].create_texture.allocated.?.free(data[i].create_texture.data.?);
+                    }
+                },
+                else => {},
+            }
+        }
+    }
+    _op.*.resize(__system.allocator, 0) catch unreachable;
 }
 
 var cond_cnt: bool = false;
@@ -1023,6 +1040,38 @@ fn find_memory_type(_type_filter: u32, _prop: vk.MemoryPropertyFlags) ?u32 {
 fn append_op(node: operation_node) void {
     mutex.lock();
     defer mutex.unlock();
+    if (xfit.exiting()) {
+        switch (node) {
+            .map_copy => {
+                if (node.map_copy.allocated != null) {
+                    node.map_copy.allocated.?.free(node.map_copy.address);
+                }
+                return;
+            },
+            .create_buffer => {
+                if (node.create_buffer.allocated != null and node.create_buffer.data != null) {
+                    node.create_buffer.allocated.?.free(node.create_buffer.data.?);
+                }
+                return;
+            },
+            .create_texture => {
+                if (node.create_texture.allocated != null and node.create_texture.data != null) {
+                    node.create_texture.allocated.?.free(node.create_texture.data.?);
+                }
+                return;
+            },
+            else => {},
+        }
+    } else {
+        switch (node) {
+            inline .map_copy, .create_buffer, .create_texture => |n| {
+                if (n.allocated != null) {
+                    op_alloc_queue.append(__system.allocator, node) catch xfit.herrm("self.op_alloc_queue.append");
+                }
+            },
+            else => {},
+        }
+    }
 
     // if (node == .__update_descriptor_sets) {
     //     for (node.__update_descriptor_sets.sets) |*v| {
@@ -1032,6 +1081,14 @@ fn append_op(node: operation_node) void {
     op_queue.append(__system.allocator, node) catch xfit.herrm("self.op_queue.append");
 }
 fn append_op_save(node: operation_node) void {
+    switch (node) {
+        .map_copy, .create_buffer, .create_texture => {
+            mutex.lock();
+            op_alloc_queue.append(__system.allocator, node) catch xfit.herrm("self.op_alloc_queue.append");
+            mutex.unlock();
+        },
+        else => {},
+    }
     op_save_queue.append(__system.allocator, node) catch xfit.herrm("self.op_save_queue.append");
 }
 
@@ -1055,17 +1112,17 @@ pub fn vulkan_res_node(_res_type: res_type) type {
             if (_res_type == .buffer) {
                 self.*.buffer_option = option;
                 self.*.builded = true;
-                append_op(.{ .create_buffer = .{ .buf = self, .data = _data } });
+                append_op(.{ .create_buffer = .{ .buf = self, .data = _data, .allocated = null } });
             } else {
                 @compileError("_res_type need buffer");
             }
         }
-        pub fn create_buffer_copy(self: *vulkan_res_node_Self, option: buffer_create_option, _data: []const u8) void {
+        pub fn create_buffer_copy(self: *vulkan_res_node_Self, option: buffer_create_option, _data: []const u8, _allocator: std.mem.Allocator) void {
             if (_res_type == .buffer) {
                 self.*.buffer_option = option;
                 self.*.builded = true;
-                const map_data = th_allocator.dupe(u8, _data) catch unreachable;
-                append_op(.{ .create_buffer = .{ .buf = self, .data = map_data, .allocated = th_allocator } });
+                const map_data = _allocator.dupe(u8, _data) catch unreachable;
+                append_op(.{ .create_buffer = .{ .buf = self, .data = map_data, .allocated = _allocator } });
             } else {
                 @compileError("_res_type need buffer");
             }
@@ -1075,18 +1132,7 @@ pub fn vulkan_res_node(_res_type: res_type) type {
                 self.*.sampler = _sampler;
                 self.*.texture_option = option;
                 self.*.builded = true;
-                append_op(.{ .create_texture = .{ .buf = self, .data = _data } });
-            } else {
-                @compileError("_res_type need image");
-            }
-        }
-        pub fn create_texture_copy(self: *vulkan_res_node_Self, option: texture_create_option, _sampler: vk.Sampler, _data: []const u8) void {
-            if (_res_type == .texture) {
-                self.*.sampler = _sampler;
-                self.*.texture_option = option;
-                self.*.builded = true;
-                const map_data = th_allocator.dupe(u8, _data) catch unreachable;
-                append_op(.{ .create_texture = .{ .buf = self, .data = map_data, .allocated = th_allocator } });
+                append_op(.{ .create_texture = .{ .buf = self, .data = _data, .allocated = null } });
             } else {
                 @compileError("_res_type need image");
             }
@@ -1118,7 +1164,6 @@ pub fn vulkan_res_node(_res_type: res_type) type {
             }
         }
         fn map_copy(self: *vulkan_res_node_Self, _out_data: []const u8, allocated: ?std.mem.Allocator) void {
-            if (self.*.pvulkan_buffer == null) return;
             if (_res_type == .buffer) {
                 append_op(.{
                     .map_copy = .{
@@ -1151,26 +1196,27 @@ pub fn vulkan_res_node(_res_type: res_type) type {
         //     self.*.pvulkan_buffer.?.*.unmap();
         // }
         ///! unlike copy_update, _data cannot be a temporary variable.
-        pub fn map_update(self: *vulkan_res_node_Self, _data: anytype) void {
+        pub fn map_update(self: *vulkan_res_node_Self, _data: anytype, _allocator: ?std.mem.Allocator) void {
             var u8data: []const u8 = undefined;
             if (@typeInfo(@TypeOf(_data)) == .pointer and @typeInfo(@TypeOf(_data)).pointer.size == .One) {
                 u8data = @as([*]const u8, @ptrCast(_data))[0..@sizeOf(@TypeOf(_data.*))];
             } else {
                 u8data = std.mem.sliceAsBytes(_data);
             }
-            self.*.map_copy(u8data, null);
+            if (self.*.pvulkan_buffer == null) return;
+            self.*.map_copy(u8data, _allocator);
         }
-        pub fn copy_update(self: *vulkan_res_node_Self, _data: anytype) void {
+        pub fn copy_update(self: *vulkan_res_node_Self, _data: anytype, _allocator: std.mem.Allocator) void {
             var u8data: []const u8 = undefined;
             if (@typeInfo(@TypeOf(_data)) == .pointer and @typeInfo(@TypeOf(_data)).pointer.size == .One) {
                 u8data = @as([*]const u8, @ptrCast(_data))[0..@sizeOf(@TypeOf(_data.*))];
             } else {
                 u8data = std.mem.sliceAsBytes(_data);
             }
+            if (self.*.pvulkan_buffer == null) return;
+            const map_data = _allocator.dupe(u8, u8data) catch unreachable;
 
-            const map_data = th_allocator.dupe(u8, u8data) catch unreachable;
-
-            self.*.map_copy(map_data, th_allocator);
+            self.*.map_copy(map_data, _allocator);
         }
         pub fn clean(self: *vulkan_res_node_Self, callback: ?*const fn (caller: *anyopaque) void, data: anytype) void {
             self.*.builded = false;
@@ -1308,9 +1354,6 @@ const vulkan_res = struct {
             const st = (nd.*.data.idx) * self.*.cell_size - self.*.map_start;
             //const en = (nd.*.data.idx + nd.*.data.size - start) * self.*.cell_size;
             @memcpy(self.*.map_data[st..(st + copy.address.len)], copy.address[0..copy.address.len]);
-            if (v.map_copy.allocated != null) {
-                v.map_copy.allocated.?.free(copy.address);
-            }
         }
         if (self.*.cached) {
             __vulkan.vkd.?.flushMappedMemoryRanges(@intCast(ranges.len), ranges.ptr) catch unreachable;

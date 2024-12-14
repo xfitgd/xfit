@@ -260,7 +260,7 @@ pub fn vertices(comptime vertexT: type) type {
             if (_array.len == 0) {
                 xfit.herrm("empty vertices array!");
             }
-            self.*.node.create_buffer_copy(.{
+            self.*.node.create_buffer(.{
                 .len = @intCast(_array.len * @sizeOf(vertexT)),
                 .typ = .vertex,
                 .use = _flag,
@@ -268,8 +268,8 @@ pub fn vertices(comptime vertexT: type) type {
             }, std.mem.sliceAsBytes(_array));
         }
         ///!call when write_flag is cpu
-        pub fn copy_update(self: *Self, _array: []vertexT) void {
-            self.*.node.copy_update(_array);
+        pub fn map_update(self: *Self, _array: []vertexT) void {
+            self.*.node.map_update(_array);
         }
     };
 }
@@ -307,7 +307,7 @@ pub fn indices_(comptime _type: index_type) type {
         }
         pub fn __build(self: *Self, _array: []idxT, _flag: graphic_resource_write_flag, comptime use_gcpu_mem: bool) void {
             self.*.__check_init.init();
-            self.*.node.create_buffer_copy(.{
+            self.*.node.create_buffer(.{
                 .len = @intCast(_array.len * @sizeOf(idxT)),
                 .typ = .index,
                 .use = _flag,
@@ -316,8 +316,8 @@ pub fn indices_(comptime _type: index_type) type {
         }
 
         ///!call when write_flag is cpu
-        pub fn copy_update(self: *Self, _array: []idxT) void {
-            self.*.node.copy_update(_array);
+        pub fn map_update(self: *Self, _array: []idxT) void {
+            self.*.node.map_update(_array);
         }
     };
 }
@@ -389,12 +389,12 @@ pub const projection = struct {
             .len = @sizeOf(matrix),
             .typ = .uniform,
             .use = _flag,
-        }, @as([*]const u8, @ptrCast(&mat))[0..@sizeOf(@TypeOf(mat))]);
+        }, @as([*]const u8, @ptrCast(&mat))[0..@sizeOf(@TypeOf(mat))], __system.allocator);
     }
     ///!call when write_flag is cpu
     pub fn copy_update(self: *Self) void {
         const mat = if (xfit.is_mobile) math.matrix_multiply(self.*.proj, __vulkan.rotate_mat) else self.*.proj;
-        self.*.__uniform.copy_update(&mat);
+        self.*.__uniform.copy_update(&mat, __system.allocator);
     }
 };
 pub const camera = struct {
@@ -418,7 +418,7 @@ pub const camera = struct {
             .len = @sizeOf(matrix),
             .typ = .uniform,
             .use = .cpu,
-        }, @as([*]const u8, @ptrCast(&self.*.view))[0..@sizeOf(@TypeOf(self.*.view))]);
+        }, @as([*]const u8, @ptrCast(&self.*.view))[0..@sizeOf(@TypeOf(self.*.view))], __system.allocator);
     }
     ///!call when write_flag is cpu
     pub fn copy_update(self: *Self) void {
@@ -450,12 +450,12 @@ pub const color_transform = struct {
             .len = @sizeOf(matrix),
             .typ = .uniform,
             .use = _flag,
-        }, @as([*]const u8, @ptrCast(&self.*.color_mat))[0..@sizeOf(@TypeOf(self.*.color_mat))]);
+        }, @as([*]const u8, @ptrCast(&self.*.color_mat))[0..@sizeOf(@TypeOf(self.*.color_mat))], __system.allocator);
     }
     ///!call when write_flag is cpu
     pub fn copy_update(self: *Self) void {
         self.*.__check_alloc.check_inited();
-        self.*.__uniform.copy_update(&self.*.color_mat);
+        self.*.__uniform.copy_update(&self.*.color_mat, __system.allocator);
     }
 };
 
@@ -482,12 +482,12 @@ pub const transform = struct {
             .len = @sizeOf(matrix),
             .typ = .uniform,
             .use = .cpu,
-        }, @as([*]const u8, @ptrCast(&self.*.model))[0..@sizeOf(@TypeOf(self.*.model))]);
+        }, @as([*]const u8, @ptrCast(&self.*.model))[0..@sizeOf(@TypeOf(self.*.model))], __system.allocator);
     }
     ///!call when write_flag is readwrite_cpu
     pub fn copy_update(self: *Self) void {
         self.*.__check_init.check_inited();
-        self.*.__model_uniform.copy_update(&self.*.model);
+        self.*.__model_uniform.copy_update(&self.*.model, __system.allocator);
     }
 };
 
@@ -580,20 +580,14 @@ pub const texture_array = struct {
             },
         };
     }
-    pub inline fn build_gcpu(self: *Self, _width: u32, _height: u32, _frames: u32, _pixels: ?[]u8) void {
-        self.*.__build(_width, _height, _frames, _pixels, true);
-    }
-    pub inline fn build(self: *Self, _width: u32, _height: u32, _frames: u32, _pixels: ?[]u8) void {
-        self.*.__build(_width, _height, _frames, _pixels, false);
-    }
-    fn __build(self: *Self, _width: u32, _height: u32, _frames: u32, _pixels: ?[]u8, comptime use_gcpu_mem: bool) void {
+    pub fn build(self: *Self, _width: u32, _height: u32, _frames: u32, _pixels: ?[]u8) void {
         self.__check_init.init();
         self.pixels = _pixels;
         self.__image.create_texture(.{
             .width = _width,
             .height = _height,
             .len = _frames,
-            .use_gcpu_mem = use_gcpu_mem,
+            .use_gcpu_mem = false,
         }, self.sampler, self.pixels.?);
         var __set_res: [1]res_union = .{.{ .tex = &self.__image }};
         @memcpy(self.*.__set.__res[0..1], __set_res[0..1]);
@@ -640,13 +634,7 @@ pub const tile_texture_array = struct {
             },
         };
     }
-    pub inline fn build_gcpu(self: *Self, tile_width: u32, tile_height: u32, tile_count: u32, _width: u32, pixels: []const u8, inout_alloc_pixels: []u8) void {
-        self.*.__build(tile_width, tile_height, tile_count, _width, pixels, inout_alloc_pixels, true);
-    }
-    pub inline fn build(self: *Self, tile_width: u32, tile_height: u32, tile_count: u32, _width: u32, pixels: []const u8, inout_alloc_pixels: []u8) void {
-        self.*.__build(tile_width, tile_height, tile_count, _width, pixels, inout_alloc_pixels, false);
-    }
-    pub fn __build(self: *Self, tile_width: u32, tile_height: u32, tile_count: u32, _width: u32, pixels: []const u8, inout_alloc_pixels: []u8, comptime use_gcpu_mem: bool) void {
+    pub fn build(self: *Self, tile_width: u32, tile_height: u32, tile_count: u32, _width: u32, pixels: []const u8, inout_alloc_pixels: []u8) void {
         self.__check_init.init();
         self.alloc_pixels = inout_alloc_pixels;
         //convert tilemap pixel data format to tile image data format arranged sequentially
@@ -674,7 +662,7 @@ pub const tile_texture_array = struct {
             .width = tile_width,
             .height = tile_height,
             .len = tile_count,
-            .use_gcpu_mem = use_gcpu_mem,
+            .use_gcpu_mem = false,
         }, self.sampler, self.alloc_pixels);
         var __set_res: [1]res_union = .{.{ .tex = &self.__image }};
         @memcpy(self.*.__set.__res[0..1], __set_res[0..1]);
@@ -765,7 +753,7 @@ pub const shape_source = struct {
                 .len = @sizeOf(vector),
                 .typ = .uniform,
                 .use = _color_flag,
-            }, @as([*]const u8, @ptrCast(&cc))[0..@sizeOf(@TypeOf(cc))]);
+            }, @as([*]const u8, @ptrCast(&cc))[0..@sizeOf(@TypeOf(cc))], __system.allocator);
         }
         __vulkan_allocator.update_descriptor_sets(self.*.__raw.?.__color_sets);
         __system.cmd_op_wait.store(true, .release);
@@ -818,7 +806,7 @@ pub const shape_source = struct {
     ///!call when write_flag is cpu
     pub fn copy_color_update(self: *shape_source, _start_idx: usize, colors: []const vector) void {
         for (self.*.__raw.?.__color_uniforms[_start_idx .. _start_idx + colors.len], colors) |*u, c| {
-            u.*.copy_update(&c);
+            u.*.copy_update(&c, __system.allocator);
         }
     }
 };
@@ -1087,7 +1075,7 @@ pub const animate_image = struct {
     pub fn copy_update_frame(self: *Self) void {
         if (!self.*.__frame_uniform.is_build() or self.*.src.*.__image.texture_option.len == 0 or self.*.src.*.__image.texture_option.len - 1 < self.*.frame) return;
         const __frame_cpy: f32 = @floatFromInt(self.*.frame);
-        self.*.__frame_uniform.copy_update(&__frame_cpy);
+        self.*.__frame_uniform.copy_update(&__frame_cpy, __system.allocator);
     }
     pub fn update_uniforms(self: *Self) void {
         var __set_res: [5]res_union = .{
@@ -1108,7 +1096,7 @@ pub const animate_image = struct {
             .len = @sizeOf(f32),
             .typ = .uniform,
             .use = .cpu,
-        }, @as([*]const u8, @ptrCast(&__frame_cpy))[0..@sizeOf(@TypeOf(__frame_cpy))]);
+        }, @as([*]const u8, @ptrCast(&__frame_cpy))[0..@sizeOf(@TypeOf(__frame_cpy))], __system.allocator);
 
         self.*.update_uniforms();
         __system.cmd_op_wait.store(true, .release);

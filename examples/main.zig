@@ -29,7 +29,7 @@ var font0_data: []u8 = undefined;
 var rect_button_src: xfit.shape_source = undefined;
 var button_area_rect = xfit.rect{ .left = -100, .right = 100, .top = 50, .bottom = -50 };
 
-var shape_src: *xfit.shape_source = undefined;
+var text_src: xfit.shape_source = undefined;
 var github_shape_src: xfit.shape_source = undefined;
 var image_src: xfit.texture = undefined;
 var anim_image_src: xfit.texture_array = undefined;
@@ -180,8 +180,11 @@ pub fn xfit_init() !void {
             },
         },
     };
-    shape_src = try font.render_string2("Hello World!\n안녕하세요. break;", option2, arena_alloc);
-    text_shape = xfit.shape.init(shape_src);
+    const text_src_raw = try font.render_string2("Hello World!\n안녕하세요. break;", option2, arena_alloc);
+    text_src = xfit.shape_source.init();
+    try text_src.build(arena_alloc, text_src_raw, .gpu, .cpu);
+
+    text_shape = xfit.shape.init(&text_src);
 
     text_shape.transform.camera = &g_camera;
     text_shape.transform.projection = &g_proj;
@@ -191,13 +194,12 @@ pub fn xfit_init() !void {
     //
 
     //build button
-    var button_src = try xfit.button.make_square_button_raw(.{ 200, 100 }, 2, arena_alloc, allocator);
+    var button_src = try xfit.button.make_square_button(.{ 200, 100 }, 2, arena_alloc, allocator);
     defer button_src[1].deinit(allocator);
 
-    const rect_text_src_raw = try font0.render_string_raw("버튼", .{ .pivot = .{ 0.5, 0.3 }, .scale = .{ 4.5, 4.5 }, .color = .{ 0, 0, 0, 1 } }, allocator);
+    const rect_text_src_raw = try font0.render_string("버튼", .{ .pivot = .{ 0.5, 0.3 }, .scale = .{ 4.5, 4.5 }, .color = .{ 0, 0, 0, 1 } }, allocator);
     defer rect_text_src_raw.deinit(allocator);
-    var concat_button_src = try button_src[1].concat(rect_text_src_raw, allocator);
-    defer concat_button_src.deinit(allocator);
+    const concat_button_src = try button_src[1].concat(rect_text_src_raw, arena_alloc);
 
     rect_button_src = xfit.shape_source.init();
     try rect_button_src.build(arena_alloc, concat_button_src, .gpu, .cpu);
@@ -218,8 +220,7 @@ pub fn xfit_init() !void {
     var svg_datas = try svg_parser.calculate_shapes(allocator);
     defer svg_datas[1].deinit();
 
-    var github_shape_raw = try svg_datas[0].compute_polygon(allocator);
-    defer github_shape_raw.deinit(allocator);
+    const github_shape_raw = try svg_datas[0].compute_polygon(arena_alloc);
     github_shape_src = xfit.shape_source.init();
     try github_shape_src.build(arena_alloc, github_shape_raw, .gpu, .cpu);
 
@@ -356,7 +357,7 @@ fn move_callback() !bool {
 pub fn xfit_update() !void {
     update_mutex.lock();
 
-    shape_src.*.copy_color_update(0, &[_]xfit.vector{.{ 1, 1, 1, shape_alpha }});
+    text_src.copy_color_update(0, &[_]xfit.vector{.{ 1, 1, 1, shape_alpha }});
     text_shape.transform.model = xfit.matrix_multiply(xfit.matrix_scaling(f32, 5, 5, 1.0), xfit.matrix_translation(f32, -200 + dx, 0, 0.5));
     update_mutex.unlock();
 
@@ -378,7 +379,7 @@ pub fn xfit_size() !void {
 pub fn xfit_destroy() !void {
     move_callback_thread.join();
 
-    shape_src.*.deinit();
+    text_src.deinit();
     rect_button_src.deinit();
     github_shape_src.deinit();
 

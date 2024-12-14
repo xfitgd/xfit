@@ -172,7 +172,7 @@ pub fn button_(_msaa: bool) type {
             }
         }
         ///raw shape use allocator 1 otherwises 0
-        pub fn make_square_button_raw(scale: point, thickness: f32, _allocator0: std.mem.Allocator, _allocator1: std.mem.Allocator) !std.meta.Tuple(&[_]type{ []button_sets, geometry.geometry_raw_shapes }) {
+        pub fn make_square_button(scale: point, thickness: f32, _allocator0: std.mem.Allocator, _allocator1: std.mem.Allocator) !std.meta.Tuple(&[_]type{ []button_sets, geometry.geometry_raw_shapes }) {
             var sets: []button_sets = try _allocator0.alloc(button_sets, 2);
             errdefer _allocator0.free(sets);
 
@@ -205,19 +205,6 @@ pub fn button_(_msaa: bool) type {
             };
 
             return .{ sets, try rect_poly.compute_polygon(_allocator1) };
-        }
-        ///raw shape use allocator 1 otherwises 0
-        pub fn make_square_button(scale: point, thickness: f32, _allocator0: std.mem.Allocator, _allocator1: std.mem.Allocator) !std.meta.Tuple(&[_]type{ []button_sets, *shape_source }) {
-            var raw_polygons = try make_square_button_raw(scale, thickness, _allocator0, _allocator1);
-            defer raw_polygons[1].deinit(_allocator1);
-
-            const out: *shape_source = try _allocator0.create(shape_source);
-            errdefer _allocator0.destroy(out);
-
-            out.* = shape_source.init();
-            try out.*.build(_allocator0, raw_polygons[1], .gpu, .cpu);
-
-            return .{ raw_polygons[0], out };
         }
         pub fn ptransform(self: *Self) *transform {
             return &self.*.shape.transform;

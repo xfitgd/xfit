@@ -164,34 +164,7 @@ fn _render_string2_raw(
     }
 }
 
-pub fn render_string2(_str: []const u8, _render_option: render_option2, allocator: std.mem.Allocator) !*graphics.shape_source {
-    var vertlist = std.ArrayList([]graphics.shape_vertex_2d).init(allocator);
-    var indlist = std.ArrayList([]u32).init(allocator);
-    var colorlist = std.ArrayList(vector).init(allocator);
-    defer {
-        for (vertlist.items) |v| {
-            allocator.free(v);
-        }
-        for (indlist.items) |i| {
-            allocator.free(i);
-        }
-        vertlist.deinit();
-        indlist.deinit();
-        colorlist.deinit();
-    }
-
-    try _render_string2_raw(_str, _render_option, allocator, &vertlist, &indlist, &colorlist);
-    var raw: geometry.geometry_raw_shapes = undefined;
-    raw.vertices = vertlist.items;
-    raw.indices = indlist.items;
-    raw.colors = colorlist.items;
-    const src = try allocator.create(graphics.shape_source);
-    src.* = graphics.shape_source.init();
-    errdefer allocator.destroy(src);
-    try src.*.build(allocator, raw, _render_option.option.flag, _render_option.option.color_flag);
-    return src;
-}
-pub fn render_string2_raw(_str: []const u8, _render_option: render_option2, allocator: std.mem.Allocator) !geometry.geometry_raw_shapes {
+pub fn render_string2(_str: []const u8, _render_option: render_option2, allocator: std.mem.Allocator) !geometry.geometry_raw_shapes {
     var vertlist = std.ArrayList([]graphics.shape_vertex_2d).init(allocator);
     var indlist = std.ArrayList([]u32).init(allocator);
     var colorlist = std.ArrayList(vector).init(allocator);
@@ -274,26 +247,7 @@ fn _render_string_shapes(self: *Self, _str: []const u8, _render_option: render_o
     return offset * _render_option.scale;
 }
 
-pub fn render_string(self: *Self, _str: []const u8, _render_option: render_option, allocator: std.mem.Allocator) !*graphics.shape_source {
-    var vertex_array: []graphics.shape_vertex_2d = try allocator.alloc(graphics.shape_vertex_2d, 0);
-    var index_array: []u32 = try allocator.alloc(u32, 0);
-    defer {
-        allocator.free(vertex_array);
-        allocator.free(index_array);
-    }
-    _ = try _render_string(self, _str, _render_option, &vertex_array, &index_array, allocator);
-    const shape_src = try allocator.create(graphics.shape_source);
-    errdefer allocator.destroy(shape_src);
-    shape_src.* = graphics.shape_source.init();
-    var raw: geometry.geometry_raw_shapes = undefined;
-    raw.vertices = @constCast(&[_][]graphics.shape_vertex_2d{vertex_array});
-    raw.indices = @constCast(&[_][]u32{index_array});
-    raw.colors = @constCast(&[_]vector{_render_option.color});
-    try shape_src.*.build(allocator, raw, _render_option.flag, _render_option.color_flag);
-    return shape_src;
-}
-
-pub fn render_string_raw(self: *Self, _str: []const u8, _render_option: render_option, allocator: std.mem.Allocator) !geometry.geometry_raw_shapes {
+pub fn render_string(self: *Self, _str: []const u8, _render_option: render_option, allocator: std.mem.Allocator) !geometry.geometry_raw_shapes {
     var vertices: ?[][]graphics.shape_vertex_2d = null;
     var indices: ?[][]u32 = null;
     var colors: ?[]vector = null;

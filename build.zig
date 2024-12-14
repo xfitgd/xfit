@@ -99,8 +99,6 @@ pub const run_option = struct {
     is_console: bool = false,
     ANDROID_KEYSTORE: ?[]const u8 = null,
     enable_log: bool = true,
-    ///omit frame pointer always true when debug
-    enable_trace: bool = true,
 };
 
 const linux_lib_names = [_][]const u8{
@@ -217,7 +215,6 @@ pub fn run(
                 .root_source_file = option.root_source_file,
                 .optimize = option.OPTIMIZE,
                 .pic = true,
-                .omit_frame_pointer = if (option.enable_trace) true else null,
             });
             var contents = std.ArrayList(u8).init(arena_allocator.allocator());
             var writer = contents.writer();
@@ -283,7 +280,6 @@ pub fn run(
                 .root_source_file = option.root_source_file,
                 .optimize = option.OPTIMIZE,
                 .pic = true,
-                .omit_frame_pointer = if (option.enable_trace) true else null,
             });
             result.linkLibC();
 
@@ -339,7 +335,6 @@ pub fn run(
                 .root_source_file = option.root_source_file,
                 .optimize = option.OPTIMIZE,
                 .pic = true,
-                .omit_frame_pointer = if (option.enable_trace) true else null,
             });
 
             result.linkLibC();
