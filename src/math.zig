@@ -62,11 +62,11 @@ pub inline fn pow(v0: anytype, p: anytype) @TypeOf(v0) {
 pub fn rect_(comptime T: type) type {
     const pointT = switch (T) {
         u32 => pointu,
-        u64 => pointu8,
+        u64 => pointu64,
         f32 => point,
-        f64 => point8,
+        f64 => point64,
         i32 => pointi,
-        i64 => pointi8,
+        i64 => pointi64,
         else => @compileError("not a rect compatible type"),
     };
     return struct {
@@ -124,8 +124,8 @@ pub fn rect_(comptime T: type) type {
             if (@typeInfo(T) != .float and @import("xfit.zig").__xfit_test) return undefined;
             if (@typeInfo(T) != .float) @compileError("rect T type must be float");
 
-            const _width = @as(f32, @floatFromInt(window.window_width()));
-            const _height = @as(f32, @floatFromInt(window.window_height()));
+            const _width = @as(f32, @floatFromInt(window.width()));
+            const _height = @as(f32, @floatFromInt(window.height()));
             const ratio = if (_width / _height > _CANVAS_W / _CANVAS_H) _height / _CANVAS_H else _width / _CANVAS_W;
 
             return .{
@@ -189,20 +189,20 @@ pub fn rect_(comptime T: type) type {
             return self.left <= pt[0] and self.right >= pt[0] and self.top <= pt[1] and self.bottom >= pt[1];
         }
         pub fn is_mouse_in(self: Self) bool {
-            if (pointT != point and pointT != point8) {
+            if (pointT != point and pointT != point64) {
                 const inp = input.get_cursor_pos();
                 return self.is_point_in(.{ @intFromFloat(inp[0]), @intFromFloat(inp[1]) });
-            } else if (pointT == point8) {
+            } else if (pointT == point64) {
                 const inp = input.get_cursor_pos();
                 return self.is_point_in(.{ @floatCast(inp[0]), @floatCast(inp[1]) });
             }
             return self.is_point_in(input.get_cursor_pos());
         }
         pub fn is_mouse_in_window_rect(self: Self) bool {
-            if (pointT != point and pointT != point8) {
+            if (pointT != point and pointT != point64) {
                 const inp = input.get_cursor_pos();
                 return self.is_point_in_window_rect(.{ @intFromFloat(inp[0]), @intFromFloat(inp[1]) });
-            } else if (pointT == point8) {
+            } else if (pointT == point64) {
                 const inp = input.get_cursor_pos();
                 return self.is_point_in_window_rect(.{ @floatCast(inp[0]), @floatCast(inp[1]) });
             }
@@ -221,16 +221,20 @@ comptime {
 }
 
 pub const point = @Vector(2, f32);
-pub const point8 = @Vector(2, f64);
+pub const point64 = @Vector(2, f64);
 pub const pointu = @Vector(2, u32);
-pub const pointu8 = @Vector(2, u64);
+pub const pointu64 = @Vector(2, u64);
 pub const pointi = @Vector(2, i32);
-pub const pointi8 = @Vector(2, i64);
+pub const pointi64 = @Vector(2, i64);
 pub const vector = @Vector(4, f32);
-pub const vector8 = @Vector(4, f64);
+pub const vector64 = @Vector(4, f64);
 
 pub const point3d = @Vector(3, f32);
-pub const point3d8 = @Vector(3, f64);
+pub const point3d64 = @Vector(3, f64);
+pub const point3du = @Vector(3, u32);
+pub const point3du64 = @Vector(3, u64);
+pub const point3di = @Vector(3, i32);
+pub const point3di64 = @Vector(3, i64);
 
 pub fn point_(comptime T: type) type {
     test_number_type(T);
@@ -295,16 +299,16 @@ pub fn length1(p1: anytype) @TypeOf(p1[0]) {
     return std.math.sqrt(length_pow1(p1));
 }
 
-pub inline fn dot3(v0: anytype, v1: anytype) @TypeOf(v0[0], v1[0]) {
+pub inline fn dot(v0: anytype, v1: anytype) @TypeOf(v0[0], v1[0]) {
     if (@typeInfo(@TypeOf(v0, v1)) == .vector) {
         test_float_type(@typeInfo(@TypeOf(v0, v1)).vector.child);
-        const dot = v0 * v1;
+        const dot_ = v0 * v1;
 
         comptime var i = 0;
         var res: f32 = 0;
         const len = if (@typeInfo(@TypeOf(v0, v1)).vector.len < 3) @typeInfo(@TypeOf(v0, v1)).vector.len else 3;
         inline while (i < len) : (i += 1) {
-            res += dot[i];
+            res += dot_[i];
         }
         return res;
     } else if (@typeInfo(@TypeOf(v0, v1)) == .array) {
@@ -364,11 +368,11 @@ inline fn calc(a: anytype, b: anytype, calc_func: anytype) @TypeOf(a, b) {
 }
 pub inline fn normalize(v: anytype) @TypeOf(v) {
     if (@typeInfo(@TypeOf(v)) == .vector) {
-        return v * (@as(@TypeOf(v), @splat(1)) / @as(@TypeOf(v), @splat(std.math.sqrt(dot3(v, v)))));
+        return v * (@as(@TypeOf(v), @splat(1)) / @as(@TypeOf(v), @splat(std.math.sqrt(dot(v, v)))));
     } else if (@typeInfo(@TypeOf(v)) == .array) {
         test_float_type(@typeInfo(@TypeOf(v)).array.child);
         comptime var i = 0;
-        const l = std.math.sqrt(dot3(v, v));
+        const l = std.math.sqrt(dot(v, v));
         var res = v;
         inline while (i < @typeInfo(@TypeOf(v)).array.len) : (i += 1) {
             res[i] *= 1.0 / l;
@@ -477,13 +481,13 @@ inline fn mulAdd(v0: anytype, v1: anytype, v2: anytype) @TypeOf(v0, v1, v2) {
 }
 
 pub const matrix = matrix_(f32);
-pub const matrix8 = matrix_(f64);
+pub const matrix64 = matrix_(f64);
 pub fn matrix_(comptime float_T: type) type {
     if (@typeInfo(float_T) != .float) @compileError("not a float type");
     return [4]vector_(float_T);
 }
 
-pub fn matrix_init(comptime float_T: type) matrix_(float_T) {
+pub fn matrix_zero_init(comptime float_T: type) matrix_(float_T) {
     return .{.{0} ** 4} ** 4;
 }
 pub inline fn matrix_translation(comptime float_T: type, x: float_T, y: float_T, z: float_T) matrix_(float_T) {
@@ -722,7 +726,7 @@ pub fn matrix_lookToLh(comptime float_T: type, eyepos_vector: vector_(float_T), 
         .{ ax[0], ay[0], az[0], 0 },
         .{ ax[1], ay[1], az[1], 0 },
         .{ ax[2], ay[2], az[2], 0 },
-        .{ -dot3(ax, eyepos_vector), -dot3(ay, eyepos_vector), -dot3(az, eyepos_vector), 1 },
+        .{ -dot(ax, eyepos_vector), -dot(ay, eyepos_vector), -dot(az, eyepos_vector), 1 },
     };
 }
 ///w coordinate no need to care
@@ -778,7 +782,7 @@ pub inline fn matrix_div_vector(_matrix: anytype, _target_vector: anytype) !vect
 pub inline fn matrix_mul_point(_matrix: anytype, pt: point_(@TypeOf(_matrix[0][0]))) point_(@TypeOf(_matrix[0][0])) {
     const xx = point{ _matrix[0][0], _matrix[0][1] };
     const yy = point{ _matrix[1][0], _matrix[1][1] };
-    return .{ dot3(pt, xx) + _matrix[3][0], dot3(pt, yy) + _matrix[3][1] };
+    return .{ dot(pt, xx) + _matrix[3][0], dot(pt, yy) + _matrix[3][1] };
 }
 pub inline fn matrix_div_point(_matrix: anytype, pt: anytype) !point_(@TypeOf(_matrix[0][0])) {
     return matrix_mul_point(try matrix_inverse(_matrix), pt);
@@ -950,7 +954,7 @@ pub fn matrix3x3(comptime T: type) type {
 }
 
 /// 라플라스 전개를 사용한 행렬식 계산 Calculating matrix determinant using Laplace expansion
-pub fn matrix3x3_determinant(comptime T: type, _matrix: matrix3x3(T)) T {
+pub inline fn matrix3x3_determinant(comptime T: type, _matrix: matrix3x3(T)) T {
     return _matrix[0][0] * (_matrix[1][1] * _matrix[2][2] - _matrix[1][2] * _matrix[2][1]) -
         _matrix[0][1] * (_matrix[1][0] * _matrix[2][2] - _matrix[1][2] * _matrix[2][0]) +
         _matrix[0][2] * (_matrix[1][0] * _matrix[2][1] - _matrix[1][1] * _matrix[2][0]);

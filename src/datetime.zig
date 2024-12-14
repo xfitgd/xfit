@@ -1654,7 +1654,8 @@ test "file-modified-date" {
     const stat = try f.stat();
     var buf: [32]u8 = undefined;
     const str = try Datetime.formatHttpFromModifiedDate(&buf, stat.mtime);
-    std.log.warn("Modtime: {s}\n", .{str});
+    _ = str;
+    //std.log.warn("Modtime: {s}\n", .{str}); //?modified
 }
 
 test "readme-example" {
@@ -1669,7 +1670,7 @@ test "readme-example" {
     const now = Datetime.now();
     const now_str = try now.formatHttp(allocator);
     defer allocator.free(now_str);
-    std.log.warn("The time is now: {s}\n", .{now_str});
+    //std.log.warn("The time is now: {s}\n", .{now_str}); //?modified
     // The time is now: Fri, 20 Dec 2019 22:03:02 UTC
 
 }

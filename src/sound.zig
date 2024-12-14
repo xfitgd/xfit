@@ -331,7 +331,7 @@ pub fn deinit(self: *Self) void {
     self.*.deinit2();
     g_mutex.unlock();
 }
-pub fn deinit2(self: *Self) void {
+fn deinit2(self: *Self) void {
     if (self.*.__sound == null) return;
     miniaudio.ma_sound_uninit(&self.*.__sound.?);
     miniaudio.ma_audio_buffer_uninit(&self.*.__audio_buf);

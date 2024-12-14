@@ -30,7 +30,7 @@ const vulkan_res_node = __vulkan_allocator.vulkan_res_node;
 ///use make_shape2d_data fn
 pub const indices16 = indices_(.U16);
 pub const indices32 = indices_(.U32);
-pub const indices = indices_(DEF_IDX_TYPE_);
+pub const indices = indices_(.U32);
 
 pub inline fn execute_and_wait_all_op() void {
     __vulkan_allocator.execute_and_wait_all_op();
@@ -44,22 +44,8 @@ pub inline fn set_render_clear_color(_color: vector) void {
     @atomicStore(f32, &__vulkan.clear_color._2, _color[2], .monotonic);
     @atomicStore(f32, &__vulkan.clear_color._3, _color[3], .monotonic);
 }
-pub inline fn lock_data() void {
-    __vulkan_allocator.lock_data();
-}
-pub inline fn trylock_data() bool {
-    return __vulkan_allocator.trylock_data();
-}
-pub inline fn unlock_data() void {
-    __vulkan_allocator.unlock_data();
-}
 
-pub fn take_vertices(dest_type: type, src_ptrmempool: anytype) !dest_type {
-    return @as(dest_type, @alignCast(@ptrCast(try src_ptrmempool.*.create())));
-}
-pub const take_indices = take_vertices;
-
-pub const write_flag = __vulkan_allocator.res_usage;
+pub const graphic_resource_write_flag = __vulkan_allocator.res_usage;
 
 pub const shape_vertex_2d = extern struct {
     pos: point align(1),
@@ -71,11 +57,7 @@ pub const tex_vertex_2d = extern struct {
     uv: point align(1),
 };
 
-pub var render_cmd: ?[]*render_command = null;
-
 pub const index_type = enum { U16, U32 };
-pub const DEF_IDX_TYPE_: index_type = .U32;
-pub const DEF_IDX_TYPE = indices_(DEF_IDX_TYPE_).idxT;
 
 const components = @import("components.zig");
 
@@ -241,7 +223,7 @@ pub const iobject = struct {
     }
 };
 
-test "iobject test" {
+test "iobject" {
     var img: image = undefined;
     var iobj = iobject.init(&img);
     try std.testing.expect(iobj.eql_type(image));
@@ -267,13 +249,13 @@ pub fn vertices(comptime vertexT: type) type {
             self.*.__check_init.deinit();
             self.*.node.clean(callback, data);
         }
-        pub inline fn build_gcpu(self: *Self, _array: []vertexT, _flag: write_flag) void {
+        pub inline fn build_gcpu(self: *Self, _array: []vertexT, _flag: graphic_resource_write_flag) void {
             self.*.__build(_array, _flag, true);
         }
-        pub inline fn build(self: *Self, _array: []vertexT, _flag: write_flag) void {
+        pub inline fn build(self: *Self, _array: []vertexT, _flag: graphic_resource_write_flag) void {
             self.*.__build(_array, _flag, false);
         }
-        fn __build(self: *Self, _array: []vertexT, _flag: write_flag, comptime use_gcpu_mem: bool) void {
+        fn __build(self: *Self, _array: []vertexT, _flag: graphic_resource_write_flag, comptime use_gcpu_mem: bool) void {
             self.*.__check_init.init();
             if (_array.len == 0) {
                 xfit.herrm("empty vertices array!");
@@ -317,13 +299,13 @@ pub fn indices_(comptime _type: index_type) type {
             self.*.__check_init.deinit();
             self.*.node.clean(callback, data);
         }
-        pub inline fn build_gcpu(self: *Self, _array: []idxT, _flag: write_flag) void {
+        pub inline fn build_gcpu(self: *Self, _array: []idxT, _flag: graphic_resource_write_flag) void {
             self.*.__build(_array, _flag, true);
         }
-        pub inline fn build(self: *Self, _array: []idxT, _flag: write_flag) void {
+        pub inline fn build(self: *Self, _array: []idxT, _flag: graphic_resource_write_flag) void {
             self.*.__build(_array, _flag, false);
         }
-        pub fn __build(self: *Self, _array: []idxT, _flag: write_flag, comptime use_gcpu_mem: bool) void {
+        pub fn __build(self: *Self, _array: []idxT, _flag: graphic_resource_write_flag, comptime use_gcpu_mem: bool) void {
             self.*.__check_init.init();
             self.*.node.create_buffer_copy(.{
                 .len = @intCast(_array.len * @sizeOf(idxT)),
@@ -364,8 +346,8 @@ pub const projection = struct {
         return init_matrix_orthographic2(self, _width, _height, 0.1, 100);
     }
     pub fn init_matrix_orthographic2(self: *Self, _width: f32, _height: f32, near: f32, far: f32) matrix_error!void {
-        const width = @as(f32, @floatFromInt(window.window_width()));
-        const height = @as(f32, @floatFromInt(window.window_height()));
+        const width = @as(f32, @floatFromInt(window.width()));
+        const height = @as(f32, @floatFromInt(window.height()));
         const ratio = if (width / height > _width / _height) _height / height else _width / width;
         self.*.proj = try math.matrix_orthographicLhVulkan(
             f32,
@@ -378,7 +360,7 @@ pub const projection = struct {
         self.*.__window_height.store(height * ratio, .monotonic);
     }
     pub fn init_matrix_perspective(self: *Self, fov: f32) matrix_error!void {
-        const ratio = @as(f32, @floatFromInt(window.window_width())) / @as(f32, @floatFromInt(window.window_height()));
+        const ratio = @as(f32, @floatFromInt(window.width())) / @as(f32, @floatFromInt(window.height()));
         self.*.proj = try math.matrix_perspectiveFovLhVulkan(
             f32,
             fov,
@@ -391,7 +373,7 @@ pub const projection = struct {
         self.*.proj = try math.matrix_perspectiveFovLhVulkan(
             f32,
             fov,
-            @as(f32, @floatFromInt(window.window_width())) / @as(f32, @floatFromInt(window.window_height())),
+            @as(f32, @floatFromInt(window.width())) / @as(f32, @floatFromInt(window.height())),
             near,
             far,
         );
@@ -400,7 +382,7 @@ pub const projection = struct {
         self.*.__check_alloc.deinit();
         self.*.__uniform.clean(null, {});
     }
-    pub fn build(self: *Self, _flag: write_flag) void {
+    pub fn build(self: *Self, _flag: graphic_resource_write_flag) void {
         self.*.__check_alloc.init(__system.allocator);
         const mat = if (xfit.is_mobile) math.matrix_multiply(self.*.proj, __vulkan.rotate_mat) else self.*.proj;
         self.*.__uniform.create_buffer_copy(.{
@@ -462,7 +444,7 @@ pub const color_transform = struct {
         self.*.__check_alloc.deinit();
         self.*.__uniform.clean(null, {});
     }
-    pub fn build(self: *Self, _flag: write_flag) void {
+    pub fn build(self: *Self, _flag: graphic_resource_write_flag) void {
         self.*.__check_alloc.init(__system.allocator);
         self.*.__uniform.create_buffer_copy(.{
             .len = @sizeOf(matrix),
@@ -727,7 +709,13 @@ pub const shape_source = struct {
             .__raw = null,
         };
     }
-    pub fn build(self: *shape_source, _allocator: std.mem.Allocator, _raw: geometry.raw_shapes, _flag: write_flag, _color_flag: write_flag) !void {
+    pub fn build(
+        self: *shape_source,
+        _allocator: std.mem.Allocator,
+        _raw: geometry.geometry_raw_shapes,
+        _flag: graphic_resource_write_flag,
+        _color_flag: graphic_resource_write_flag,
+    ) !void {
         if (self.*.__raw != null) xfit.herrm("shape_source can't build twice!");
         if (!((_raw.vertices.len == _raw.indices.len) and (_raw.colors.len == _raw.indices.len))) xfit.herrm("shape_source build _raw.vertices.len != _raw.indices.len != _raw.colors.len!");
 

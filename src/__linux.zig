@@ -195,8 +195,8 @@ pub fn set_borderlessscreen_mode(monitor: *const system.monitor_info) void {
 }
 
 pub fn get_monitor_from_window() *const system.monitor_info {
-    const x = window.window_x();
-    const y = window.window_y();
+    const x = window.x();
+    const y = window.y();
     for (__system.monitors.items) |*v| {
         if (v.*.rect.is_point_in_window_rect(.{ x, y })) return v;
     }
@@ -217,7 +217,7 @@ pub fn set_window_size(w: u32, h: u32) void {
     set_size_hint(true);
 }
 
-pub fn set_window_mode2(pos: math.point_(i32), size: math.point_(u32), state: window.window_state, can_maximize: bool, can_minimize: bool, can_resizewindow: bool) void {
+pub fn set_window_mode2(pos: math.point_(i32), size: math.point_(u32), state: window.state, can_maximize: bool, can_minimize: bool, can_resizewindow: bool) void {
     _ = can_maximize;
     _ = can_minimize;
     @atomicStore(bool, &__system.init_set.can_resizewindow, can_resizewindow, .monotonic);
@@ -244,7 +244,7 @@ pub fn set_window_mode2(pos: math.point_(i32), size: math.point_(u32), state: wi
         .y = pos[1],
         .width = size[0],
         .height = size[1],
-        .state = window.window_state.Restore,
+        .state = window.state.Restore,
     };
     set_size_hint(true);
 }
@@ -402,7 +402,7 @@ pub fn linux_start() void {
         .y = __system.init_set.window_y,
         .width = __system.init_set.window_width,
         .height = __system.init_set.window_height,
-        .state = window.window_state.Restore,
+        .state = window.state.Restore,
     }; //initial value
 
     if (__system.init_set.screen_mode != .WINDOW) {
@@ -507,8 +507,8 @@ pub fn linux_loop() void {
                 }
             },
             c.ConfigureNotify => {
-                const w = window.window_width();
-                const h = window.window_height();
+                const w = window.width();
+                const h = window.height();
                 if (w != event.xconfigure.width or h != event.xconfigure.height) {
                     @atomicStore(u32, &__system.init_set.window_width, @abs(event.xconfigure.width), .monotonic);
                     @atomicStore(u32, &__system.init_set.window_height, @abs(event.xconfigure.height), .monotonic);
@@ -560,8 +560,8 @@ pub fn linux_loop() void {
                     }
                     //xfit.print_log("w{d}, h{d}\n", .{ event.xconfigure.width, event.xconfigure.height });
                 }
-                const x = window.window_x();
-                const y = window.window_y();
+                const x = window.x();
+                const y = window.y();
                 if (event.xconfigure.send_event == c.False and event.xconfigure.override_redirect == c.False) {
                     var unused: c.Window = undefined;
                     _ = c.XTranslateCoordinates(display, wnd, c.XDefaultRootWindow(display), 0, 0, &event.xconfigure.x, &event.xconfigure.y, &unused);
@@ -650,8 +650,8 @@ pub fn linux_loop() void {
                 }
             },
             c.MotionNotify => {
-                const w = window.window_width();
-                const h = window.window_height();
+                const w = window.width();
+                const h = window.height();
                 const mm = input.convert_set_mouse_pos(.{ @floatFromInt(event.xmotion.x), @floatFromInt(event.xmotion.y) });
                 @atomicStore(f64, @as(*f64, @ptrCast(&__system.cursor_pos)), @bitCast(mm), .monotonic);
                 if (input.is_mouse_out()) {

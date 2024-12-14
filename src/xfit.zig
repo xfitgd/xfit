@@ -2,72 +2,267 @@ const std = @import("std");
 const root = @import("root");
 const builtin = @import("builtin");
 
-pub const meta = @import("meta.zig");
-pub const system = @import("system.zig");
-pub const animator = @import("animator.zig");
-pub const asset_file = if (__xfit_test) void else @import("asset_file.zig");
-pub const collision = @import("collision.zig");
-pub const components = @import("components.zig");
-pub const datetime = @import("datetime.zig");
-pub const file = @import("file.zig");
-pub const font = @import("font.zig");
-pub const general_input = @import("general_input.zig");
-pub const geometry = @import("geometry.zig");
-pub const graphics = @import("graphics.zig");
-pub const image_util = @import("image_util.zig");
-pub const lua = @import("lua.zig");
-pub const math = @import("math.zig");
-pub const raw_input = if (__xfit_test) void else @import("raw_input.zig");
-pub const render_command = @import("render_command.zig");
-pub const sound = @import("sound.zig");
-pub const timer_callback = @import("timer_callback.zig");
-pub const timezones = @import("timezones.zig");
-pub const webp = @import("webp.zig");
-pub const window = @import("window.zig");
-pub const xbox_pad_input = @import("xbox_pad_input.zig");
-pub const input = @import("input.zig");
-pub const mem = @import("mem.zig");
-pub const ini = @import("ini.zig");
-pub const s2s = @import("s2s.zig");
-pub const gui = @import("gui.zig");
-///!pub const yaml = @import("yaml"); FAIL test unknown reason (error code 11) (zig_yaml)
-pub const xml = @import("xml");
-pub const json = @import("json.zig");
-pub const gltf = @import("gltf");
-pub const svg = @import("svg.zig");
-
 pub const XfitPlatform = enum(u32) {
     windows,
     android,
     linux,
 };
 
-///std.testing.refAllDeclsRecursive(@This());
-fn refAllDeclsRecursive2(comptime T: type) void {
-    if (!builtin.is_test) return;
-    inline for (comptime std.meta.declarations(T)) |decl| {
-        if (@TypeOf(@field(T, decl.name)) == type) {
-            if (comptime std.mem.eql(u8, decl.name, "c")) continue;
-            if (comptime std.mem.eql(u8, decl.name, "miniaudio")) continue;
-            if (comptime std.mem.eql(u8, decl.name, "vulkan")) continue;
-            switch (@typeInfo(@field(T, decl.name))) {
-                .@"struct", .@"enum", .@"union", .@"opaque" => refAllDeclsRecursive2(@field(T, decl.name)),
-                else => {},
-            }
-        }
-        _ = &@field(T, decl.name);
-    }
-}
+pub const modules = struct {
+    pub const meta = @import("meta.zig");
+    pub const system = @import("system.zig");
+    pub const animator = @import("animator.zig");
+    pub const collision = @import("collision.zig");
+    pub const components = @import("components.zig");
+    pub const general_input = @import("general_input.zig");
+    pub const geometry = @import("geometry.zig");
+    pub const graphics = @import("graphics.zig");
+    pub const gui = @import("gui.zig");
+};
+
+pub const datetime = @import("datetime.zig");
+pub const timezones = @import("timezones.zig");
+pub const xml = @import("xml");
+///!pub const yaml = @import("yaml"); FAIL test unknown reason (error code 11) (zig_yaml)
+pub const s2s = @import("s2s.zig");
+pub const ini = @import("ini.zig");
+pub const gltf = @import("gltf");
+
+pub const windows = @import("__windows.zig").win32;
+pub const android = @import("__android.zig").android;
+pub const vulkan = __vulkan.vk;
+pub const freetype = @import("include/freetype.zig");
+
+pub var render_cmd: ?[]*render_command = null;
+
+//?meta
+pub const is_slice = modules.meta.is_slice;
+pub const parse_value = modules.meta.parse_value;
+pub const init_default_value_and_undefined = modules.meta.init_default_value_and_undefined;
+pub const set_value = modules.meta.set_value;
+pub const create_bit_field = modules.meta.create_bit_field;
+//?system
+pub const get_processor_core_len = modules.system.get_processor_core_len;
+pub const a_load = modules.system.a_load;
+pub const a_fn = modules.system.a_fn;
+pub const a_fn_call = modules.system.a_fn_call;
+pub const a_fn_error = modules.system.a_fn_error;
+pub const platform_version = modules.system.platform_version;
+pub const screen_info = modules.system.screen_info;
+pub const monitor_info = modules.system.monitor_info;
+pub const monitors = modules.system.monitors;
+pub const primary_monitor = modules.system.primary_monitor;
+pub const current_monitor = modules.system.current_monitor;
+pub const get_platform_version = modules.system.get_platform_version;
+pub const notify = modules.system.notify;
+pub const text_notify = modules.system.text_notify;
+pub const set_execute_all_cmd_per_update = modules.system.set_execute_all_cmd_per_update;
+pub const get_execute_all_cmd_per_update = modules.system.get_execute_all_cmd_per_update;
+//?animator
+pub const ianimate_object = modules.animator.ianimate_object;
+pub const multi_animate_player = modules.animator.multi_animate_player;
+pub const animate_player = modules.animator.animate_player;
+//?asset_file
+pub const asset_file = @import("asset_file.zig");
+//?file
+pub const file = @import("file.zig");
+//?font
+pub const font = @import("font.zig");
+//?collision
+pub const iarea_type = modules.collision.iarea_type;
+pub const iarea = modules.collision.iarea;
+//?components
+pub const button = modules.components.button;
+pub const pixel_button = modules.components.pixel_button;
+pub const button_state = modules.components.button_state;
+pub const button_sets = modules.components.button_sets;
+//?general_input
+pub const GENERAL_INPUT_BUTTONS = modules.general_input.GENERAL_INPUT_BUTTONS;
+pub const GENERAL_INPUT_STATE = modules.general_input.GENERAL_INPUT_STATE;
+pub const CallbackFn = modules.general_input.CallbackFn;
+pub const start_general_input = modules.general_input.start_general_input;
+pub const destroy_general_input = modules.general_input.destroy_general_input;
+pub const set_general_input_callback = modules.general_input.set_general_input_callback;
+//?geometry
+pub const curve_type = modules.geometry.curve_type;
+pub const line_error = modules.geometry.line_error;
+pub const shapes_error = modules.geometry.shapes_error;
+pub const convert_quadratic_to_cubic0 = modules.geometry.convert_quadratic_to_cubic0;
+pub const convert_quadratic_to_cubic1 = modules.geometry.convert_quadratic_to_cubic1;
+pub const point_in_triangle = modules.geometry.point_in_triangle;
+pub const point_in_line = modules.geometry.point_in_line;
+pub const point_in_vector = modules.geometry.point_in_vector;
+pub const lines_intersect = modules.geometry.lines_intersect;
+pub const point_line_distance = modules.geometry.point_line_distance;
+pub const point_in_polygon = modules.geometry.point_in_polygon;
+pub const center_point_in_polygon = modules.geometry.center_point_in_polygon;
+pub const line_in_polygon = modules.geometry.line_in_polygon;
+pub const nearest_point_between_point_line = modules.geometry.nearest_point_between_point_line;
+pub const geometry_circle = modules.geometry.geometry_circle;
+pub const compute_option = modules.geometry.compute_option;
+pub const geometry_shapes = modules.geometry.geometry_shapes;
+pub const geometry_line = modules.geometry.geometry_line;
+pub const geometry_raw_shapes = modules.geometry.geometry_raw_shapes;
+//?graphics
+pub const indices16 = modules.graphics.indices16;
+pub const indices32 = modules.graphics.indices32;
+pub const indices = modules.graphics.indices;
+pub const execute_and_wait_all_op = modules.graphics.execute_and_wait_all_op;
+pub const execute_all_op = modules.graphics.execute_all_op;
+pub const set_render_clear_color = modules.graphics.set_render_clear_color;
+pub const graphic_resource_write_flag = modules.graphics.graphic_resource_write_flag;
+pub const iobject = modules.graphics.iobject;
+pub const projection = modules.graphics.projection;
+pub const camera = modules.graphics.camera;
+pub const color_transform = modules.graphics.color_transform;
+pub const transform = modules.graphics.transform;
+pub const texture = modules.graphics.texture;
+pub const get_default_quad_image_vertices = modules.graphics.get_default_quad_image_vertices;
+pub const get_default_linear_sampler = modules.graphics.get_default_linear_sampler;
+pub const get_default_nearest_sampler = modules.graphics.get_default_nearest_sampler;
+pub const texture_array = modules.graphics.texture_array;
+pub const tile_texture_array = modules.graphics.tile_texture_array;
+pub const shape = modules.graphics.shape;
+pub const pixel_shape = modules.graphics.pixel_shape;
+pub const shape_source = modules.graphics.shape_source;
+pub const center_pt_pos = modules.graphics.center_pt_pos;
+pub const image = modules.graphics.image;
+pub const pixel_perfect_point = modules.graphics.pixel_perfect_point;
+pub const animate_image = modules.graphics.animate_image;
+pub const tile_image = modules.graphics.tile_image;
+//?render_command
+pub const render_command = @import("render_command.zig");
+//?image_util
+pub const image_util = @import("image_util.zig");
+//?lua
+pub const lua = @import("lua.zig");
+//?math
+pub const math = @import("math.zig");
+pub const matrix = math.matrix;
+pub const matrix64 = math.matrix64;
+pub const matrix3x3 = math.matrix3x3;
+///TODO matrix3x3_inverse
+pub const matrix3x3_determinant = math.matrix3x3_determinant;
+pub const rect = math.rect;
+pub const recti = math.recti;
+pub const rectu = math.rectu;
+pub const pointu = math.pointu;
+pub const pointu64 = math.pointu64;
+pub const pointi = math.pointi;
+pub const pointi64 = math.pointi64;
+pub const point64 = math.point64;
+pub const point = math.point;
+pub const point3d = math.point3d;
+pub const point3d64 = math.point3d64;
+pub const point3du = math.point3du;
+pub const point3du64 = math.point3du64;
+pub const point3di = math.point3di;
+pub const point3di64 = math.point3di64;
+pub const vector = math.vector;
+pub const vector64 = math.vector64;
+pub const matrix_error = math.matrix_error;
+pub const matrix_addition = math.matrix_addition;
+pub const matrix_subtract = math.matrix_subtract;
+pub const matrix_transpose = math.matrix_transpose;
+pub const matrix_determinant = math.matrix_determinant;
+pub const matrix_inverse = math.matrix_inverse;
+pub const matrix_div_point = math.matrix_div_point;
+pub const matrix_mul_point = math.matrix_mul_point;
+pub const matrix_div_vector = math.matrix_div_vector;
+pub const matrix_mul_vector = math.matrix_mul_vector;
+pub const matrix_multiply = math.matrix_multiply;
+pub const matrix_identity = math.matrix_identity;
+pub const matrix_lookAtRh = math.matrix_lookAtRh;
+pub const matrix_lookAtLh = math.matrix_lookAtLh;
+pub const matrix_lookToRh = math.matrix_lookToRh;
+pub const matrix_lookToLh = math.matrix_lookToLh;
+pub const matrix_orthographicRh = math.matrix_orthographicRh;
+pub const matrix_orthographicLh = math.matrix_orthographicLh;
+pub const matrix_orthographicLhVulkan = math.matrix_orthographicLhVulkan;
+pub const matrix_perspectiveFovRhGL = math.matrix_perspectiveFovRhGL;
+pub const matrix_perspectiveFovRh = math.matrix_perspectiveFovRh;
+pub const matrix_perspectiveFovLh = math.matrix_perspectiveFovLh;
+pub const matrix_perspectiveFovLhVulkan = math.matrix_perspectiveFovLhVulkan;
+pub const matrix_scaling_inverse = math.matrix_scaling_inverse;
+pub const matrix_rotation2D_inverse = math.matrix_rotation2D_inverse;
+pub const matrix_rocation2D_transpose = math.matrix_rocation2D_transpose;
+pub const matrix_rocationZ_transpose = math.matrix_rocationZ_transpose;
+pub const matrix_rocationY_transpose = math.matrix_rocationY_transpose;
+pub const matrix_rocationX_transpose = math.matrix_rocationX_transpose;
+pub const matrix_rotationZ_inverse = math.matrix_rotationZ_inverse;
+pub const matrix_rotationY_inverse = math.matrix_rotationY_inverse;
+pub const matrix_rotationX_inverse = math.matrix_rotationX_inverse;
+pub const matrix_rotation2D = math.matrix_rotation2D;
+pub const matrix_rotationZ = math.matrix_rotationZ;
+pub const matrix_rotationY = math.matrix_rotationY;
+pub const matrix_rotationX = math.matrix_rotationX;
+pub const matrix_scalingXY = math.matrix_scalingXY;
+pub const matrix_scaling = math.matrix_scaling;
+pub const matrix_translation_transpose_inverse = math.matrix_translation_transpose_inverse;
+pub const matrix_translation_inverse = math.matrix_translation_inverse;
+pub const matrix_translation_transpose = math.matrix_translation_transpose;
+pub const matrix_translationXY = math.matrix_translationXY;
+pub const matrix_translation = math.matrix_translation;
+pub const matrix_zero_init = math.matrix_zero_init;
+pub const compare_n = math.compare_n;
+pub const compare = math.compare;
+pub const dot = math.dot;
+pub const cross3 = math.cross3;
+pub const cross2 = math.cross2;
+pub const pow = math.pow;
+//?raw_input
+pub const raw_input = @import("raw_input.zig");
+//?sound
+pub const sound = @import("sound.zig");
+pub const play_sound = sound.play_sound;
+pub const sound_source = sound.sound_source;
+//?timer_callback
+pub const timer_callback = @import("timer_callback.zig");
+//?webp
+pub const webp = @import("webp.zig");
+//?window
+pub const window = @import("window.zig");
+pub const screen_orientation = window.screen_orientation;
+//?xbox_pad_input
+pub const xbox_pad_input = @import("xbox_pad_input.zig");
+//?input
+pub const input = @import("input.zig");
+//?mem
+pub const mem = @import("mem.zig");
+//?gui
+pub const icomponent = modules.gui.icomponent;
+pub const component = modules.gui.component;
+//?json
+pub const json = @import("json.zig");
+//?svg
+pub const svg = @import("svg.zig");
 
 test {
     @setEvalBranchQuota(10000000);
-    refAllDeclsRecursive2(@This());
+    std.testing.refAllDeclsRecursive(math);
+    std.testing.refAllDeclsRecursive(json);
+    std.testing.refAllDeclsRecursive(svg);
+    std.testing.refAllDeclsRecursive(modules);
+    std.testing.refAllDeclsRecursive(mem);
+    std.testing.refAllDeclsRecursive(input);
+    std.testing.refAllDeclsRecursive(window);
+    std.testing.refAllDeclsRecursive(webp);
+    std.testing.refAllDeclsRecursive(timer_callback);
+    std.testing.refAllDecls(sound);
+    std.testing.refAllDecls(sound.sound_source);
+    std.testing.refAllDecls(font);
+    std.testing.refAllDeclsRecursive(image_util);
+    std.testing.refAllDeclsRecursive(render_command);
+    std.testing.refAllDeclsRecursive(timezones);
+    std.testing.refAllDeclsRecursive(datetime);
+    std.testing.refAllDeclsRecursive(gltf);
+    std.testing.refAllDeclsRecursive(xml);
 }
 
 //system engine only headers
 const __system = @import("__system.zig");
-const __windows = if (platform == .windows) @import("__windows.zig") else void;
-const __android = if (platform == .android) @import("__android.zig") else void;
+const __windows = if (!@import("builtin").is_test) @import("__windows.zig") else void;
+const __android = if (!@import("builtin").is_test) @import("__android.zig") else void;
 const __vulkan = @import("__vulkan.zig");
 const __linux = @import("__linux.zig");
 
@@ -201,7 +396,7 @@ pub inline fn print_error(comptime fmt: []const u8, args: anytype) void {
 
         std.debug.print("{s}\n{s}", .{ str, str2.items });
 
-        system.a_fn_call(__system.error_handling_func, .{ str, str2.items }) catch {};
+        a_fn_call(__system.error_handling_func, .{ str, str2.items }) catch {};
         // fs.create("xfit_err.log", .{ .truncate = false }) catch fs.create("xfit_err.log", .{ .exclusive = true }) catch  return;
     } else {
         const str = std.fmt.allocPrint(std.heap.c_allocator, "{s} @ " ++ fmt ++ " ", .{now_str} ++ args) catch return;
@@ -227,7 +422,7 @@ pub inline fn print_error(comptime fmt: []const u8, args: anytype) void {
         str2.append(0) catch return;
         _ = __android.android.__android_log_write(__android.android.ANDROID_LOG_ERROR, "xfit", str2.items.ptr);
 
-        system.a_fn_call(__system.error_handling_func, .{ str, str2.items }) catch {};
+        a_fn_call(__system.error_handling_func, .{ str, str2.items }) catch {};
     }
     // fs.seekFromEnd(0) catch return;
     // _ = fs.write(str) catch return;
@@ -386,7 +581,7 @@ pub const init_setting = struct {
     min_window_width: u32 = DEF_SIZE,
     min_window_height: u32 = DEF_SIZE,
 
-    window_show: window.window_show = window.window_show.DEFAULT,
+    window_show: window.show = window.show.DEFAULT,
     screen_mode: screen_mode = screen_mode.WINDOW,
     screen_index: u32 = PRIMARY_SCREEN_INDEX,
 

@@ -1,14 +1,14 @@
 const std = @import("std");
 const xfit = @import("xfit.zig");
 
-const __windows = if (xfit.platform == .windows) @import("__windows.zig") else void;
-const __android = if (xfit.platform == .android) @import("__android.zig") else void;
+const __windows = if (!@import("builtin").is_test) @import("__windows.zig") else void;
+const __android = if (!@import("builtin").is_test) @import("__android.zig") else void;
 const __system = @import("__system.zig");
 const system = @import("system.zig");
 
 const win32 = __windows.win32;
 
-pub const INPUT_BUTTONS = packed struct {
+pub const GENERAL_INPUT_BUTTONS = packed struct {
     A: bool,
     B: bool,
     X: bool,
@@ -32,7 +32,7 @@ pub const INPUT_BUTTONS = packed struct {
     VOLUME_DOWN: bool,
 };
 
-pub const INPUT_STATE = struct {
+pub const GENERAL_INPUT_STATE = struct {
     handle: ?*anyopaque,
     left_trigger: f32,
     right_trigger: f32,
@@ -40,20 +40,20 @@ pub const INPUT_STATE = struct {
     left_thumb_y: f32,
     right_thumb_x: f32,
     right_thumb_y: f32,
-    buttons: INPUT_BUTTONS,
+    buttons: GENERAL_INPUT_BUTTONS,
 };
 
-pub const CallbackFn = *const fn (state: INPUT_STATE) void;
+pub const CallbackFn = *const fn (state: GENERAL_INPUT_STATE) void;
 
 var fn_: ?CallbackFn = null;
 
-pub fn start() void {}
+pub fn start_general_input() void {}
 
-pub fn destroy() void {
+pub fn destroy_general_input() void {
     @atomicStore(?CallbackFn, &__system.general_input_callback, null, .monotonic);
 }
 
-pub fn set_callback(_fn: CallbackFn) void {
+pub fn set_general_input_callback(_fn: CallbackFn) void {
     fn_ = _fn;
     @atomicStore(?CallbackFn, &__system.general_input_callback, _fn, .monotonic);
 }

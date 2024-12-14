@@ -4,8 +4,8 @@ const ArrayList = std.ArrayList;
 const MemoryPoolExtra = std.heap.MemoryPoolExtra;
 
 const window = @import("window.zig");
-const __windows = if (xfit.platform == .windows) @import("__windows.zig") else void;
-const __android = if (xfit.platform == .android) @import("__android.zig") else void;
+const __windows = if (!builtin.is_test) @import("__windows.zig") else void;
+const __android = if (!builtin.is_test) @import("__android.zig") else void;
 const __linux = @import("__linux.zig");
 const system = @import("system.zig");
 const math = @import("math.zig");
@@ -235,7 +235,7 @@ fn chooseSwapExtent(capabilities: vk.SurfaceCapabilitiesKHR) vk.Extent2D {
     if (capabilities.current_extent.width != std.math.maxInt(u32)) {
         return capabilities.current_extent;
     } else {
-        var swapchainExtent = vk.Extent2D{ .width = @max(0, window.window_width()), .height = @max(0, window.window_height()) };
+        var swapchainExtent = vk.Extent2D{ .width = @max(0, window.width()), .height = @max(0, window.height()) };
         swapchainExtent.width = std.math.clamp(swapchainExtent.width, capabilities.min_image_extent.width, capabilities.max_image_extent.width);
         swapchainExtent.height = std.math.clamp(swapchainExtent.height, capabilities.min_image_extent.height, capabilities.max_image_extent.height);
         return swapchainExtent;
@@ -2144,7 +2144,7 @@ pub fn drawFrame() void {
         recreate_swapchain();
     }
 
-    if (graphics.render_cmd != null) {
+    if (xfit.render_cmd != null) {
         if (first_draw) {
             first_draw = false;
         } else {
@@ -2178,14 +2178,14 @@ pub fn drawFrame() void {
         }
         imageIndex = acquireNextImageKHR_result.image_index;
 
-        const cmds = __system.allocator.alloc(vk.CommandBuffer, graphics.render_cmd.?.len + 1) catch xfit.herrm("drawframe cmds alloc");
+        const cmds = __system.allocator.alloc(vk.CommandBuffer, xfit.render_cmd.?.len + 1) catch xfit.herrm("drawframe cmds alloc");
         defer __system.allocator.free(cmds);
 
         cmds[0] = vkCommandBuffer[state.frame];
         var cmdidx: usize = 1;
 
         render_command.mutex.lock();
-        for (graphics.render_cmd.?) |*cmd| {
+        for (xfit.render_cmd.?) |*cmd| {
             if (@cmpxchgStrong(bool, &cmd.*.*.__refesh[state.frame], true, false, .monotonic, .monotonic) == null) {
                 recordCommandBuffer(cmd, @intCast(state.frame));
             }

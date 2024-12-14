@@ -7,8 +7,8 @@ const root = @import("root");
 
 const xfit = @import("xfit.zig");
 
-const __windows = if (xfit.platform == .windows) @import("__windows.zig") else void;
-const __android = if (xfit.platform == .android) @import("__android.zig") else void;
+const __windows = if (!@import("builtin").is_test) @import("__windows.zig") else void;
+const __android = if (!@import("builtin").is_test) @import("__android.zig") else void;
 const __linux = @import("__linux.zig");
 const window = @import("window.zig");
 const __vulkan = @import("__vulkan.zig");
@@ -17,10 +17,6 @@ const __system = @import("__system.zig");
 const math = @import("math.zig");
 const file = @import("file.zig");
 const datetime = @import("datetime.zig");
-
-pub const windows = if (xfit.platform == .windows) __windows.win32 else void;
-pub const android = if (xfit.platform == .android) __android.android else void;
-pub const vulkan = __vulkan.vk;
 
 pub inline fn get_processor_core_len() u32 {
     return __system.processor_core_len;
@@ -114,7 +110,7 @@ pub const monitor_info = struct {
 
     is_primary: bool,
     resolution: screen_info = undefined,
-    __hmonitor: if (xfit.platform == .windows) windows.HMONITOR else void = if (xfit.platform == .windows) undefined else {},
+    __hmonitor: if (xfit.platform == .windows) __windows.HMONITOR else void = if (xfit.platform == .windows) undefined else {},
 
     name: []const u8 = undefined,
 

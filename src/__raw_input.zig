@@ -2,17 +2,17 @@
 const std = @import("std");
 const ArrayList = std.ArrayList;
 
-const __windows = @import("__windows.zig");
+const __windows = if (!@import("builtin").is_test) @import("__windows.zig") else void;
 const __system = @import("__system.zig");
 const raw_input = @import("raw_input.zig");
 const system = @import("system.zig");
 const xfit = @import("xfit.zig");
 
 comptime {
-    if (xfit.platform != .windows) @compileError("__raw_input only can run windows");
+    if (xfit.platform != .windows and !@import("builtin").is_test) @compileError("__raw_input only can run windows");
 }
 
-const win32 = __windows.win32;
+const win32 = if (!@import("builtin").is_test) __windows.win32 else void;
 
 const device = struct {
     handle: ?*anyopaque = null,

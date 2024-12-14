@@ -7,8 +7,8 @@ const __system = @import("__system.zig");
 const iobject = graphics.iobject;
 const transform = graphics.transform;
 const shape_source = graphics.shape_source;
-const shape_node = geometry.shapes.shape_node;
-const shapes = geometry.shapes;
+const shape_node = geometry.geometry_shapes.shape_node;
+const shapes = geometry.geometry_shapes;
 const shape_ = graphics.shape_;
 const font = @import("font.zig");
 
@@ -172,7 +172,7 @@ pub fn button_(_msaa: bool) type {
             }
         }
         ///raw shape use allocator 1 otherwises 0
-        pub fn make_square_button_raw(scale: point, thickness: f32, _allocator0: std.mem.Allocator, _allocator1: std.mem.Allocator) !std.meta.Tuple(&[_]type{ []button_sets, geometry.raw_shapes }) {
+        pub fn make_square_button_raw(scale: point, thickness: f32, _allocator0: std.mem.Allocator, _allocator1: std.mem.Allocator) !std.meta.Tuple(&[_]type{ []button_sets, geometry.geometry_raw_shapes }) {
             var sets: []button_sets = try _allocator0.alloc(button_sets, 2);
             errdefer _allocator0.free(sets);
 
@@ -185,11 +185,11 @@ pub fn button_(_msaa: bool) type {
             sets[1].over_color = .{ 0.5, 0.5, 1, 1 };
             sets[1].up_color = .{ 0.5, 0.5, 0.5, 1 };
 
-            var rect_line: [4]geometry.line = .{
-                geometry.line.line_init(.{ -scale[0] / 2, scale[1] / 2 }, .{ scale[0] / 2, scale[1] / 2 }),
-                geometry.line.line_init(.{ scale[0] / 2, scale[1] / 2 }, .{ scale[0] / 2, -scale[1] / 2 }),
-                geometry.line.line_init(.{ scale[0] / 2, -scale[1] / 2 }, .{ -scale[0] / 2, -scale[1] / 2 }),
-                geometry.line.line_init(.{ -scale[0] / 2, -scale[1] / 2 }, .{ -scale[0] / 2, scale[1] / 2 }),
+            var rect_line: [4]geometry.geometry_line = .{
+                geometry.geometry_line.line_init(.{ -scale[0] / 2, scale[1] / 2 }, .{ scale[0] / 2, scale[1] / 2 }),
+                geometry.geometry_line.line_init(.{ scale[0] / 2, scale[1] / 2 }, .{ scale[0] / 2, -scale[1] / 2 }),
+                geometry.geometry_line.line_init(.{ scale[0] / 2, -scale[1] / 2 }, .{ -scale[0] / 2, -scale[1] / 2 }),
+                geometry.geometry_line.line_init(.{ -scale[0] / 2, -scale[1] / 2 }, .{ -scale[0] / 2, scale[1] / 2 }),
             };
             var rect_npoly: [1]u32 = .{rect_line.len};
 

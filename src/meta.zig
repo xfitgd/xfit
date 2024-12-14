@@ -16,6 +16,7 @@ fn _init_default_value_and_undefined(in_field: anytype) void {
 }
 
 pub inline fn is_slice(comptime T: type) bool {
+    //if (!@inComptime()) unreachable; //! ??unknown unreachable
     return @typeInfo(T) == .pointer and @typeInfo(T).pointer.size == .Slice;
 }
 
@@ -84,6 +85,7 @@ pub fn set_value(field: anytype, value: anytype) void {
 }
 
 pub fn create_bit_field(comptime struct_T: type) type {
+    if (!@inComptime()) unreachable;
     const func = struct {
         pub fn add_field(comptime fields: []const std.builtin.Type.StructField, comptime output_fields: []std.builtin.Type.StructField) void {
             inline for (fields, 0..) |T, i| {

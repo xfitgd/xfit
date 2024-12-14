@@ -9,8 +9,6 @@ const xfit = @import("xfit");
 const window = xfit.window;
 const input = xfit.input;
 const xbox_pad_input = input.xbox_pad_input;
-const general_input = input.general_input;
-const timer_callback = xfit.timer_callback;
 
 const ArrayList = std.ArrayList;
 const MemoryPoolExtra = std.heap.MemoryPoolExtra;
@@ -49,7 +47,7 @@ fn xinput_callback(state: xbox_pad_input.XBOX_STATE) void {
         state.right_trigger,
     });
 }
-fn general_input_callback(state: general_input.INPUT_STATE) void {
+fn general_input_callback(state: xfit.GENERAL_INPUT_STATE) void {
     xfit.print("GENERAL [{}]\n", .{state.handle.?});
     xfit.print("Buttons={s}{s}{s}{s} {s} {s}\n", .{
         if (state.buttons.A) "A" else " ",
@@ -93,11 +91,11 @@ fn change_xbox(_device_idx: u32, add_or_remove: bool) void {
 
 pub fn xfit_init() !void {
     try xbox_pad_input.start(change_xbox);
-    general_input.start();
-    general_input.set_callback(general_input_callback);
+    xfit.start_general_input();
+    xfit.set_general_input_callback(general_input_callback);
     xbox_pad_input.set_callback(xinput_callback);
 
-    _ = try timer_callback.start(xfit.sec_to_nano_sec2(1, 0, 0, 0), 0, vib_callback, .{});
+    _ = try xfit.timer_callback.start(xfit.sec_to_nano_sec2(1, 0, 0, 0), 0, vib_callback, .{});
 }
 
 fn vib_callback() !void {
@@ -118,7 +116,7 @@ pub fn xfit_size() !void {}
 ///before system clean
 pub fn xfit_destroy() !void {
     xbox_pad_input.destroy();
-    general_input.destroy();
+    xfit.destroy_general_input();
 }
 
 ///after system clean

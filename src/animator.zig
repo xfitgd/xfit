@@ -61,14 +61,14 @@ pub const ianimate_object = struct {
     }
 };
 
-pub const multi_player = struct {
+pub const multi_animate_player = struct {
     objs: []ianimate_object,
     playing: bool = false,
     target_fps: f32 = 30,
     __playing_dt: f32 = 0,
     loop: bool = true,
 
-    pub fn update(self: *multi_player, _dt: f64) void {
+    pub fn update(self: *multi_animate_player, _dt: f64) void {
         if (self.*.playing) {
             const dt: f32 = @floatCast(_dt);
             self.*.__playing_dt += dt;
@@ -87,38 +87,38 @@ pub const multi_player = struct {
             }
         }
     }
-    pub fn play(self: *multi_player) void {
+    pub fn play(self: *multi_animate_player) void {
         self.*.playing = true;
         self.*.__playing_dt = 0.0;
     }
-    pub fn stop(self: *multi_player) void {
+    pub fn stop(self: *multi_animate_player) void {
         self.*.playing = false;
     }
-    pub fn set_frame(self: *multi_player, _frame: u32) void {
+    pub fn set_frame(self: *multi_animate_player, _frame: u32) void {
         for (self.*.objs) |*v| {
             v.*.set_frame(_frame);
         }
     }
-    pub fn prev_frame(self: *multi_player) void {
+    pub fn prev_frame(self: *multi_animate_player) void {
         for (self.*.objs) |*v| {
             v.*.prev_frame();
         }
     }
-    pub fn next_frame(self: *multi_player) void {
+    pub fn next_frame(self: *multi_animate_player) void {
         for (self.*.objs) |*v| {
             v.*.next_frame();
         }
     }
 };
 
-pub const player = struct {
+pub const animate_player = struct {
     obj: ianimate_object,
     playing: bool = false,
     target_fps: f64 = 30,
     __playing_dt: f64 = 0,
     loop: bool = true,
 
-    pub fn update(self: *player, _dt: f64) void {
+    pub fn update(self: *animate_player, _dt: f64) void {
         if (self.*.playing) {
             const dt: f64 = _dt;
             self.*.__playing_dt += dt;
@@ -132,20 +132,20 @@ pub const player = struct {
             }
         }
     }
-    pub fn play(self: *player) void {
+    pub fn play(self: *animate_player) void {
         self.*.playing = true;
         self.*.__playing_dt = 0.0;
     }
-    pub fn stop(self: *player) void {
+    pub fn stop(self: *animate_player) void {
         self.*.playing = false;
     }
-    pub fn set_frame(self: *player, _frame: u32) void {
+    pub fn set_frame(self: *animate_player, _frame: u32) void {
         self.*.obj.set_frame(_frame);
     }
-    pub fn prev_frame(self: *player) void {
+    pub fn prev_frame(self: *animate_player) void {
         self.*.obj.prev_frame();
     }
-    pub fn next_frame(self: *player) void {
+    pub fn next_frame(self: *animate_player) void {
         self.*.obj.next_frame();
     }
 };

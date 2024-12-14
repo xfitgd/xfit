@@ -2,8 +2,8 @@ const std = @import("std");
 
 const xfit = @import("xfit.zig");
 
-const __windows = if (xfit.platform == .windows) @import("__windows.zig") else void;
-const __android = if (xfit.platform == .android) @import("__android.zig") else void;
+const __windows = if (!@import("builtin").is_test) @import("__windows.zig") else void;
+const __android = if (!@import("builtin").is_test) @import("__android.zig") else void;
 const __linux = @import("__linux.zig");
 const window = @import("window.zig");
 const __system = @import("__system.zig");
@@ -650,8 +650,8 @@ pub inline fn get_mouse_scroll_dt() i32 {
 pub fn convert_set_mouse_pos(mouse_pos: math.point) math.point {
     const mx: f32 = mouse_pos[0];
     const my: f32 = mouse_pos[1];
-    const w = @as(f32, @floatFromInt(window.window_width())) / 2.0;
-    const h = @as(f32, @floatFromInt(window.window_height())) / 2.0;
+    const w = @as(f32, @floatFromInt(window.width())) / 2.0;
+    const h = @as(f32, @floatFromInt(window.height())) / 2.0;
     const mm = math.point{ mx - w, -my + h };
     @atomicStore(f32, &__system.cursor_pos[0], mm[0], std.builtin.AtomicOrder.monotonic);
     @atomicStore(f32, &__system.cursor_pos[1], mm[1], std.builtin.AtomicOrder.monotonic);
@@ -660,8 +660,8 @@ pub fn convert_set_mouse_pos(mouse_pos: math.point) math.point {
 pub fn convert_mouse_pos(mouse_pos: math.point) math.point {
     const mx: f32 = mouse_pos[0];
     const my: f32 = mouse_pos[1];
-    const w = @as(f32, @floatFromInt(window.window_width())) / 2.0;
-    const h = @as(f32, @floatFromInt(window.window_height())) / 2.0;
+    const w = @as(f32, @floatFromInt(window.width())) / 2.0;
+    const h = @as(f32, @floatFromInt(window.height())) / 2.0;
     const mm = math.point{ mx - w, -my + h };
     return mm;
 }

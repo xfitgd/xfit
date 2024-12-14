@@ -7,8 +7,8 @@ const system = @import("system.zig");
 
 const xfit = @import("xfit.zig");
 
-const __windows = if (xfit.platform == .windows) @import("__windows.zig") else void;
-const __android = if (xfit.platform == .android) @import("__android.zig") else void;
+const __windows = if (!@import("builtin").is_test) @import("__windows.zig") else void;
+const __android = if (!@import("builtin").is_test) @import("__android.zig") else void;
 
 //TODO linux support
 

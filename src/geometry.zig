@@ -7,12 +7,12 @@ const graphics = @import("graphics.zig");
 const point = math.point;
 const vector = math.vector;
 
-const dot3 = math.dot3;
+const dot = math.dot;
 const cross3 = math.cross3;
 const sqrt = std.math.sqrt;
 const pow = math.pow;
 
-pub const curve_TYPE = enum {
+pub const curve_type = enum {
     unknown,
     serpentine,
     loop,
@@ -47,11 +47,11 @@ pub fn point_in_triangle(p: point, a: point, b: point, c: point) bool {
     const v1 = b - a;
     const v2 = p - a;
 
-    const dot00 = dot3(v0, v0);
-    const dot01 = dot3(v0, v1);
-    const dot02 = dot3(v0, v2);
-    const dot11 = dot3(v1, v1);
-    const dot12 = dot3(v1, v2);
+    const dot00 = dot(v0, v0);
+    const dot01 = dot(v0, v1);
+    const dot02 = dot(v0, v2);
+    const dot11 = dot(v1, v1);
+    const dot12 = dot(v1, v2);
     const denominator = dot00 * dot11 - dot01 * dot01;
     if (denominator == 0) {
         return false;
@@ -97,7 +97,7 @@ pub fn lines_intersect(a1: point, a2: point, b1: point, b2: point, result: ?*poi
     return false;
 }
 
-pub inline fn point_line_side(p: point, l0: point, l1: point) f32 {
+pub inline fn point_line_distance(p: point, l0: point, l1: point) f32 {
     return (l1[0] - l0[0]) * (p[1] - l0[1]) - (p[0] - l0[0]) * (l1[1] - l0[1]);
 }
 ///https://bowbowbow.tistory.com/24
@@ -157,10 +157,10 @@ pub fn nearest_point_between_point_line(p: point, l0: point, l1: point) point {
     return .{ x, a * p[0] + l0[1] - l0[0] * a };
 }
 
-pub const circle = struct {
+pub const geometry_circle = struct {
     p: point,
     radius: f32,
-    pub fn circle_in_circle(a: @This(), b: circle) bool {
+    pub fn circle_in_circle(a: @This(), b: geometry_circle) bool {
         return math.length_pow(a.p, b.p) <= math.pow(a.radius + b.radius, 2);
     }
     pub fn circle_in_point(c: @This(), p: point) bool {
@@ -172,9 +172,9 @@ pub const compute_option = struct {
     mat: math.matrix,
 };
 
-pub const shapes = struct {
+pub const geometry_shapes = struct {
     pub const shape_node = struct {
-        lines: []line,
+        lines: []geometry_line,
         color: ?vector = .{ 0, 0, 0, 1 },
         stroke_color: ?vector = null,
         n_polygons: []u32,
@@ -208,9 +208,9 @@ pub const shapes = struct {
     // }
 
     fn _compute_polygon_sub(
-        _out: *raw_shapes,
+        _out: *geometry_raw_shapes,
         _allocator: std.mem.Allocator,
-        _lines: []line,
+        _lines: []geometry_line,
         _n_polygons: []const u32,
         _vertices_list: *ArrayList([]graphics.shape_vertex_2d),
         _indices_list: *ArrayList([]u32),
@@ -268,9 +268,9 @@ pub const shapes = struct {
     }
 
     fn _compute_polygon_sub_outline(
-        _out: *raw_shapes,
+        _out: *geometry_raw_shapes,
         _allocator: std.mem.Allocator,
-        _lines: []line,
+        _lines: []geometry_line,
         _n_polygons: []const u32,
         _vertices_list: *ArrayList([]graphics.shape_vertex_2d),
         _indices_list: *ArrayList([]u32),
@@ -292,7 +292,7 @@ pub const shapes = struct {
             }
         }
 
-        var lines_ = try _allocator.dupe(line, _lines);
+        var lines_ = try _allocator.dupe(geometry_line, _lines);
         defer _allocator.free(lines_);
 
         var vertex_len: u32 = 0;
@@ -307,7 +307,7 @@ pub const shapes = struct {
             try vertices_sub_list.append(.{ .pos = .{ std.math.floatMax(f32), std.math.floatMin(f32) }, .uvw = .{ 1, 0, 0 } });
             const first_vertex_idx2: u32 = @intCast(vertices_sub_list.items.len - 1); // we need first {std.math.floatMax(f32), std.math.floatMin(f32) } point, so save idx2 separate
             var first_vertex_idx3: u32 = undefined;
-            const ccw: f32 = if (math.cross2(_lines[first_vertex_idx].start, if (_lines[first_vertex_idx].curve_type == .line) _lines[first_vertex_idx].end else _lines[first_vertex_idx].control0) > 0) -1 else 1;
+            const ccw: f32 = if (math.cross2(_lines[first_vertex_idx].start, if (_lines[first_vertex_idx].type == .line) _lines[first_vertex_idx].end else _lines[first_vertex_idx].control0) > 0) -1 else 1;
 
             for (&[_]f32{ thickness, -thickness }) |t| {
                 var i: u32 = first_vertex_idx;
@@ -318,9 +318,9 @@ pub const shapes = struct {
                         const next = if (i - 1 >= first_vertex_idx) i - 1 else vertex_len - 1;
                         const prev = if (i == vertex_len - 1) first_vertex_idx else (i + 1);
 
-                        if (lines_[i].curve_type == .line) { //if type is line, no need to change lines_ value
+                        if (lines_[i].type == .line) { //if type is line, no need to change lines_ value
                             try vertices_sub_list.append(.{ .pos = extend_point(
-                                if (_lines[prev].curve_type == .line) lines_[prev].start else _lines[prev].control1,
+                                if (_lines[prev].type == .line) lines_[prev].start else _lines[prev].control1,
                                 _lines[i].start,
                                 _lines[i].end,
                                 t,
@@ -328,7 +328,7 @@ pub const shapes = struct {
                             ), .uvw = .{ 1, 0, 0 } });
                         } else {
                             lines_[i].start = extend_point(
-                                if (_lines[prev].curve_type == .line) lines_[prev].start else _lines[prev].control1,
+                                if (_lines[prev].type == .line) lines_[prev].start else _lines[prev].control1,
                                 _lines[i].start,
                                 _lines[i].control0,
                                 t,
@@ -353,7 +353,7 @@ pub const shapes = struct {
                             lines_[i].end = extend_point(
                                 lines_[i].control1,
                                 _lines[i].end,
-                                if (_lines[next].curve_type == .line) _lines[next].end else _lines[next].control0,
+                                if (_lines[next].type == .line) _lines[next].end else _lines[next].control0,
                                 t,
                                 ccw,
                             );
@@ -374,9 +374,9 @@ pub const shapes = struct {
                         const next = if (i + 1 < vertex_len) i + 1 else first_vertex_idx;
                         const prev = if (i == first_vertex_idx) vertex_len - 1 else (i - 1);
 
-                        if (lines_[i].curve_type == .line) { //if type is line, no need to change lines_ value
+                        if (lines_[i].type == .line) { //if type is line, no need to change lines_ value
                             try vertices_sub_list.append(.{ .pos = extend_point(
-                                if (_lines[prev].curve_type == .line) lines_[prev].start else _lines[prev].control1,
+                                if (_lines[prev].type == .line) lines_[prev].start else _lines[prev].control1,
                                 _lines[i].start,
                                 _lines[i].end,
                                 t,
@@ -384,7 +384,7 @@ pub const shapes = struct {
                             ), .uvw = .{ 1, 0, 0 } });
                         } else {
                             lines_[i].start = extend_point(
-                                if (_lines[prev].curve_type == .line) lines_[prev].start else _lines[prev].control1,
+                                if (_lines[prev].type == .line) lines_[prev].start else _lines[prev].control1,
                                 _lines[i].start,
                                 _lines[i].control0,
                                 t,
@@ -409,7 +409,7 @@ pub const shapes = struct {
                             lines_[i].end = extend_point(
                                 lines_[i].control1,
                                 _lines[i].end,
-                                if (_lines[next].curve_type == .line) _lines[next].end else _lines[next].control0,
+                                if (_lines[next].type == .line) _lines[next].end else _lines[next].control0,
                                 t,
                                 ccw,
                             );
@@ -430,9 +430,9 @@ pub const shapes = struct {
                         const next = if (i + 1 < vertex_len) i + 1 else first_vertex_idx;
                         const prev = if (i == first_vertex_idx) vertex_len - 1 else (i - 1);
 
-                        if (lines_[i].curve_type == .line) { //if type is line, no need to change lines_ value
+                        if (lines_[i].type == .line) { //if type is line, no need to change lines_ value
                             try vertices_sub_list.append(.{ .pos = extend_point(
-                                if (_lines[prev].curve_type == .line) lines_[prev].start else _lines[prev].control1,
+                                if (_lines[prev].type == .line) lines_[prev].start else _lines[prev].control1,
                                 _lines[i].start,
                                 _lines[i].end,
                                 t,
@@ -440,7 +440,7 @@ pub const shapes = struct {
                             ), .uvw = .{ 1, 0, 0 } });
                         } else {
                             lines_[i].start = extend_point(
-                                if (_lines[prev].curve_type == .line) lines_[prev].start else _lines[prev].control1,
+                                if (_lines[prev].type == .line) lines_[prev].start else _lines[prev].control1,
                                 _lines[i].start,
                                 _lines[i].control0,
                                 t,
@@ -465,7 +465,7 @@ pub const shapes = struct {
                             lines_[i].end = extend_point(
                                 lines_[i].control1,
                                 _lines[i].end,
-                                if (_lines[next].curve_type == .line) _lines[next].end else _lines[next].control0,
+                                if (_lines[next].type == .line) _lines[next].end else _lines[next].control0,
                                 t,
                                 ccw,
                             );
@@ -492,15 +492,15 @@ pub const shapes = struct {
             first_vertex_idx = vertex_len;
         }
         for (lines_, 0..) |l, i| {
-            _lines[i].curve_type = l.curve_type;
+            _lines[i].type = l.type;
         }
         try _vertices_list.*.append(try _allocator.dupe(graphics.shape_vertex_2d, vertices_sub_list.items));
         try _indices_list.*.append(try _allocator.dupe(u32, indices_sub_list.items));
     }
 
-    pub fn compute_polygon(self: *shapes, allocator: std.mem.Allocator) shapes_error!raw_shapes {
+    pub fn compute_polygon(self: *geometry_shapes, allocator: std.mem.Allocator) shapes_error!geometry_raw_shapes {
         var count: usize = 0;
-        var _out: raw_shapes = undefined;
+        var _out: geometry_raw_shapes = undefined;
         var vertices_list: ArrayList([]graphics.shape_vertex_2d) = ArrayList([]graphics.shape_vertex_2d).init(allocator);
         var indices_list: ArrayList([]u32) = ArrayList([]u32).init(allocator);
         var color_list: ArrayList(vector) = ArrayList(vector).init(allocator);
@@ -543,14 +543,14 @@ pub const shapes = struct {
     }
 };
 
-pub const line = struct {
+pub const geometry_line = struct {
     const Self = @This();
     start: point,
     control0: point,
     control1: point,
     end: point,
     /// default value 'unknown' recongnises curve type 'cubic' 기본값 'unknown'은 커브 유형 'cubic'으로 인식합니다.
-    curve_type: curve_TYPE = curve_TYPE.unknown,
+    type: curve_type = curve_type.unknown,
 
     pub fn reverse(self: Self) Self {
         return .{
@@ -558,11 +558,11 @@ pub const line = struct {
             .control0 = self.control1,
             .control1 = self.control0,
             .end = self.start,
-            .curve_type = self.curve_type,
+            .type = self.type,
         };
     }
     pub fn mul_mat(self: Self, _mat: math.matrix) Self {
-        if (self.curve_type == .line) {
+        if (self.type == .line) {
             const start_ = math.matrix_mul_point(_mat, self.start);
             const end_ = math.matrix_mul_point(_mat, self.end);
             return .{
@@ -570,7 +570,7 @@ pub const line = struct {
                 .control0 = start_,
                 .control1 = end_,
                 .end = end_,
-                .curve_type = .line,
+                .type = .line,
             };
         }
         return .{
@@ -578,7 +578,7 @@ pub const line = struct {
             .control0 = math.matrix_mul_point(_mat, self.control0),
             .control1 = math.matrix_mul_point(_mat, self.control1),
             .end = math.matrix_mul_point(_mat, self.end),
-            .curve_type = self.curve_type,
+            .type = self.type,
         };
     }
     pub fn quadratic_init(_start: point, _control01: point, _end: point) Self {
@@ -587,7 +587,7 @@ pub const line = struct {
             .control0 = convert_quadratic_to_cubic0(_start, _control01),
             .control1 = convert_quadratic_to_cubic1(_end, _control01),
             .end = _end,
-            .curve_type = .quadratic,
+            .type = .quadratic,
         };
     }
     pub fn line_init(_start: point, _end: point) Self {
@@ -596,7 +596,7 @@ pub const line = struct {
             .control0 = _start,
             .control1 = _end,
             .end = _end,
-            .curve_type = .line,
+            .type = .line,
         };
     }
     pub fn rect_line_init(_rect: math.rect) [4]Self {
@@ -689,13 +689,13 @@ pub const line = struct {
         var d1: f32 = undefined;
         var d2: f32 = undefined;
         var d3: f32 = undefined;
-        if (self.curve_type == .line) {
+        if (self.type == .line) {
             //xfit.print_debug("line", .{});
             return;
         }
 
-        const cur_type = if (self.curve_type == .quadratic) .quadratic else try __get_curve_type(_start, _control0, _control1, _end, &d1, &d2, &d3);
-        self.curve_type = cur_type;
+        const cur_type: curve_type = if (self.type == .quadratic) .quadratic else try __get_curve_type(_start, _control0, _control1, _end, &d1, &d2, &d3);
+        self.type = cur_type;
 
         var mat: math.matrix = undefined;
         var flip: bool = false;
@@ -971,13 +971,13 @@ pub const line = struct {
             }
         }
     }
-    pub fn get_curve_type(self: Self) line_error!curve_TYPE {
+    pub fn get_curve_type(self: Self) line_error!curve_type {
         var d1: f32 = undefined;
         var d2: f32 = undefined;
         var d3: f32 = undefined;
         return try __get_curve_type(self.start, self.control0, self.control1, self.end, &d1, &d2, &d3);
     }
-    fn __get_curve_type(_start: point, _control0: point, _control1: point, _end: point, out_d1: *f32, out_d2: *f32, out_d3: *f32) line_error!curve_TYPE {
+    fn __get_curve_type(_start: point, _control0: point, _control1: point, _end: point, out_d1: *f32, out_d2: *f32, out_d3: *f32) line_error!curve_type {
         const start_x: f32 = @floatCast(_start[0]);
         const start_y: f32 = @floatCast(_start[1]);
         const control0_x: f32 = @floatCast(_control0[0]);
@@ -1005,26 +1005,26 @@ pub const line = struct {
         if (math.compare(_start, _control0) and math.compare(_control0, _control1) and math.compare(_control1, _end)) {
             return line_error.is_point_not_line;
         }
-        if (discr > std.math.floatEps(f32)) return curve_TYPE.serpentine;
-        if (discr < -std.math.floatEps(f32)) return curve_TYPE.loop;
+        if (discr > std.math.floatEps(f32)) return .serpentine;
+        if (discr < -std.math.floatEps(f32)) return .loop;
         if (std.math.approxEqAbs(f32, discr, 0, std.math.floatEps(f32))) {
             if (std.math.approxEqAbs(f32, out_d1.*, 0, std.math.floatEps(f32))) {
                 if (std.math.approxEqAbs(f32, out_d2.*, 0, std.math.floatEps(f32))) {
-                    if (std.math.approxEqAbs(f32, out_d3.*, 0, std.math.floatEps(f32))) return curve_TYPE.line;
-                    return curve_TYPE.quadratic;
+                    if (std.math.approxEqAbs(f32, out_d3.*, 0, std.math.floatEps(f32))) return .line;
+                    return .quadratic;
                 }
             }
-            return curve_TYPE.cusp;
+            return .cusp;
         }
-        return curve_TYPE.loop;
+        return .loop;
     }
 };
 
-pub const raw_shapes = struct {
+pub const geometry_raw_shapes = struct {
     vertices: [][]graphics.shape_vertex_2d,
     indices: [][]u32,
     colors: []vector,
-    pub fn deinit(self: raw_shapes, _allocator: std.mem.Allocator) void {
+    pub fn deinit(self: geometry_raw_shapes, _allocator: std.mem.Allocator) void {
         for (self.vertices, self.indices) |v, i| {
             _allocator.free(v);
             _allocator.free(i);
@@ -1033,7 +1033,7 @@ pub const raw_shapes = struct {
         _allocator.free(self.indices);
         _allocator.free(self.colors);
     }
-    pub fn concat(self: raw_shapes, src: raw_shapes, _allocator: std.mem.Allocator) !raw_shapes {
+    pub fn concat(self: geometry_raw_shapes, src: geometry_raw_shapes, _allocator: std.mem.Allocator) !geometry_raw_shapes {
         var vertices = try _allocator.alloc([]graphics.shape_vertex_2d, self.vertices.len + src.vertices.len);
         errdefer _allocator.free(vertices);
         var indices = try _allocator.alloc([]u32, self.indices.len + src.indices.len);

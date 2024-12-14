@@ -7,7 +7,6 @@ comptime {
 const std = @import("std");
 const xfit = @import("xfit");
 const sound = xfit.sound;
-const timer_callback = xfit.timer_callback;
 
 var gpa: std.heap.GeneralPurposeAllocator(.{}) = undefined;
 var allocator: std.mem.Allocator = undefined;
@@ -37,8 +36,8 @@ pub fn xfit_init() !void {
     defer allocator.free(data);
     sfx_source = sound.decode_sound_memory(data) catch |e| xfit.herr3("sfx.decode_sound_memory", e);
 
-    _ = try timer_callback.start(1000000000, 0, sfx_callback, .{});
-    _ = try timer_callback.start(10000000000, 1, pl_callback, .{});
+    _ = try xfit.timer_callback.start(1000000000, 0, sfx_callback, .{});
+    _ = try xfit.timer_callback.start(10000000000, 1, pl_callback, .{});
 }
 
 pub fn xfit_update() !void {}

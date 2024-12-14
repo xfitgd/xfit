@@ -1,13 +1,13 @@
 const std = @import("std");
 const system = @import("system.zig");
 
-const __android = @import("__android.zig");
+const __android = if (!@import("builtin").is_test) @import("__android.zig") else void;
 
 const AAsset = __android.android.AAsset;
 const xfit = @import("xfit.zig");
 
 comptime {
-    if (xfit.platform != .android) @compileError("asset_file only can use android.");
+    if (xfit.platform != .android and !@import("builtin").is_test) @compileError("asset_file only can use android.");
 }
 
 const Self = @This();

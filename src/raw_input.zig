@@ -1,11 +1,12 @@
 //Windows Only
 const std = @import("std");
 
-const __windows = @import("__windows.zig");
+const __windows = if (!@import("builtin").is_test) @import("__windows.zig") else void;
+const __android = if (!@import("builtin").is_test) @import("__android.zig") else void;
 const system = @import("system.zig");
 const __raw_input = @import("__raw_input.zig");
 
-pub const GUID = __windows.win32.GUID;
+pub const GUID = @import("__windows.zig").win32.GUID;
 
 pub const ERROR = error{
     SYSTEM_ERROR,

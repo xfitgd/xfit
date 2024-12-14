@@ -8,7 +8,8 @@ pub var allocator: std.mem.Allocator = undefined;
 const system = @import("system.zig");
 const window = @import("window.zig");
 const __vulkan = @import("__vulkan.zig");
-const __windows = @import("__windows.zig");
+const __windows = if (!@import("builtin").is_test) @import("__windows.zig") else void;
+const __android = if (!@import("builtin").is_test) @import("__android.zig") else void;
 const __vulkan_allocator = @import("__vulkan_allocator.zig");
 const math = @import("math.zig");
 const input = @import("input.zig");
@@ -72,11 +73,11 @@ fn lua_writestringerror(fmt: [*c]const u8, _str: [*c]const u8) callconv(.C) void
 pub fn save_prev_window_state() void {
     if (init_set.screen_mode == .WINDOW) {
         prev_window = .{
-            .x = window.window_x(),
-            .y = window.window_y(),
-            .width = window.window_width(),
-            .height = window.window_height(),
-            .state = if (xfit.platform == .windows) __windows.get_window_state() else window.window_state.Restore,
+            .x = window.x(),
+            .y = window.y(),
+            .width = window.width(),
+            .height = window.height(),
+            .state = if (xfit.platform == .windows) __windows.get_window_state() else window.state.Restore,
         };
     }
 }
@@ -86,7 +87,7 @@ pub var prev_window: struct {
     y: i32,
     width: u32,
     height: u32,
-    state: window.window_state,
+    state: window.state,
 } = undefined;
 
 pub var title: [:0]u8 = undefined;

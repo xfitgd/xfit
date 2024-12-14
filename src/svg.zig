@@ -10,7 +10,7 @@ const ArrayList = std.ArrayList;
 
 const point = math.point;
 const vector = math.vector;
-const shapes = geometry.shapes;
+const geometry_shapes = geometry.geometry_shapes;
 
 pub const SVG = struct {
     width: ?[]const u8 = null,
@@ -215,7 +215,7 @@ pub fn init_parse(allocator: std.mem.Allocator, _svg_data: []const u8) !Self {
     inline for (svg_tags, svg_tags2, 0..) |tag, tag2, i| {
         output_fields[i] = .{
             .name = tag,
-            .type = if (meta.is_slice(@TypeOf(@field(self, tag)))) ArrayList(tag2) else ?tag2,
+            .type = if (comptime meta.is_slice(@TypeOf(@field(self, tag)))) ArrayList(tag2) else ?tag2,
             .default_value = null,
             .is_comptime = false,
             .alignment = 0,
@@ -483,16 +483,16 @@ fn _parse_color(color: []const u8, opacity: ?f32) !?vector {
     return SVG_ERROR.INVALID_NODE;
 }
 
-fn _parse_rect(nodes: *ArrayList(shapes.shape_node), rect: RECT, _allocator: *std.heap.ArenaAllocator) !void {
+fn _parse_rect(nodes: *ArrayList(geometry_shapes.shape_node), rect: RECT, _allocator: *std.heap.ArenaAllocator) !void {
     const has_stroke = rect._0.stroke != null and rect._0.stroke_width != null and rect._0.stroke_width.? > 0;
     const has_fill = rect._0.fill != null;
     if (!((has_fill or has_stroke))) return;
     const allocator = _allocator.*.allocator();
 
-    const node = shapes.shape_node{
+    const node = geometry_shapes.shape_node{
         .color = if (has_fill) try _parse_color(rect._0.fill.?, rect._0.fill_opacity) else null,
         .stroke_color = if (has_stroke) try _parse_color(rect._0.stroke.?, rect._0.stroke_opacity) else null,
-        .lines = try allocator.dupe(geometry.line, &geometry.line.rect_line_init(.{
+        .lines = try allocator.dupe(geometry.geometry_line, &geometry.geometry_line.rect_line_init(.{
             .left = rect.x.?,
             .right = rect.x.? + rect.width.?,
             .top = -rect.y.?,
@@ -505,16 +505,16 @@ fn _parse_rect(nodes: *ArrayList(shapes.shape_node), rect: RECT, _allocator: *st
     try nodes.*.append(node);
 }
 
-fn _parse_circle(nodes: *ArrayList(shapes.shape_node), circle: CIRCLE, _allocator: *std.heap.ArenaAllocator) !void {
+fn _parse_circle(nodes: *ArrayList(geometry_shapes.shape_node), circle: CIRCLE, _allocator: *std.heap.ArenaAllocator) !void {
     const has_stroke = circle._0.stroke != null and circle._0.stroke_width != null and circle._0.stroke_width.? > 0;
     const has_fill = circle._0.fill != null;
     if (!((has_fill or has_stroke))) return;
     const allocator = _allocator.*.allocator();
 
-    const node = shapes.shape_node{
+    const node = geometry_shapes.shape_node{
         .color = if (has_fill) try _parse_color(circle._0.fill.?, circle._0.fill_opacity) else null,
         .stroke_color = if (has_stroke) try _parse_color(circle._0.stroke.?, circle._0.stroke_opacity) else null,
-        .lines = try allocator.dupe(geometry.line, &geometry.line.circle_cubic_init(.{ circle.cx.?, -circle.cy.? }, circle.r.?)),
+        .lines = try allocator.dupe(geometry.geometry_line, &geometry.geometry_line.circle_cubic_init(.{ circle.cx.?, -circle.cy.? }, circle.r.?)),
         .n_polygons = try allocator.dupe(u32, &[_]u32{4}),
         .thickness = if (has_stroke) circle._0.stroke_width.? else 0,
     };
@@ -522,17 +522,17 @@ fn _parse_circle(nodes: *ArrayList(shapes.shape_node), circle: CIRCLE, _allocato
     try nodes.*.append(node);
 }
 
-fn _parse_ellipse(nodes: *ArrayList(shapes.shape_node), ellipse: ELLIPSE, _allocator: *std.heap.ArenaAllocator) !void {
+fn _parse_ellipse(nodes: *ArrayList(geometry_shapes.shape_node), ellipse: ELLIPSE, _allocator: *std.heap.ArenaAllocator) !void {
     const has_stroke = ellipse._0.stroke != null and ellipse._0.stroke_width != null and ellipse._0.stroke_width.? > 0;
     const has_fill = ellipse._0.fill != null;
     if (!((has_fill or has_stroke))) return;
     if (ellipse.cx == null or ellipse.cy == null or ellipse.rx == null or ellipse.ry == null) return SVG_ERROR.INVALID_NODE;
     const allocator = _allocator.*.allocator();
 
-    const node = shapes.shape_node{
+    const node = geometry_shapes.shape_node{
         .color = if (has_fill) try _parse_color(ellipse._0.fill.?, ellipse._0.fill_opacity) else null,
         .stroke_color = if (has_stroke) try _parse_color(ellipse._0.stroke.?, ellipse._0.stroke_opacity) else null,
-        .lines = try allocator.dupe(geometry.line, &geometry.line.ellipse_cubic_init(.{ ellipse.cx.?, -ellipse.cy.? }, .{ ellipse.rx.?, ellipse.ry.? })),
+        .lines = try allocator.dupe(geometry.geometry_line, &geometry.geometry_line.ellipse_cubic_init(.{ ellipse.cx.?, -ellipse.cy.? }, .{ ellipse.rx.?, ellipse.ry.? })),
         .n_polygons = try allocator.dupe(u32, &[_]u32{4}),
         .thickness = if (has_stroke) ellipse._0.stroke_width.? else 0,
     };
@@ -540,14 +540,14 @@ fn _parse_ellipse(nodes: *ArrayList(shapes.shape_node), ellipse: ELLIPSE, _alloc
     try nodes.*.append(node);
 }
 
-fn _parse_polyline(nodes: *ArrayList(shapes.shape_node), polyline: POLYLINE, _allocator: *std.heap.ArenaAllocator) !void {
+fn _parse_polyline(nodes: *ArrayList(geometry_shapes.shape_node), polyline: POLYLINE, _allocator: *std.heap.ArenaAllocator) !void {
     const has_stroke = polyline._0.stroke != null and polyline._0.stroke_width != null and polyline._0.stroke_width.? > 0;
     const has_fill = polyline._0.fill != null;
     if (!((has_fill or has_stroke))) return;
     if (polyline.points == null) return SVG_ERROR.INVALID_NODE;
     const allocator = _allocator.*.allocator();
 
-    var node = shapes.shape_node{
+    var node = geometry_shapes.shape_node{
         .color = if (has_fill) try _parse_color(polyline._0.fill.?, polyline._0.fill_opacity) else null,
         .stroke_color = if (has_stroke) try _parse_color(polyline._0.stroke.?, polyline._0.stroke_opacity) else null,
         .lines = undefined,
@@ -556,14 +556,14 @@ fn _parse_polyline(nodes: *ArrayList(shapes.shape_node), polyline: POLYLINE, _al
     };
     //
     var npoly: u32 = 0;
-    var lines = ArrayList(geometry.line).init(allocator);
+    var lines = ArrayList(geometry.geometry_line).init(allocator);
     var cur: point = undefined;
     for (polyline.points.?) |_p| {
         var p = _p;
         p[1] *= -1;
 
         if (lines.items.len > 0) {
-            try lines.append(geometry.line.line_init(cur, p));
+            try lines.append(geometry.geometry_line.line_init(cur, p));
             npoly += 1;
         }
         cur = p;
@@ -576,14 +576,14 @@ fn _parse_polyline(nodes: *ArrayList(shapes.shape_node), polyline: POLYLINE, _al
     try nodes.*.append(node);
 }
 
-fn _parse_polygon(nodes: *ArrayList(shapes.shape_node), polygon: POLYGON, _allocator: *std.heap.ArenaAllocator) !void {
+fn _parse_polygon(nodes: *ArrayList(geometry_shapes.shape_node), polygon: POLYGON, _allocator: *std.heap.ArenaAllocator) !void {
     const has_stroke = polygon._0.stroke != null and polygon._0.stroke_width != null and polygon._0.stroke_width.? > 0;
     const has_fill = polygon._0.fill != null;
     if (!((has_fill or has_stroke))) return;
     if (polygon.points == null) return SVG_ERROR.INVALID_NODE;
     const allocator = _allocator.*.allocator();
 
-    var node = shapes.shape_node{
+    var node = geometry_shapes.shape_node{
         .color = if (has_fill) try _parse_color(polygon._0.fill.?, polygon._0.fill_opacity) else null,
         .stroke_color = if (has_stroke) try _parse_color(polygon._0.stroke.?, polygon._0.stroke_opacity) else null,
         .lines = undefined,
@@ -592,14 +592,14 @@ fn _parse_polygon(nodes: *ArrayList(shapes.shape_node), polygon: POLYGON, _alloc
     };
     //
     var npoly: u32 = 0;
-    var lines = ArrayList(geometry.line).init(allocator);
+    var lines = ArrayList(geometry.geometry_line).init(allocator);
     var cur: point = undefined;
     for (polygon.points.?) |_p| {
         var p = _p;
         p[1] *= -1;
 
         if (lines.items.len > 0) {
-            try lines.append(geometry.line.line_init(cur, p));
+            try lines.append(geometry.geometry_line.line_init(cur, p));
             npoly += 1;
         }
         cur = p;
@@ -607,7 +607,7 @@ fn _parse_polygon(nodes: *ArrayList(shapes.shape_node), polygon: POLYGON, _alloc
 
     if (lines.items.len == 0) return SVG_ERROR.INVALID_NODE;
     if (!math.compare(lines.items[0].start, lines.items[lines.items.len - 1].end)) {
-        try lines.append(geometry.line.line_init(lines.items[lines.items.len - 1].end, lines.items[0].start));
+        try lines.append(geometry.geometry_line.line_init(lines.items[lines.items.len - 1].end, lines.items[0].start));
         npoly += 1;
     }
     node.lines = lines.items;
@@ -616,16 +616,16 @@ fn _parse_polygon(nodes: *ArrayList(shapes.shape_node), polygon: POLYGON, _alloc
     try nodes.*.append(node);
 }
 
-fn _parse_line(nodes: *ArrayList(shapes.shape_node), line: LINE, _allocator: *std.heap.ArenaAllocator) !void {
+fn _parse_line(nodes: *ArrayList(geometry_shapes.shape_node), line: LINE, _allocator: *std.heap.ArenaAllocator) !void {
     const has_stroke = line._0.stroke != null and line._0.stroke_width != null and line._0.stroke_width.? > 0;
     if (!((has_stroke))) return;
     if (line.x1 == null or line.x2 == null or line.y2 == null or line.y2 == null) return SVG_ERROR.INVALID_NODE;
     const allocator = _allocator.*.allocator();
 
-    const node = shapes.shape_node{
+    const node = geometry_shapes.shape_node{
         .color = null,
         .stroke_color = if (has_stroke) try _parse_color(line._0.stroke.?, line._0.stroke_opacity) else null,
-        .lines = try allocator.dupe(geometry.line, &[_]geometry.line{geometry.line.line_init(.{ line.x1.?, line.y1.? }, .{ line.x2.?, line.y2.? })}),
+        .lines = try allocator.dupe(geometry.geometry_line, &[_]geometry.geometry_line{geometry.geometry_line.line_init(.{ line.x1.?, line.y1.? }, .{ line.x2.?, line.y2.? })}),
         .n_polygons = try allocator.dupe(u32, &[_]u32{1}),
         .thickness = if (has_stroke) line._0.stroke_width.? else 0,
     };
@@ -633,7 +633,7 @@ fn _parse_line(nodes: *ArrayList(shapes.shape_node), line: LINE, _allocator: *st
     try nodes.*.append(node);
 }
 
-fn _parse_path(nodes: *ArrayList(shapes.shape_node), path: PATH, _allocator: *std.heap.ArenaAllocator) !void {
+fn _parse_path(nodes: *ArrayList(geometry_shapes.shape_node), path: PATH, _allocator: *std.heap.ArenaAllocator) !void {
     const F = struct {
         pub fn _read_path_p(_str: []const u8, i: *usize, op_: u8, cur: point) !point {
             var p = try _parse_point(_str, i);
@@ -679,16 +679,16 @@ fn _parse_path(nodes: *ArrayList(shapes.shape_node), path: PATH, _allocator: *st
     if (!(path.d != null and (has_fill or has_stroke))) return;
     const allocator = _allocator.*.allocator();
 
-    var node = shapes.shape_node{
+    var node = geometry_shapes.shape_node{
         .color = if (has_fill) try _parse_color(path._0.fill.?, path._0.fill_opacity) else null,
         .stroke_color = if (has_stroke) try _parse_color(path._0.stroke.?, path._0.stroke_opacity) else null,
         .lines = undefined,
         .n_polygons = undefined,
         .thickness = if (has_stroke) path._0.stroke_width.? else 0,
     };
-    var lines = ArrayList(geometry.line).init(allocator);
+    var lines = ArrayList(geometry.geometry_line).init(allocator);
     var n_polygons = ArrayList(u32).init(allocator);
-    var line: geometry.line = undefined;
+    var line: geometry.geometry_line = undefined;
     var cur: point = .{ 0, 0 };
     var start: bool = false;
 
@@ -700,10 +700,10 @@ fn _parse_path(nodes: *ArrayList(shapes.shape_node), path: PATH, _allocator: *st
         if (path.d.?[i] == 'Z' or path.d.?[i] == 'z') {
             if (lines.items.len == 0) return SVG_ERROR.INVALID_NODE;
             if (start) {
-                line = geometry.line.line_init(line.start, lines.items[starti].start);
+                line = geometry.geometry_line.line_init(line.start, lines.items[starti].start);
                 start = false;
             } else {
-                line = geometry.line.line_init(lines.items[lines.items.len - 1].end, lines.items[starti].start);
+                line = geometry.geometry_line.line_init(lines.items[lines.items.len - 1].end, lines.items[starti].start);
             }
             if (!math.compare(line.start, line.end)) {
                 try lines.append(line);
@@ -743,7 +743,7 @@ fn _parse_path(nodes: *ArrayList(shapes.shape_node), path: PATH, _allocator: *st
             'L', 'l' => {
                 if (!start) return SVG_ERROR.INVALID_NODE;
                 const p = try F._read_path_p(path.d.?, &i, op_.?, cur);
-                line = geometry.line.line_init(line.start, p);
+                line = geometry.geometry_line.line_init(line.start, p);
                 cur = p;
                 prevS = null;
                 prevT = null;
@@ -751,7 +751,7 @@ fn _parse_path(nodes: *ArrayList(shapes.shape_node), path: PATH, _allocator: *st
             'V', 'v' => {
                 if (!start) return SVG_ERROR.INVALID_NODE;
                 const y = try F._read_path_fy(path.d.?, &i, op_.?, cur[1]);
-                line = geometry.line.line_init(line.start, .{ line.start[0], y });
+                line = geometry.geometry_line.line_init(line.start, .{ line.start[0], y });
                 cur[1] = y;
                 prevS = null;
                 prevT = null;
@@ -759,7 +759,7 @@ fn _parse_path(nodes: *ArrayList(shapes.shape_node), path: PATH, _allocator: *st
             'H', 'h' => {
                 if (!start) return SVG_ERROR.INVALID_NODE;
                 const x = try F._read_path_fx(path.d.?, &i, op_.?, cur[0]);
-                line = geometry.line.line_init(line.start, .{ x, line.start[1] });
+                line = geometry.geometry_line.line_init(line.start, .{ x, line.start[1] });
                 cur[0] = x;
                 prevS = null;
                 prevT = null;
@@ -769,7 +769,7 @@ fn _parse_path(nodes: *ArrayList(shapes.shape_node), path: PATH, _allocator: *st
                 const p = try F._read_path_p(path.d.?, &i, op_.?, cur);
                 const p2 = try F._read_path_p(path.d.?, &i, op_.?, cur);
 
-                line = geometry.line.quadratic_init(line.start, p, p2);
+                line = geometry.geometry_line.quadratic_init(line.start, p, p2);
                 cur = p2;
                 prevS = null;
                 prevT = p;
@@ -780,9 +780,9 @@ fn _parse_path(nodes: *ArrayList(shapes.shape_node), path: PATH, _allocator: *st
                 const p2 = try F._read_path_p(path.d.?, &i, op_.?, cur);
                 const p3 = try F._read_path_p(path.d.?, &i, op_.?, cur);
                 if (math.compare(p, line.start)) {
-                    line = geometry.line.quadratic_init(line.start, p2, p3);
+                    line = geometry.geometry_line.quadratic_init(line.start, p2, p3);
                 } else {
-                    line = geometry.line{
+                    line = geometry.geometry_line{
                         .start = line.start,
                         .control0 = p,
                         .control1 = p2,
@@ -799,14 +799,14 @@ fn _parse_path(nodes: *ArrayList(shapes.shape_node), path: PATH, _allocator: *st
                 if (prevS == null) {
                     const p = try F._read_path_p(path.d.?, &i, op_.?, cur);
                     const p2 = try F._read_path_p(path.d.?, &i, op_.?, cur);
-                    line = geometry.line.quadratic_init(line.start, p, p2);
+                    line = geometry.geometry_line.quadratic_init(line.start, p, p2);
                     cur = p2;
                     prevS = p;
                 } else {
                     const p = try F._read_path_p(path.d.?, &i, op_.?, cur);
                     const p0 = math.xy_mirror_point(cur, prevS.?);
                     const p2 = try F._read_path_p(path.d.?, &i, op_.?, cur);
-                    line = geometry.line{
+                    line = geometry.geometry_line{
                         .start = line.start,
                         .control0 = p0,
                         .control1 = p,
@@ -821,10 +821,10 @@ fn _parse_path(nodes: *ArrayList(shapes.shape_node), path: PATH, _allocator: *st
                 if (!start) return SVG_ERROR.INVALID_NODE;
                 const p = try F._read_path_p(path.d.?, &i, op_.?, cur);
                 if (prevT == null) {
-                    line = geometry.line.line_init(line.start, p);
+                    line = geometry.geometry_line.line_init(line.start, p);
                 } else {
                     const p0 = math.xy_mirror_point(cur, prevT.?);
-                    line = geometry.line.quadratic_init(line.start, p0, p);
+                    line = geometry.geometry_line.quadratic_init(line.start, p0, p);
                     cur = p;
                     prevT = p0;
                 }
@@ -857,7 +857,7 @@ fn _parse_path(nodes: *ArrayList(shapes.shape_node), path: PATH, _allocator: *st
                 prevT = null;
                 if ((pp[0] == 0 and pp[1] == 0) or (r[0] == 0 or r[1] == 0)) {
                     end[1] *= -1;
-                    line = geometry.line.line_init(line.start, end);
+                    line = geometry.geometry_line.line_init(line.start, end);
                     cur = end;
                 } else {
                     r = @abs(r);
@@ -891,10 +891,10 @@ fn _parse_path(nodes: *ArrayList(shapes.shape_node), path: PATH, _allocator: *st
                     const D = struct {
                         pub fn vector_angle(u: point, v: point) f32 {
                             const sign: f32 = if (0 > math.cross2(u, v)) -1 else 1;
-                            var dot = math.dot3(u, v);
-                            dot = std.math.clamp(dot, -1, 1);
+                            var dot_ = math.dot(u, v);
+                            dot_ = std.math.clamp(dot_, -1, 1);
 
-                            return sign * std.math.acos(dot);
+                            return sign * std.math.acos(dot_);
                         }
                         pub fn map_to_ellipse(_in: point, _r: point, _cos: f32, _sin: f32, _center: point) point {
                             var in = _in;
@@ -959,15 +959,15 @@ fn _parse_path(nodes: *ArrayList(shapes.shape_node), path: PATH, _allocator: *st
     try nodes.*.append(node);
 }
 
-pub fn calculate_shapes(self: *Self, _allocator: std.mem.Allocator) !std.meta.Tuple(&.{ shapes, std.heap.ArenaAllocator }) {
+pub fn calculate_shapes(self: *Self, _allocator: std.mem.Allocator) !std.meta.Tuple(&.{ geometry_shapes, std.heap.ArenaAllocator }) {
     if (self.*.arena_allocator == null) {
         return SVG_ERROR.NOT_INITIALIZED;
     }
-    var shps = shapes{
+    var shps = geometry_shapes{
         .nodes = undefined,
     };
     var arena = std.heap.ArenaAllocator.init(_allocator);
-    var nodes = ArrayList(shapes.shape_node).init(arena.allocator());
+    var nodes = ArrayList(geometry_shapes.shape_node).init(arena.allocator());
     errdefer arena.deinit();
 
     for (self.*.shape_ptrs) |shape_ptr| {

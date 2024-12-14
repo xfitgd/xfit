@@ -537,7 +537,7 @@ fn engine_handle_cmd(_cmd: AppEvent) void {
     }
 }
 
-var input_state: general_input.INPUT_STATE = std.mem.zeroes(general_input.INPUT_STATE);
+var input_state: general_input.GENERAL_INPUT_STATE = std.mem.zeroes(general_input.GENERAL_INPUT_STATE);
 
 fn handle_input_buttons(_event: ?*android.AInputEvent, keycode: u32, updown: bool) bool {
     const general_input_callback = system.a_fn(__system.general_input_callback);
