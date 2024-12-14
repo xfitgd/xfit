@@ -1697,10 +1697,10 @@ fn cleanup_swapchain() void {
             vk_swapchain_frame_buffers[i].deinit();
         }
 
-        depth_stencil_image_sample.clean(null, {});
-        color_image_sample.clean(null, {});
-        depth_stencil_image.clean(null, {});
-        color_image.clean(null, {});
+        depth_stencil_image_sample.clean(null, undefined);
+        color_image_sample.clean(null, undefined);
+        depth_stencil_image.clean(null, undefined);
+        color_image.clean(null, undefined);
 
         __vulkan_allocator.op_execute();
 

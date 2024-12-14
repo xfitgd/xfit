@@ -364,11 +364,11 @@ pub fn update_descriptor_sets(sets: []descriptor_set) void {
     } });
 }
 
-pub fn update_descriptor_sets_callback(sets: []descriptor_set, callback: ?*const fn (self: *anyopaque) void, callback_data: anytype) void {
+pub fn update_descriptor_sets_callback(sets: []descriptor_set, callback: ?*const fn (self: *anyopaque) void, callback_data: *anyopaque) void {
     append_op(.{ .__update_descriptor_sets = .{
         .sets = sets,
         .callback = callback,
-        .callback_data = if (@TypeOf(callback_data) == void) undefined else @ptrCast(callback_data),
+        .callback_data = if (callback == null) undefined else callback_data,
     } });
 }
 
@@ -1169,7 +1169,7 @@ pub fn vulkan_res_node(_res_type: res_type) type {
 
             self.*.map_copy(map_data, _allocator);
         }
-        pub fn clean(self: *vulkan_res_node_Self, callback: ?*const fn (caller: *anyopaque) void, data: anytype) void {
+        pub fn clean(self: *vulkan_res_node_Self, callback: ?*const fn (caller: *anyopaque) void, data: *anyopaque) void {
             self.*.builded = false;
 
             switch (_res_type) {
@@ -1181,7 +1181,7 @@ pub fn vulkan_res_node(_res_type: res_type) type {
                         append_op(.{ .destroy_image = .{
                             .buf = self,
                             .callback = callback,
-                            .callback_data = if (@TypeOf(data) != void) @ptrCast(data) else undefined,
+                            .callback_data = if (callback != null) data else undefined,
                         } });
                     }
                 },
@@ -1190,7 +1190,7 @@ pub fn vulkan_res_node(_res_type: res_type) type {
                     append_op(.{ .destroy_buffer = .{
                         .buf = self,
                         .callback = callback,
-                        .callback_data = if (@TypeOf(data) != void) @ptrCast(data) else undefined,
+                        .callback_data = if (callback != null) data else undefined,
                     } });
                 },
             }

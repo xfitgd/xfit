@@ -237,9 +237,9 @@ pub fn vertices(comptime vertexT: type) type {
         }
         pub inline fn deinit(self: *Self) void {
             self.*.__check_init.deinit();
-            self.*.node.clean(null, {});
+            self.*.node.clean(null, undefined);
         }
-        pub inline fn deinit_callback(self: *Self, callback: ?*const fn (caller: *anyopaque) void, data: anytype) void {
+        pub inline fn deinit_callback(self: *Self, callback: ?*const fn (data: *anyopaque) void, data: *anyopaque) void {
             self.*.__check_init.deinit();
             self.*.node.clean(callback, data);
         }
@@ -287,9 +287,9 @@ pub fn indices_(comptime _type: index_type) type {
         }
         pub inline fn deinit(self: *Self) void {
             self.*.__check_init.deinit();
-            self.*.node.clean(null, {});
+            self.*.node.clean(null, undefined);
         }
-        pub inline fn deinit_callback(self: *Self, callback: ?*const fn (caller: *anyopaque) void, data: anytype) void {
+        pub inline fn deinit_callback(self: *Self, callback: ?*const fn (data: *anyopaque) void, data: *anyopaque) void {
             self.*.__check_init.deinit();
             self.*.node.clean(callback, data);
         }
@@ -374,7 +374,11 @@ pub const projection = struct {
     }
     pub inline fn deinit(self: *Self) void {
         self.*.__check_alloc.deinit();
-        self.*.__uniform.clean(null, {});
+        self.*.__uniform.clean(null, undefined);
+    }
+    pub inline fn deinit_callback(self: *Self, callback: ?*const fn (data: *anyopaque) void, data: *anyopaque) void {
+        self.*.__check_alloc.deinit();
+        self.*.node.clean(callback, data);
     }
     pub fn build(self: *Self, _flag: graphic_resource_write_flag) void {
         self.*.__check_alloc.init(__system.allocator);
@@ -405,7 +409,11 @@ pub const camera = struct {
     }
     pub inline fn deinit(self: *Self) void {
         self.*.__check_alloc.deinit();
-        self.*.__uniform.clean(null, {});
+        self.*.__uniform.clean(null, undefined);
+    }
+    pub inline fn deinit_callback(self: *Self, callback: ?*const fn (data: *anyopaque) void, data: *anyopaque) void {
+        self.*.__check_alloc.deinit();
+        self.*.node.clean(callback, data);
     }
     pub fn build(self: *Self) void {
         self.*.__uniform.create_buffer_copy(.{
@@ -436,7 +444,11 @@ pub const color_transform = struct {
     }
     pub inline fn deinit(self: *Self) void {
         self.*.__check_alloc.deinit();
-        self.*.__uniform.clean(null, {});
+        self.*.__uniform.clean(null, undefined);
+    }
+    pub inline fn deinit_callback(self: *Self, callback: ?*const fn (data: *anyopaque) void, data: *anyopaque) void {
+        self.*.__check_alloc.deinit();
+        self.*.node.clean(callback, data);
     }
     pub fn build(self: *Self, _flag: graphic_resource_write_flag) void {
         self.*.__check_alloc.init(__system.allocator);
@@ -466,7 +478,7 @@ pub const transform = struct {
 
     __check_init: mem.check_init = .{},
 
-    pub inline fn __deinit(self: *Self, callback: ?*const fn (caller: *anyopaque) void, data: anytype) void {
+    pub inline fn __deinit(self: *Self, callback: ?*const fn (caller: *anyopaque) void, data: *anyopaque) void {
         self.*.__check_init.deinit();
         self.*.__model_uniform.clean(callback, data);
     }
@@ -524,11 +536,11 @@ pub const texture = struct {
     }
     pub inline fn deinit(self: *Self) void {
         self.*.__check_init.deinit();
-        self.*.__image.clean(null, {});
+        self.*.__image.clean(null, undefined);
     }
-    pub fn deinit_callback(self: *Self, callback: ?*const fn (caller: *anyopaque) void, data: anytype) void {
+    pub fn deinit_callback(self: *Self, callback: ?*const fn (data: *anyopaque) void, data: *anyopaque) void {
         self.*.__check_init.deinit();
-        self.*.__image.clean(callback, data);
+        self.*.__image.clean(callback, @ptrCast(data));
     }
     // pub fn copy(self: *Self, _data: []const u8, rect: ?math.recti) void {
     //     __vulkan_allocator.copy_texture(self, _data, rect);
@@ -589,9 +601,9 @@ pub const texture_array = struct {
 
     pub inline fn deinit(self: *Self) void {
         self.*.__check_init.deinit();
-        self.*.__image.clean(null, {});
+        self.*.__image.clean(null, undefined);
     }
-    pub fn deinit_callback(self: *Self, callback: ?*const fn (caller: *anyopaque) void, data: anytype) void {
+    pub fn deinit_callback(self: *Self, callback: ?*const fn (caller: *anyopaque) void, data: *anyopaque) void {
         self.*.__check_init.deinit();
         self.*.__image.clean(callback, data);
     }
@@ -663,11 +675,11 @@ pub const tile_texture_array = struct {
 
     pub inline fn deinit(self: *Self) void {
         self.*.__check_init.deinit();
-        self.*.__image.clean(null, {});
+        self.*.__image.clean(null, undefined);
     }
-    pub inline fn deinit_callback(self: *Self, callback: ?*const fn (caller: *anyopaque) void, data: anytype) void {
+    pub inline fn deinit_callback(self: *Self, callback: ?*const fn (caller: *anyopaque) void, data: *anyopaque) void {
         self.*.__check_init.deinit();
-        self.*.__image.clean(callback, self, data);
+        self.*.__image.clean(callback, data);
     }
 };
 
@@ -752,35 +764,35 @@ pub const shape_source = struct {
         self: *shape_source,
         allocator: std.mem.Allocator,
     };
-    fn dealloc_callback(caller: *anyopaque) void {
-        const ar: *dealloc_struct = @alignCast(@ptrCast(caller));
-        const _allocator: std.mem.Allocator = ar.*.allocator;
-        const self: *shape_source = ar.*.self;
-        _allocator.free(self.*.__raw.?.vertices);
-        _allocator.free(self.*.__raw.?.indices);
+    // fn dealloc_callback(caller: *anyopaque) void {
+    //     const ar: *dealloc_struct = @alignCast(@ptrCast(caller));
+    //     const _allocator: std.mem.Allocator = ar.*.allocator;
+    //     const self: *shape_source = ar.*.self;
+    //     _allocator.free(self.*.__raw.?.vertices);
+    //     _allocator.free(self.*.__raw.?.indices);
 
-        _allocator.free(self.*.__raw.?.__color_uniforms);
-        _allocator.free(self.*.__raw.?.__color_sets);
+    //     _allocator.free(self.*.__raw.?.__color_uniforms);
+    //     _allocator.free(self.*.__raw.?.__color_sets);
 
-        __system.allocator.destroy(ar);
-    }
-    ///recommend using std.heap.ArenaAllocator instead.
-    pub fn deinit_dealloc(self: *shape_source, _allocator: std.mem.Allocator) void {
-        const s = __system.allocator.create(dealloc_struct) catch unreachable;
-        s.*.self = self;
-        s.*.allocator = _allocator;
-        deinit_callback(
-            self,
-            dealloc_callback,
-            s,
-        );
-    }
-    pub fn deinit_callback(self: *shape_source, callback: ?*const fn (caller: *anyopaque) void, data: anytype) void {
+    //     __system.allocator.destroy(ar);
+    // }
+    // ///recommend using std.heap.ArenaAllocator instead.
+    // pub fn deinit_dealloc(self: *shape_source, _allocator: std.mem.Allocator) void {
+    //     const s = __system.allocator.create(dealloc_struct) catch unreachable;
+    //     s.*.self = self;
+    //     s.*.allocator = _allocator;
+    //     deinit_callback(
+    //         self,
+    //         dealloc_callback,
+    //         s,
+    //     );
+    // }
+    pub fn deinit_callback(self: *shape_source, callback: ?*const fn (caller: *shape_source) void, data: *anyopaque) void {
         for (self.*.__raw.?.vertices, self.*.__raw.?.indices, self.*.__raw.?.__color_uniforms, 0..) |*v, *i, *u, idx| {
             v.*.deinit();
             i.*.deinit();
             if (idx < self.*.__raw.?.__color_uniforms.len - 1) {
-                u.*.clean(null, {});
+                u.*.clean(null, undefined);
             } else {
                 u.*.clean(callback, data);
             }
@@ -790,7 +802,7 @@ pub const shape_source = struct {
         for (self.*.__raw.?.vertices, self.*.__raw.?.indices, self.*.__raw.?.__color_uniforms) |*v, *i, *u| {
             v.*.deinit();
             i.*.deinit();
-            u.*.clean(null, {});
+            u.*.clean(null, undefined);
         }
     }
     ///!call when write_flag is cpu
@@ -838,9 +850,9 @@ pub fn shape_(_msaa: bool) type {
             self.*.update_uniforms();
         }
         pub fn deinit(self: *Self) void {
-            self.*.transform.__deinit(null, {});
+            self.*.transform.__deinit(null, undefined);
         }
-        pub fn deinit_callback(self: *Self, callback: ?*const fn (caller: *anyopaque) void, data: anytype) void {
+        pub fn deinit_callback(self: *Self, callback: ?*const fn (data: *anyopaque) void, data: *anyopaque) void {
             self.*.transform.__deinit(callback, data);
         }
         pub fn draw(self: *Self, cmd: usize) void {
@@ -924,9 +936,9 @@ pub const image = struct {
         return &self.*.transform;
     }
     pub fn deinit(self: *Self) void {
-        self.*.transform.__deinit(null, {});
+        self.*.transform.__deinit(null, undefined);
     }
-    pub fn deinit_callback(self: *Self, callback: ?*const fn (caller: *anyopaque) void, data: anytype) void {
+    pub fn deinit_callback(self: *Self, callback: ?*const fn (data: *anyopaque) void, data: *anyopaque) void {
         self.*.transform.__deinit(callback, data);
     }
     pub fn update_uniforms(self: *Self) void {
@@ -944,7 +956,7 @@ pub const image = struct {
 
         self.*.update_uniforms();
     }
-    pub fn update_uniforms_callback(self: *Self, callback: ?*const fn (self: *anyopaque) void) void {
+    pub fn update_uniforms_callback(self: *Self, callback: ?*const fn (data: *anyopaque) void, data: *anyopaque) void {
         var __set_res: [4]res_union = .{
             .{ .buf = &self.*.transform.__model_uniform },
             .{ .buf = &self.*.transform.camera.*.__uniform },
@@ -952,12 +964,12 @@ pub const image = struct {
             .{ .buf = &self.*.color_tran.*.__uniform },
         };
         @memcpy(self.*.__set.__res[0..4], __set_res[0..4]);
-        __vulkan_allocator.update_descriptor_sets_callback((&self.*.__set)[0..1], callback, self);
+        __vulkan_allocator.update_descriptor_sets_callback((&self.*.__set)[0..1], callback, data);
     }
-    pub fn build_callback(self: *Self, callback: ?*const fn (self: *anyopaque) void) void {
+    pub fn build_callback(self: *Self, callback: ?*const fn (data: *anyopaque) void, data: *anyopaque) void {
         self.*.transform.__build();
 
-        self.*.update_uniforms_callback(callback);
+        self.*.update_uniforms_callback(callback, data);
     }
     pub fn draw(self: *Self, cmd: usize) void {
         self.*.transform.__check_init.check_inited();
