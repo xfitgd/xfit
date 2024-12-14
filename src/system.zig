@@ -181,10 +181,3 @@ pub fn text_notify(text: []const u8) void {
         @compileError("not support platform");
     }
 }
-
-pub fn set_execute_all_cmd_per_update(_on_off: bool) void {
-    __vulkan_allocator.execute_all_cmd_per_update.store(_on_off, .monotonic);
-}
-pub fn get_execute_all_cmd_per_update() bool {
-    return __vulkan_allocator.execute_all_cmd_per_update.load(.monotonic);
-}

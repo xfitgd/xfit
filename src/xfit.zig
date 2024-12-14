@@ -56,8 +56,6 @@ pub const current_monitor = modules.system.current_monitor;
 pub const get_platform_version = modules.system.get_platform_version;
 pub const notify = modules.system.notify;
 pub const text_notify = modules.system.text_notify;
-pub const set_execute_all_cmd_per_update = modules.system.set_execute_all_cmd_per_update;
-pub const get_execute_all_cmd_per_update = modules.system.get_execute_all_cmd_per_update;
 //?animator
 pub const ianimate_object = modules.animator.ianimate_object;
 pub const multi_animate_player = modules.animator.multi_animate_player;
@@ -107,8 +105,6 @@ pub const geometry_raw_shapes = modules.geometry.geometry_raw_shapes;
 pub const indices16 = modules.graphics.indices16;
 pub const indices32 = modules.graphics.indices32;
 pub const indices = modules.graphics.indices;
-pub const execute_and_wait_all_op = modules.graphics.execute_and_wait_all_op;
-pub const execute_all_op = modules.graphics.execute_all_op;
 pub const set_render_clear_color = modules.graphics.set_render_clear_color;
 pub const graphic_resource_write_flag = modules.graphics.graphic_resource_write_flag;
 pub const iobject = modules.graphics.iobject;

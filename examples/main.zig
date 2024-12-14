@@ -266,13 +266,6 @@ pub fn xfit_init() !void {
         .{},
     );
     //
-
-    // _ = try timer_callback.start(
-    //     xfit.sec_to_nano_sec2(0, 1, 0, 0),
-    //     0,
-    //     multi_execute_and_wait,
-    //     .{},
-    // );
 }
 
 fn mouse_move(pos: xfit.point) void {
@@ -324,12 +317,6 @@ fn key_down(_key: xfit.input.key) void {
             },
         }
     }
-}
-
-//multi execute and wait test
-fn multi_execute_and_wait() !void {
-    xfit.execute_all_op();
-    xfit.execute_and_wait_all_op();
 }
 
 var update_mutex: std.Thread.Mutex = .{};

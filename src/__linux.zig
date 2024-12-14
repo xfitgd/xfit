@@ -105,12 +105,9 @@ fn render_func() void {
         };
     }
 
-    __vulkan_allocator.execute_and_wait_all_op();
-
     while (!xfit.exiting()) {
         __system.loop();
     }
-    __vulkan_allocator.execute_and_wait_all_op();
 
     __vulkan.wait_device_idle();
 

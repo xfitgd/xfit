@@ -32,12 +32,6 @@ pub const indices16 = indices_(.U16);
 pub const indices32 = indices_(.U32);
 pub const indices = indices_(.U32);
 
-pub inline fn execute_and_wait_all_op() void {
-    __vulkan_allocator.execute_and_wait_all_op();
-}
-pub inline fn execute_all_op() void {
-    __vulkan_allocator.execute_all_op();
-}
 pub inline fn set_render_clear_color(_color: vector) void {
     @atomicStore(f32, &__vulkan.clear_color._0, _color[0], .monotonic);
     @atomicStore(f32, &__vulkan.clear_color._1, _color[1], .monotonic);
@@ -949,6 +943,21 @@ pub const image = struct {
         self.*.transform.__build();
 
         self.*.update_uniforms();
+    }
+    pub fn update_uniforms_callback(self: *Self, callback: ?*const fn (self: *anyopaque) void) void {
+        var __set_res: [4]res_union = .{
+            .{ .buf = &self.*.transform.__model_uniform },
+            .{ .buf = &self.*.transform.camera.*.__uniform },
+            .{ .buf = &self.*.transform.projection.*.__uniform },
+            .{ .buf = &self.*.color_tran.*.__uniform },
+        };
+        @memcpy(self.*.__set.__res[0..4], __set_res[0..4]);
+        __vulkan_allocator.update_descriptor_sets_callback((&self.*.__set)[0..1], callback, self);
+    }
+    pub fn build_callback(self: *Self, callback: ?*const fn (self: *anyopaque) void) void {
+        self.*.transform.__build();
+
+        self.*.update_uniforms_callback(callback);
     }
     pub fn draw(self: *Self, cmd: usize) void {
         self.*.transform.__check_init.check_inited();

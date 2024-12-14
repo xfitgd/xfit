@@ -1690,7 +1690,7 @@ fn recreateSurface() void {
 
 fn cleanup_swapchain() void {
     if (vkSwapchain != .null_handle) {
-        __vulkan_allocator.execute_and_wait_all_op();
+        __vulkan_allocator.op_execute();
 
         var i: usize = 0;
         while (i < vk_swapchain_frame_buffers.len) : (i += 1) {
@@ -1702,7 +1702,7 @@ fn cleanup_swapchain() void {
         depth_stencil_image.clean(null, {});
         color_image.clean(null, {});
 
-        __vulkan_allocator.execute_and_wait_all_op();
+        __vulkan_allocator.op_execute();
 
         std.heap.c_allocator.free(vk_swapchain_frame_buffers);
         i = 0;
@@ -1768,7 +1768,7 @@ fn create_framebuffer() void {
 
     refresh_pre_matrix();
 
-    __vulkan_allocator.execute_and_wait_all_op();
+    __vulkan_allocator.op_execute();
     var i: usize = 0;
     while (i < vk_swapchain_images.len) : (i += 1) {
         vk_swapchain_frame_buffers[i] = .{};
@@ -2084,7 +2084,7 @@ pub fn recreate_swapchain() void {
         released_fullscreen_ex = true;
     }
 
-    __vulkan_allocator.execute_and_wait_all_op();
+    __vulkan_allocator.op_execute();
     wait_device_idle();
 
     if (xfit.platform == .android) {
@@ -2099,7 +2099,7 @@ pub fn recreate_swapchain() void {
     if (vkExtent.width <= 0 or vkExtent.height <= 0) {
         fullscreen_mutex.unlock();
 
-        __vulkan_allocator.execute_and_wait_all_op();
+        __vulkan_allocator.op_execute();
         return;
     }
     create_framebuffer();
@@ -2119,7 +2119,7 @@ pub fn recreate_swapchain() void {
         };
     }
 
-    __vulkan_allocator.execute_and_wait_all_op();
+    __vulkan_allocator.op_execute();
 }
 
 var first_draw: bool = true;
@@ -2225,7 +2225,6 @@ pub fn drawFrame() void {
 
         vkd.?.resetFences(1, @ptrCast(&vkInFlightFence[state.frame])) catch |e| xfit.herr3("__vulkan.drawFrame.resetFences", e);
 
-        __vulkan_allocator.submit_mutex.lock();
         vkd.?.queueSubmit(vkGraphicsQueue, 1, @ptrCast(&submitInfo), vkInFlightFence[state.frame]) catch |e| xfit.herr3("__vulkan.drawFrame.queueSubmit", e);
 
         const swapChains = [_]vk.SwapchainKHR{vkSwapchain};
@@ -2239,11 +2238,9 @@ pub fn drawFrame() void {
         };
         const queuePresentKHR_result = vkd.?.queuePresentKHR(vkPresentQueue, &presentInfo) catch |e| {
             if (e == error.OutOfDateKHR) {
-                __vulkan_allocator.submit_mutex.unlock();
                 recreate_swapchain();
                 return;
             } else if (e == error.SurfaceLostKHR) {
-                __vulkan_allocator.submit_mutex.unlock();
                 recreateSurface();
                 recreate_swapchain();
                 return;
@@ -2251,7 +2248,6 @@ pub fn drawFrame() void {
                 xfit.herr3("__vulkan.drawFrame.queuePresentKHR", e);
             }
         };
-        __vulkan_allocator.submit_mutex.unlock();
 
         if (queuePresentKHR_result == .error_out_of_date_khr) {
             recreate_swapchain();

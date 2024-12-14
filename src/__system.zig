@@ -207,9 +207,7 @@ pub fn loop() void {
         };
     }
 
-    if (__vulkan_allocator.execute_all_cmd_per_update.load(.monotonic)) {
-        __vulkan_allocator.execute_all_op();
-    }
+    __vulkan_allocator.op_execute();
 
     if (!ispause) {
         __vulkan.drawFrame();

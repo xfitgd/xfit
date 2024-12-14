@@ -452,12 +452,10 @@ fn render_func() void {
 
     start_sem.post();
 
-    __vulkan_allocator.execute_and_wait_all_op();
-
     while (!xfit.exiting()) {
         __system.loop();
     }
-    __vulkan_allocator.execute_and_wait_all_op();
+
     __vulkan.wait_device_idle();
     if (!xfit.__xfit_test) {
         root.xfit_destroy() catch |e| {

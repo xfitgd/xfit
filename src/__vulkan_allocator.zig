@@ -23,7 +23,6 @@ pub var nonCoherentAtomSize: usize = 0;
 pub var supported_cache_local: bool = false;
 pub var supported_noncache_local: bool = false;
 
-pub var execute_all_cmd_per_update: std.atomic.Value(bool) = std.atomic.Value(bool).init(true);
 var arena_allocator: std.heap.ArenaAllocator = undefined;
 var aallocator: std.mem.Allocator = undefined;
 
@@ -119,11 +118,6 @@ var op_map_queue: MultiArrayList(operation_node) = undefined;
 var op_alloc_queue: MultiArrayList(operation_node) = undefined;
 var staging_buf_queue: MemoryPoolExtra(vulkan_res_node(.buffer), .{}) = undefined;
 var mutex: std.Thread.Mutex = .{};
-pub var submit_mutex: std.Thread.Mutex = .{};
-var cond: std.Thread.Condition = .{};
-var finish_cond: std.Thread.Condition = .{};
-var finish_mutex: std.Thread.Mutex = .{};
-var exited: bool = false;
 var cmd: vk.CommandBuffer = undefined;
 var cmd_pool: vk.CommandPool = undefined;
 var descriptor_pools: HashMap([*]const descriptor_pool_size, ArrayList(descriptor_pool_memory)) = undefined;
@@ -161,18 +155,9 @@ pub fn init() void {
     };
     __vulkan.vkd.?.allocateCommandBuffers(&alloc_info, @ptrCast(&cmd)) catch |e|
         xfit.herr3("__vulkan_allocator allocateCommandBuffers", e);
-
-    g_thread = std.Thread.spawn(.{}, thread_func, .{}) catch unreachable;
 }
 
 pub fn deinit() void {
-    mutex.lock();
-    exited = true;
-    cond_cnt = true;
-    cond.signal();
-    mutex.unlock();
-    g_thread.join();
-
     op_allocated_free(&op_alloc_queue);
 
     for (buffer_ids.items) |value| {
@@ -327,6 +312,8 @@ const operation_node = union(enum) {
     },
     __update_descriptor_sets: struct {
         sets: []descriptor_set,
+        callback: ?*const fn (callback_data: *anyopaque) void = null,
+        callback_data: *anyopaque = undefined,
     },
     ///user doesn't need to call
     __register_descriptor_pool: struct {
@@ -372,7 +359,17 @@ pub const descriptor_set = struct {
 };
 
 pub fn update_descriptor_sets(sets: []descriptor_set) void {
-    append_op(.{ .__update_descriptor_sets = .{ .sets = sets } });
+    append_op(.{ .__update_descriptor_sets = .{
+        .sets = sets,
+    } });
+}
+
+pub fn update_descriptor_sets_callback(sets: []descriptor_set, callback: ?*const fn (self: *anyopaque) void, callback_data: anytype) void {
+    append_op(.{ .__update_descriptor_sets = .{
+        .sets = sets,
+        .callback = callback,
+        .callback_data = if (@TypeOf(callback_data) == void) undefined else @ptrCast(callback_data),
+    } });
 }
 
 pub const frame_buffer = struct {
@@ -812,147 +809,142 @@ fn save_to_map_queue(nres: *?*vulkan_res) void {
     }
 }
 
-fn thread_func() void {
+pub fn op_execute() void {
     __vulkan.load_instance_and_device();
-    while (true) {
-        mutex.lock();
-
-        while (cond_cnt == false) cond.wait(&mutex);
-        cond_cnt = false;
-        if (exited and op_queue.len == 0) {
-            finish_cond.broadcast();
-            mutex.unlock();
-            break;
-        }
-        if (op_queue.len > 0) {
-            op_save_queue.deinit(__system.allocator);
-            op_save_queue = op_queue;
-            op_queue = .{};
-        } else {
-            mutex.unlock();
-            continue;
-        }
+    mutex.lock();
+    if (op_queue.len == 0) {
         mutex.unlock();
+        return;
+    }
+
+    if (op_queue.len > 0) {
+        op_save_queue.deinit(__system.allocator);
+        op_save_queue = op_queue;
+        op_queue = .{};
+    } else {
+        mutex.unlock();
+        return;
+    }
+    mutex.unlock();
+
+    op_map_queue.resize(__system.allocator, 0) catch unreachable;
+    var nres: ?*vulkan_res = null;
+    {
+        var i: usize = 0;
+        var slice = op_save_queue.slice();
+        while (i < op_save_queue.len) : (i += 1) {
+            const tags = slice.items(.tags);
+            const data = slice.items(.data);
+            switch (tags[i]) {
+                //create.. execution, map_copy command can be added.
+                .create_buffer => execute_create_buffer(data[i].create_buffer.buf, data[i].create_buffer.data, data[i].create_buffer.allocated),
+                .create_texture => execute_create_texture(data[i].create_texture.buf, data[i].create_texture.data, data[i].create_texture.allocated),
+                .__register_descriptor_pool => execute_register_descriptor_pool(data[i].__register_descriptor_pool.__size),
+                else => {
+                    continue;
+                },
+            }
+            slice = op_save_queue.slice(); //if elements are added during execution, the memory may change
+            slice.set(i, .{ .void = {} });
+        }
+    }
+
+    save_to_map_queue(&nres);
+
+    while (op_map_queue.len > 0) {
+        nres.?.*.map_copy_execute(op_map_queue.items(.data));
 
         op_map_queue.resize(__system.allocator, 0) catch unreachable;
-        var nres: ?*vulkan_res = null;
-        {
-            var i: usize = 0;
-            var slice = op_save_queue.slice();
-            while (i < op_save_queue.len) : (i += 1) {
-                const tags = slice.items(.tags);
-                const data = slice.items(.data);
-                switch (tags[i]) {
-                    //create.. execution, map_copy command can be added.
-                    .create_buffer => execute_create_buffer(data[i].create_buffer.buf, data[i].create_buffer.data, data[i].create_buffer.allocated),
-                    .create_texture => execute_create_texture(data[i].create_texture.buf, data[i].create_texture.data, data[i].create_texture.allocated),
-                    .__register_descriptor_pool => execute_register_descriptor_pool(data[i].__register_descriptor_pool.__size),
-                    else => {
-                        continue;
-                    },
-                }
-                slice = op_save_queue.slice(); //if elements are added during execution, the memory may change
-                slice.set(i, .{ .void = {} });
-            }
-        }
-
+        nres = null;
         save_to_map_queue(&nres);
-
-        while (op_map_queue.len > 0) {
-            nres.?.*.map_copy_execute(op_map_queue.items(.data));
-
-            op_map_queue.resize(__system.allocator, 0) catch unreachable;
-            nres = null;
-            save_to_map_queue(&nres);
-        }
-        op_allocated_free(&op_alloc_queue);
-
-        var have_cmd: bool = false;
-        {
-            var i: usize = 0;
-            const slice = op_save_queue.slice();
-            const tags = slice.items(.tags);
-            //const data = slice.items(.data);
-            while (i < op_save_queue.len) : (i += 1) {
-                switch (tags[i]) {
-                    .copy_buffer, .copy_buffer_to_image, .__update_descriptor_sets => {
-                        have_cmd = true;
-                        break;
-                    },
-                    else => continue,
-                }
-            }
-        }
-        if (have_cmd) {
-            __vulkan.vkd.?.resetCommandPool(cmd_pool, .{}) catch |e| xfit.herr3("__vulkan_allocator thread_func.resetCommandPool", e);
-
-            const begin: vk.CommandBufferBeginInfo = .{ .flags = .{ .one_time_submit_bit = true } };
-            __vulkan.vkd.?.beginCommandBuffer(cmd, &begin) catch |e| xfit.herr3("__vulkan_allocator thread_func.beginCommandBuffer", e);
-
-            var i: usize = 0;
-            const slice = op_save_queue.slice();
-            const tags = slice.items(.tags);
-            const data = slice.items(.data);
-            while (i < op_save_queue.len) : (i += 1) {
-                switch (tags[i]) {
-                    .copy_buffer => execute_copy_buffer(data[i].copy_buffer.src, data[i].copy_buffer.target),
-                    .copy_buffer_to_image => execute_copy_buffer_to_image(data[i].copy_buffer_to_image.src, data[i].copy_buffer_to_image.target),
-                    .__update_descriptor_sets => {
-                        execute_update_descriptor_sets(data[i].__update_descriptor_sets.sets);
-                        continue;
-                    },
-                    else => continue,
-                }
-            }
-            if (set_list.items.len > 0) {
-                __vulkan.vkd.?.updateDescriptorSets(@intCast(set_list.items.len), set_list.items.ptr, 0, null);
-                set_list.resize(0) catch unreachable;
-            }
-            __vulkan.vkd.?.endCommandBuffer(cmd) catch |e| xfit.herr3("__vulkan_allocator thread_func.endCommandBuffer", e);
-            const submitInfo: vk.SubmitInfo = .{
-                .command_buffer_count = 1,
-                .p_command_buffers = @ptrCast(&cmd),
-            };
-
-            submit_mutex.lock();
-            __vulkan.vkd.?.queueSubmit(__vulkan.vkGraphicsQueue, 1, @ptrCast(&submitInfo), .null_handle) catch |e| xfit.herr3("__vulkan_allocator thread_func.queueSubmit", e);
-
-            __vulkan.vkd.?.queueWaitIdle(__vulkan.vkGraphicsQueue) catch |e| xfit.herr3("__vulkan_allocator thread_func.queueWaitIdle", e);
-            submit_mutex.unlock();
-        }
-
-        //th_arena_allocator.mutex.lock();
-        if (!arena_allocator.reset(.retain_capacity)) unreachable;
-        //th_arena_allocator.mutex.unlock();
-
-        {
-            var i: usize = 0;
-            const slice = op_save_queue.slice();
-            const tags = slice.items(.tags);
-            const data = slice.items(.data);
-            while (i < op_save_queue.len) : (i += 1) {
-                switch (tags[i]) {
-                    //destroy.. call later
-                    .destroy_buffer => execute_destroy_buffer(data[i].destroy_buffer.buf, data[i].destroy_buffer.callback, data[i].destroy_buffer.callback_data),
-                    .destroy_image => execute_destroy_image(data[i].destroy_image.buf, data[i].destroy_image.callback, data[i].destroy_image.callback_data),
-                    else => continue,
-                }
-            }
-        }
-
-        mutex.lock();
-        if (exited) {
-            op_allocated_free(&op_alloc_queue);
-            finish_cond.broadcast();
-            mutex.unlock();
-            break;
-        }
-        finish_cond.broadcast();
-        mutex.unlock();
-
-        if (!staging_buf_queue.reset(.retain_capacity)) unreachable;
-        op_save_queue.resize(__system.allocator, 0) catch unreachable;
     }
+    op_allocated_free(&op_alloc_queue);
+
+    var have_cmd: bool = false;
+    {
+        var i: usize = 0;
+        const slice = op_save_queue.slice();
+        const tags = slice.items(.tags);
+        //const data = slice.items(.data);
+        while (i < op_save_queue.len) : (i += 1) {
+            switch (tags[i]) {
+                .copy_buffer, .copy_buffer_to_image, .__update_descriptor_sets => {
+                    have_cmd = true;
+                    break;
+                },
+                else => continue,
+            }
+        }
+    }
+    if (have_cmd) {
+        __vulkan.vkd.?.resetCommandPool(cmd_pool, .{}) catch |e| xfit.herr3("__vulkan_allocator thread_func.resetCommandPool", e);
+
+        const begin: vk.CommandBufferBeginInfo = .{ .flags = .{ .one_time_submit_bit = true } };
+        __vulkan.vkd.?.beginCommandBuffer(cmd, &begin) catch |e| xfit.herr3("__vulkan_allocator thread_func.beginCommandBuffer", e);
+
+        var i: usize = 0;
+        const slice = op_save_queue.slice();
+        const tags = slice.items(.tags);
+        const data = slice.items(.data);
+        while (i < op_save_queue.len) : (i += 1) {
+            switch (tags[i]) {
+                .copy_buffer => execute_copy_buffer(data[i].copy_buffer.src, data[i].copy_buffer.target),
+                .copy_buffer_to_image => execute_copy_buffer_to_image(data[i].copy_buffer_to_image.src, data[i].copy_buffer_to_image.target),
+                .__update_descriptor_sets => {
+                    execute_update_descriptor_sets(data[i].__update_descriptor_sets.sets);
+                    continue;
+                },
+                else => continue,
+            }
+        }
+        if (set_list.items.len > 0) {
+            __vulkan.vkd.?.updateDescriptorSets(@intCast(set_list.items.len), set_list.items.ptr, 0, null);
+            set_list.resize(0) catch unreachable;
+        }
+        __vulkan.vkd.?.endCommandBuffer(cmd) catch |e| xfit.herr3("__vulkan_allocator thread_func.endCommandBuffer", e);
+        const submitInfo: vk.SubmitInfo = .{
+            .command_buffer_count = 1,
+            .p_command_buffers = @ptrCast(&cmd),
+        };
+
+        __vulkan.vkd.?.queueSubmit(__vulkan.vkGraphicsQueue, 1, @ptrCast(&submitInfo), .null_handle) catch |e| xfit.herr3("__vulkan_allocator thread_func.queueSubmit", e);
+
+        __vulkan.vkd.?.queueWaitIdle(__vulkan.vkGraphicsQueue) catch |e| xfit.herr3("__vulkan_allocator thread_func.queueWaitIdle", e);
+
+        i = 0;
+        while (i < op_save_queue.len) : (i += 1) {
+            switch (tags[i]) {
+                .__update_descriptor_sets => {
+                    if (data[i].__update_descriptor_sets.callback != null) {
+                        data[i].__update_descriptor_sets.callback.?(data[i].__update_descriptor_sets.callback_data);
+                    }
+                },
+                else => {},
+            }
+        }
+    }
+
+    //th_arena_allocator.mutex.lock();
+    if (!arena_allocator.reset(.retain_capacity)) unreachable;
+    //th_arena_allocator.mutex.unlock();
+
+    {
+        var i: usize = 0;
+        const slice = op_save_queue.slice();
+        const tags = slice.items(.tags);
+        const data = slice.items(.data);
+        while (i < op_save_queue.len) : (i += 1) {
+            switch (tags[i]) {
+                //destroy.. call later
+                .destroy_buffer => execute_destroy_buffer(data[i].destroy_buffer.buf, data[i].destroy_buffer.callback, data[i].destroy_buffer.callback_data),
+                .destroy_image => execute_destroy_image(data[i].destroy_image.buf, data[i].destroy_image.callback, data[i].destroy_image.callback_data),
+                else => continue,
+            }
+        }
+    }
+
+    if (!staging_buf_queue.reset(.retain_capacity)) unreachable;
+    op_save_queue.resize(__system.allocator, 0) catch unreachable;
 }
 fn op_allocated_free(_op: *MultiArrayList(operation_node)) void {
     mutex.lock();
@@ -985,33 +977,6 @@ fn op_allocated_free(_op: *MultiArrayList(operation_node)) void {
     }
     _op.*.resize(__system.allocator, 0) catch unreachable;
 }
-
-var cond_cnt: bool = false;
-//var finishcond_cnt: bool = false;
-
-pub fn execute_and_wait_all_op() void {
-    mutex.lock();
-    if (op_queue.len > 0) {
-        cond.signal();
-        cond_cnt = true;
-        finish_cond.wait(&mutex);
-    }
-    mutex.unlock();
-}
-pub fn execute_all_op() void {
-    mutex.lock();
-    if (op_queue.len > 0) {
-        cond.signal();
-        cond_cnt = true;
-    }
-    mutex.unlock();
-}
-
-// fn broadcast_op_finish() void {
-//     mutex.lock();
-//     finish_cond.broadcast();
-//     mutex.unlock();
-// }
 
 fn find_memory_type(_type_filter: u32, _prop: vk.MemoryPropertyFlags) ?u32 {
     var i: u32 = 0;
