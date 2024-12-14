@@ -232,7 +232,7 @@ pub fn button_(_msaa: bool) type {
         pub fn deinit(self: *Self) void {
             self.*.shape.deinit();
         }
-        pub inline fn deinit_callback(self: *Self, callback: ?*const fn (caller: *anyopaque) void, data: anytype) void {
+        pub inline fn deinit_callback(self: *Self, callback: ?*const fn (data: *anyopaque) void, data: *anyopaque) void {
             self.*.shape.deinit_callback(callback, data);
         }
         pub fn draw(self: *Self, cmd: usize) void {

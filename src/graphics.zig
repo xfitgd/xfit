@@ -787,7 +787,7 @@ pub const shape_source = struct {
     //         s,
     //     );
     // }
-    pub fn deinit_callback(self: *shape_source, callback: ?*const fn (caller: *shape_source) void, data: *anyopaque) void {
+    pub fn deinit_callback(self: *shape_source, callback: ?*const fn (data: *anyopaque) void, data: *anyopaque) void {
         for (self.*.__raw.?.vertices, self.*.__raw.?.indices, self.*.__raw.?.__color_uniforms, 0..) |*v, *i, *u, idx| {
             v.*.deinit();
             i.*.deinit();
@@ -1047,11 +1047,11 @@ pub const animate_image = struct {
         return &self.*.transform;
     }
     pub fn deinit(self: *Self) void {
-        self.*.transform.__deinit(null, {});
-        self.*.__frame_uniform.clean(null, {});
+        self.*.transform.__deinit(null, undefined);
+        self.*.__frame_uniform.clean(null, undefined);
     }
-    pub fn deinit_callback(self: *Self, callback: ?*const fn (caller: *anyopaque) void, data: anytype) void {
-        self.*.transform.__deinit(null, {});
+    pub fn deinit_callback(self: *Self, callback: ?*const fn (data: *anyopaque) void, data: *anyopaque) void {
+        self.*.transform.__deinit(null, undefined);
         self.*.__frame_uniform.clean(callback, data);
     }
     pub fn next_frame(self: *Self) void {
@@ -1164,11 +1164,11 @@ pub const tile_image = struct {
         return &self.*.transform;
     }
     pub fn deinit(self: *Self) void {
-        self.*.transform.__deinit(null, {});
-        self.*.__tile_uniform.clean(null, {});
+        self.*.transform.__deinit(null, undefined);
+        self.*.__tile_uniform.clean(null, undefined);
     }
-    pub fn deinit_callback(self: *Self, callback: ?*const fn (caller: *anyopaque) void, data: anytype) void {
-        self.*.transform.__deinit(null, {});
+    pub fn deinit_callback(self: *Self, callback: ?*const fn (data: *anyopaque) void, data: *anyopaque) void {
+        self.*.transform.__deinit(null, undefined);
         self.*.__tile_uniform.clean(callback, data);
     }
     pub fn set_frame(self: *Self, _frame: u32) void {
