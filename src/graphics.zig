@@ -269,7 +269,7 @@ pub fn vertices(comptime vertexT: type) type {
         }
         ///!call when write_flag is cpu
         pub fn map_update(self: *Self, _array: []vertexT) void {
-            self.*.node.map_update(_array);
+            self.*.node.map_update(_array, null);
         }
     };
 }
@@ -317,7 +317,7 @@ pub fn indices_(comptime _type: index_type) type {
 
         ///!call when write_flag is cpu
         pub fn map_update(self: *Self, _array: []idxT) void {
-            self.*.node.map_update(_array);
+            self.*.node.map_update(_array, null);
         }
     };
 }
@@ -422,7 +422,7 @@ pub const camera = struct {
     }
     ///!call when write_flag is cpu
     pub fn copy_update(self: *Self) void {
-        self.*.__uniform.copy_update(&self.*.view);
+        self.*.__uniform.copy_update(&self.*.view, __system.allocator);
     }
 };
 pub const color_transform = struct {
@@ -1168,7 +1168,7 @@ pub const tile_image = struct {
     pub fn copy_update_tile_idx(self: *Self) void {
         if (!self.*.__tile_uniform.is_build() or self.*.src.*.__image.texture_option.len == 0 or self.*.src.*.__image.texture_option.len - 1 < self.*.tile_idx) return;
         const __idx_cpy: f32 = @floatFromInt(self.*.tile_idx);
-        self.*.__tile_uniform.copy_update(&__idx_cpy);
+        self.*.__tile_uniform.copy_update(&__idx_cpy, __system.allocator);
     }
     pub fn update_uniforms(self: *Self) void {
         var __set_res: [5]res_union = .{
@@ -1189,7 +1189,7 @@ pub const tile_image = struct {
             .len = @sizeOf(f32),
             .typ = .uniform,
             .use = .cpu,
-        }, @as([*]const u8, @ptrCast(&__idx_cpy))[0..@sizeOf(@TypeOf(__idx_cpy))]);
+        }, @as([*]const u8, @ptrCast(&__idx_cpy))[0..@sizeOf(@TypeOf(__idx_cpy))], __system.allocator);
 
         self.*.update_uniforms();
         __system.cmd_op_wait.store(true, .release);
