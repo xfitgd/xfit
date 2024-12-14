@@ -856,20 +856,6 @@ fn thread_func() void {
             }
         }
 
-        if (op_alloc_queue.len > 0) {
-            var i: usize = 0;
-            const slice = op_alloc_queue.slice();
-            const tags = slice.items(.tags);
-            while (i < op_alloc_queue.len) : (i += 1) {
-                switch (tags[i]) {
-                    .create_buffer, .create_texture => {
-                        tags[i] = .void;
-                    },
-                    else => {},
-                }
-            }
-        }
-
         save_to_map_queue(&nres);
 
         while (op_map_queue.len > 0) {
@@ -983,16 +969,16 @@ fn op_allocated_free(_op: *MultiArrayList(operation_node)) void {
                         data[i].map_copy.allocated.?.free(data[i].map_copy.address);
                     }
                 },
-                .create_buffer => {
-                    if (data[i].create_buffer.allocated != null and data[i].create_buffer.data != null) {
-                        data[i].create_buffer.allocated.?.free(data[i].create_buffer.data.?);
-                    }
-                },
-                .create_texture => {
-                    if (data[i].create_texture.allocated != null and data[i].create_texture.data != null) {
-                        data[i].create_texture.allocated.?.free(data[i].create_texture.data.?);
-                    }
-                },
+                // .create_buffer => {
+                //     if (data[i].create_buffer.allocated != null and data[i].create_buffer.data != null) {
+                //         data[i].create_buffer.allocated.?.free(data[i].create_buffer.data.?);
+                //     }
+                // },
+                // .create_texture => {
+                //     if (data[i].create_texture.allocated != null and data[i].create_texture.data != null) {
+                //         data[i].create_texture.allocated.?.free(data[i].create_texture.data.?);
+                //     }
+                // },
                 else => {},
             }
         }

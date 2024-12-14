@@ -527,7 +527,6 @@ pub const texture = struct {
         var __set_res: [1]res_union = .{.{ .tex = &self.__image }};
         @memcpy(self.*.__set.__res[0..1], __set_res[0..1]);
         __vulkan_allocator.update_descriptor_sets((&self.__set)[0..1]);
-        __system.cmd_op_wait.store(true, .release);
     }
     pub inline fn deinit(self: *Self) void {
         self.*.__check_init.deinit();
@@ -592,7 +591,6 @@ pub const texture_array = struct {
         var __set_res: [1]res_union = .{.{ .tex = &self.__image }};
         @memcpy(self.*.__set.__res[0..1], __set_res[0..1]);
         __vulkan_allocator.update_descriptor_sets((&self.__set)[0..1]);
-        __system.cmd_op_wait.store(true, .release);
     }
 
     pub inline fn deinit(self: *Self) void {
@@ -667,7 +665,6 @@ pub const tile_texture_array = struct {
         var __set_res: [1]res_union = .{.{ .tex = &self.__image }};
         @memcpy(self.*.__set.__res[0..1], __set_res[0..1]);
         __vulkan_allocator.update_descriptor_sets((&self.__set)[0..1]);
-        __system.cmd_op_wait.store(true, .release);
     }
 
     pub inline fn deinit(self: *Self) void {
@@ -756,7 +753,6 @@ pub const shape_source = struct {
             }, @as([*]const u8, @ptrCast(&cc))[0..@sizeOf(@TypeOf(cc))], __system.allocator);
         }
         __vulkan_allocator.update_descriptor_sets(self.*.__raw.?.__color_sets);
-        __system.cmd_op_wait.store(true, .release);
     }
     const dealloc_struct = struct {
         self: *shape_source,
@@ -846,7 +842,6 @@ pub fn shape_(_msaa: bool) type {
         pub fn build(self: *Self) void {
             self.*.transform.__build();
             self.*.update_uniforms();
-            __system.cmd_op_wait.store(true, .release);
         }
         pub fn deinit(self: *Self) void {
             self.*.transform.__deinit(null, {});
@@ -954,7 +949,6 @@ pub const image = struct {
         self.*.transform.__build();
 
         self.*.update_uniforms();
-        __system.cmd_op_wait.store(true, .release);
     }
     pub fn draw(self: *Self, cmd: usize) void {
         self.*.transform.__check_init.check_inited();
@@ -1099,7 +1093,6 @@ pub const animate_image = struct {
         }, @as([*]const u8, @ptrCast(&__frame_cpy))[0..@sizeOf(@TypeOf(__frame_cpy))], __system.allocator);
 
         self.*.update_uniforms();
-        __system.cmd_op_wait.store(true, .release);
     }
     pub fn draw(self: *Self, cmd: usize) void {
         self.*.transform.__check_init.check_inited();
@@ -1192,7 +1185,6 @@ pub const tile_image = struct {
         }, @as([*]const u8, @ptrCast(&__idx_cpy))[0..@sizeOf(@TypeOf(__idx_cpy))], __system.allocator);
 
         self.*.update_uniforms();
-        __system.cmd_op_wait.store(true, .release);
     }
     pub fn draw(self: *Self, cmd: usize) void {
         self.*.transform.__check_init.check_inited();

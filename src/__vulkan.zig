@@ -457,8 +457,6 @@ fn cleanup_sync_object() void {
 
 var shape_list: ArrayList(*graphics.iobject) = undefined;
 
-var cmd_executed = false;
-
 fn recordCommandBuffer(commandBuffer: **render_command, fr: u32) void {
     if (commandBuffer.*.scene == null or commandBuffer.*.scene.?.len == 0) {
         return;
@@ -502,11 +500,6 @@ fn recordCommandBuffer(commandBuffer: **render_command, fr: u32) void {
         const objs = __system.allocator.dupe(graphics.iobject, commandBuffer.*.*.scene.?) catch unreachable;
         commandBuffer.*.*.objs_lock.unlock();
         defer __system.allocator.free(objs);
-
-        if (__system.cmd_op_wait.cmpxchgStrong(true, false, .acq_rel, .monotonic) == null) {
-            __vulkan_allocator.execute_and_wait_all_op();
-            cmd_executed = true;
-        }
 
         for (objs) |*value| {
             if (!value.*.v.*.__xfit_is_shape_type) {
@@ -2195,12 +2188,6 @@ pub fn drawFrame() void {
             }
         }
         render_command.mutex.unlock();
-
-        if (!cmd_executed and __vulkan_allocator.execute_all_cmd_per_update.load(.monotonic)) {
-            __vulkan_allocator.execute_all_op();
-        } else {
-            cmd_executed = false;
-        }
 
         const waitStages: vk.PipelineStageFlags = .{ .color_attachment_output_bit = true };
         var submitInfo: vk.SubmitInfo = .{
