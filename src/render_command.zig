@@ -26,7 +26,7 @@ __command_buffers: [MAX_FRAME][]vk.CommandBuffer = undefined,
 scene: ?[]graphics.iobject = null,
 offscreen_image: ?*graphics.image = null,
 ///!you have to lock this add or modify iobject 'scene'
-objs_mutex: std.Thread.Mutex = .{},
+objs_lock: std.Thread.RwLock = .{},
 const Self = @This();
 
 pub fn init() *Self {

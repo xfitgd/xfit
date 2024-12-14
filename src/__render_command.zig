@@ -27,7 +27,6 @@ pub fn refresh_all() void {
     for (render_cmd_list.?.items) |cmd| {
         cmd.*.refresh();
     }
-    render_command.mutex.unlock();
 }
 
 pub fn destroy() void {
