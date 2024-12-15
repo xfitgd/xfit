@@ -1,5 +1,7 @@
 # Xfit : Zig Game Engine Project
 
+This project has been closed and will be recreated with ODIN.
+
 For more information, please refer to the Wiki tab.
 
 ##
