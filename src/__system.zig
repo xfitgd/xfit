@@ -207,8 +207,6 @@ pub fn loop() void {
         };
     }
 
-    __vulkan_allocator.op_execute();
-
     if (!ispause) {
         __vulkan.drawFrame();
     }

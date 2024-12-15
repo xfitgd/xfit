@@ -116,10 +116,13 @@ var op_queue: MultiArrayList(operation_node) = undefined;
 var op_save_queue: MultiArrayList(operation_node) = undefined;
 var op_map_queue: MultiArrayList(operation_node) = undefined;
 var op_alloc_queue: MultiArrayList(operation_node) = undefined;
+var op_destory_queue: MultiArrayList(operation_node) = undefined;
 var staging_buf_queue: MemoryPoolExtra(vulkan_res_node(.buffer), .{}) = undefined;
 var mutex: std.Thread.Mutex = .{};
+var destroy_mutex: std.Thread.Mutex = .{};
 var cmd: vk.CommandBuffer = undefined;
 var cmd_pool: vk.CommandPool = undefined;
+var fence: vk.Fence = undefined;
 var descriptor_pools: HashMap([*]const descriptor_pool_size, ArrayList(descriptor_pool_memory)) = undefined;
 var set_list: ArrayList(vk.WriteDescriptorSet) = undefined;
 
@@ -128,6 +131,7 @@ pub fn init() void {
     buffer_ids = ArrayList(*vulkan_res).init(__system.allocator);
     memory_idx_counts = __system.allocator.alloc(u16, __vulkan.mem_prop.memory_type_count) catch |e| xfit.herr3("__vulkan_allocator init alloc memory_idx_counts", e);
     op_queue = MultiArrayList(operation_node){};
+    op_destory_queue = MultiArrayList(operation_node){};
     op_alloc_queue = MultiArrayList(operation_node){};
     op_save_queue = MultiArrayList(operation_node){};
     op_map_queue = MultiArrayList(operation_node){};
@@ -155,6 +159,10 @@ pub fn init() void {
     };
     __vulkan.vkd.?.allocateCommandBuffers(&alloc_info, @ptrCast(&cmd)) catch |e|
         xfit.herr3("__vulkan_allocator allocateCommandBuffers", e);
+
+    const fenceInfo: vk.FenceCreateInfo = .{ .flags = .{ .signaled_bit = true } };
+
+    fence = __vulkan.vkd.?.createFence(&fenceInfo, null) catch |e| xfit.herr3("__vulkan.vulkan_start CreateFence vkInFlightFence", e);
 }
 
 pub fn deinit() void {
@@ -167,6 +175,7 @@ pub fn deinit() void {
     buffer_ids.deinit();
     __system.allocator.free(memory_idx_counts);
     op_queue.deinit(__system.allocator);
+    op_destory_queue.deinit(__system.allocator);
     op_save_queue.deinit(__system.allocator);
     op_alloc_queue.deinit(__system.allocator);
     op_map_queue.deinit(__system.allocator);
@@ -185,6 +194,7 @@ pub fn deinit() void {
     arena_allocator.deinit();
 
     __vulkan.vkd.?.destroyCommandPool(cmd_pool, null);
+    __vulkan.vkd.?.destroyFence(fence, null);
 }
 
 pub var POOL_BLOCK: c_uint = 256;
@@ -809,22 +819,50 @@ fn save_to_map_queue(nres: *?*vulkan_res) void {
     }
 }
 
-pub fn op_execute() void {
+pub fn wait_fence() void {
+    const waitForFences_result = __vulkan.vkd.?.waitForFences(1, @ptrCast(&fence), vk.TRUE, std.math.maxInt(u64)) catch |e| {
+        xfit.herr3("__vulkan.wait_for_fences.vkWaitForFences", e);
+    };
+    xfit.herr(waitForFences_result == .success, "__vulkan.wait_for_fences.vkWaitForFences : {}", .{waitForFences_result});
+}
+
+///after cmd completed
+pub fn op_execute_destroy() void {
+    destroy_mutex.lock();
+    if (op_destory_queue.len == 0) {
+        destroy_mutex.unlock();
+        return;
+    }
+    var i: usize = 0;
+    const slice = op_destory_queue.slice();
+    const tags = slice.items(.tags);
+    const data = slice.items(.data);
+    while (i < op_destory_queue.len) : (i += 1) {
+        switch (tags[i]) {
+            //destroy.. call later
+            .destroy_buffer => execute_destroy_buffer(data[i].destroy_buffer.buf, data[i].destroy_buffer.callback, data[i].destroy_buffer.callback_data),
+            .destroy_image => execute_destroy_image(data[i].destroy_image.buf, data[i].destroy_image.callback, data[i].destroy_image.callback_data),
+            else => continue,
+        }
+    }
+    op_destory_queue.resize(__system.allocator, 0) catch unreachable;
+    destroy_mutex.unlock();
+    if (!staging_buf_queue.reset(.retain_capacity)) unreachable;
+}
+pub fn op_execute(wait_and_destroy: bool) void {
     __vulkan.load_instance_and_device();
     mutex.lock();
     if (op_queue.len == 0) {
         mutex.unlock();
+        if (wait_and_destroy) {
+            wait_fence();
+            op_execute_destroy();
+        }
         return;
     }
-
-    if (op_queue.len > 0) {
-        op_save_queue.deinit(__system.allocator);
-        op_save_queue = op_queue;
-        op_queue = .{};
-    } else {
-        mutex.unlock();
-        return;
-    }
+    op_save_queue.deinit(__system.allocator);
+    op_save_queue = op_queue;
+    op_queue = .{};
     mutex.unlock();
 
     op_map_queue.resize(__system.allocator, 0) catch unreachable;
@@ -848,6 +886,28 @@ pub fn op_execute() void {
             slice.set(i, .{ .void = {} });
         }
     }
+    {
+        var i: usize = 0;
+        var slice = op_save_queue.slice();
+        const tags = slice.items(.tags);
+        const data = slice.items(.data);
+        destroy_mutex.lock();
+        defer destroy_mutex.unlock();
+        while (i < op_save_queue.len) : (i += 1) {
+            switch (tags[i]) {
+                .destroy_buffer => {
+                    op_destory_queue.append(__system.allocator, .{ .destroy_buffer = data[i].destroy_buffer }) catch unreachable;
+                },
+                .destroy_image => {
+                    op_destory_queue.append(__system.allocator, .{ .destroy_image = data[i].destroy_image }) catch unreachable;
+                },
+                else => {
+                    continue;
+                },
+            }
+            slice.set(i, .{ .void = {} });
+        }
+    }
 
     save_to_map_queue(&nres);
 
@@ -865,14 +925,32 @@ pub fn op_execute() void {
         var i: usize = 0;
         const slice = op_save_queue.slice();
         const tags = slice.items(.tags);
-        //const data = slice.items(.data);
+        const data = slice.items(.data);
         while (i < op_save_queue.len) : (i += 1) {
             switch (tags[i]) {
-                .copy_buffer, .copy_buffer_to_image, .__update_descriptor_sets => {
+                .copy_buffer, .copy_buffer_to_image => {
                     have_cmd = true;
-                    break;
+                },
+                .__update_descriptor_sets => {
+                    execute_update_descriptor_sets(data[i].__update_descriptor_sets.sets);
                 },
                 else => continue,
+            }
+        }
+        if (set_list.items.len > 0) {
+            __vulkan.vkd.?.updateDescriptorSets(@intCast(set_list.items.len), set_list.items.ptr, 0, null);
+            set_list.resize(0) catch unreachable;
+
+            i = 0;
+            while (i < op_save_queue.len) : (i += 1) {
+                switch (tags[i]) {
+                    .__update_descriptor_sets => {
+                        if (data[i].__update_descriptor_sets.callback != null) {
+                            data[i].__update_descriptor_sets.callback.?(data[i].__update_descriptor_sets.callback_data);
+                        }
+                    },
+                    else => {},
+                }
             }
         }
     }
@@ -890,60 +968,32 @@ pub fn op_execute() void {
             switch (tags[i]) {
                 .copy_buffer => execute_copy_buffer(data[i].copy_buffer.src, data[i].copy_buffer.target),
                 .copy_buffer_to_image => execute_copy_buffer_to_image(data[i].copy_buffer_to_image.src, data[i].copy_buffer_to_image.target),
-                .__update_descriptor_sets => {
-                    execute_update_descriptor_sets(data[i].__update_descriptor_sets.sets);
-                    continue;
-                },
                 else => continue,
             }
         }
-        if (set_list.items.len > 0) {
-            __vulkan.vkd.?.updateDescriptorSets(@intCast(set_list.items.len), set_list.items.ptr, 0, null);
-            set_list.resize(0) catch unreachable;
-        }
+
         __vulkan.vkd.?.endCommandBuffer(cmd) catch |e| xfit.herr3("__vulkan_allocator thread_func.endCommandBuffer", e);
         const submitInfo: vk.SubmitInfo = .{
             .command_buffer_count = 1,
             .p_command_buffers = @ptrCast(&cmd),
         };
 
-        __vulkan.vkd.?.queueSubmit(__vulkan.vkGraphicsQueue, 1, @ptrCast(&submitInfo), .null_handle) catch |e| xfit.herr3("__vulkan_allocator thread_func.queueSubmit", e);
+        __vulkan.vkd.?.resetFences(1, @ptrCast(&fence)) catch |e| xfit.herr3("__vulkan.drawFrame.resetFences", e);
+        __vulkan.vkd.?.queueSubmit(__vulkan.vkGraphicsQueue, 1, @ptrCast(&submitInfo), fence) catch |e| xfit.herr3("__vulkan_allocator thread_func.queueSubmit", e);
 
-        __vulkan.vkd.?.queueWaitIdle(__vulkan.vkGraphicsQueue) catch |e| xfit.herr3("__vulkan_allocator thread_func.queueWaitIdle", e);
-
-        i = 0;
-        while (i < op_save_queue.len) : (i += 1) {
-            switch (tags[i]) {
-                .__update_descriptor_sets => {
-                    if (data[i].__update_descriptor_sets.callback != null) {
-                        data[i].__update_descriptor_sets.callback.?(data[i].__update_descriptor_sets.callback_data);
-                    }
-                },
-                else => {},
-            }
+        if (wait_and_destroy) {
+            wait_fence();
+            op_execute_destroy();
         }
+    } else if (wait_and_destroy) {
+        wait_fence();
+        op_execute_destroy();
     }
 
     //th_arena_allocator.mutex.lock();
     if (!arena_allocator.reset(.retain_capacity)) unreachable;
     //th_arena_allocator.mutex.unlock();
 
-    {
-        var i: usize = 0;
-        const slice = op_save_queue.slice();
-        const tags = slice.items(.tags);
-        const data = slice.items(.data);
-        while (i < op_save_queue.len) : (i += 1) {
-            switch (tags[i]) {
-                //destroy.. call later
-                .destroy_buffer => execute_destroy_buffer(data[i].destroy_buffer.buf, data[i].destroy_buffer.callback, data[i].destroy_buffer.callback_data),
-                .destroy_image => execute_destroy_image(data[i].destroy_image.buf, data[i].destroy_image.callback, data[i].destroy_image.callback_data),
-                else => continue,
-            }
-        }
-    }
-
-    if (!staging_buf_queue.reset(.retain_capacity)) unreachable;
     op_save_queue.resize(__system.allocator, 0) catch unreachable;
 }
 fn op_allocated_free(_op: *MultiArrayList(operation_node)) void {
@@ -989,8 +1039,6 @@ fn find_memory_type(_type_filter: u32, _prop: vk.MemoryPropertyFlags) ?u32 {
 }
 
 fn append_op(node: operation_node) void {
-    mutex.lock();
-    defer mutex.unlock();
     if (xfit.exiting()) {
         switch (node) {
             .map_copy => {
@@ -1017,18 +1065,18 @@ fn append_op(node: operation_node) void {
         switch (node) {
             inline .map_copy, .create_buffer, .create_texture => |n| {
                 if (n.allocated != null) {
+                    mutex.lock();
+                    defer mutex.unlock();
                     op_alloc_queue.append(__system.allocator, node) catch xfit.herrm("self.op_alloc_queue.append");
+                    op_queue.append(__system.allocator, node) catch xfit.herrm("self.op_queue.append");
+                    return;
                 }
             },
             else => {},
         }
     }
-
-    // if (node == .__update_descriptor_sets) {
-    //     for (node.__update_descriptor_sets.sets) |*v| {
-    //         v.*.__res = aallocator.dupe(res_union, v.*.__res) catch unreachable;
-    //     }
-    // }
+    mutex.lock();
+    defer mutex.unlock();
     op_queue.append(__system.allocator, node) catch xfit.herrm("self.op_queue.append");
 }
 fn append_op_save(node: operation_node) void {

@@ -1690,8 +1690,6 @@ fn recreateSurface() void {
 
 fn cleanup_swapchain() void {
     if (vkSwapchain != .null_handle) {
-        __vulkan_allocator.op_execute();
-
         var i: usize = 0;
         while (i < vk_swapchain_frame_buffers.len) : (i += 1) {
             vk_swapchain_frame_buffers[i].deinit();
@@ -1702,7 +1700,7 @@ fn cleanup_swapchain() void {
         depth_stencil_image.clean(null, undefined);
         color_image.clean(null, undefined);
 
-        __vulkan_allocator.op_execute();
+        __vulkan_allocator.op_execute(true);
 
         std.heap.c_allocator.free(vk_swapchain_frame_buffers);
         i = 0;
@@ -1768,7 +1766,7 @@ fn create_framebuffer() void {
 
     refresh_pre_matrix();
 
-    __vulkan_allocator.op_execute();
+    __vulkan_allocator.op_execute(true);
     var i: usize = 0;
     while (i < vk_swapchain_images.len) : (i += 1) {
         vk_swapchain_frame_buffers[i] = .{};
@@ -2084,7 +2082,6 @@ pub fn recreate_swapchain() void {
         released_fullscreen_ex = true;
     }
 
-    __vulkan_allocator.op_execute();
     wait_device_idle();
 
     if (xfit.platform == .android) {
@@ -2098,8 +2095,6 @@ pub fn recreate_swapchain() void {
     create_swapchain_and_imageviews(false);
     if (vkExtent.width <= 0 or vkExtent.height <= 0) {
         fullscreen_mutex.unlock();
-
-        __vulkan_allocator.op_execute();
         return;
     }
     create_framebuffer();
@@ -2118,8 +2113,6 @@ pub fn recreate_swapchain() void {
             xfit.herr3("xfit_size", e);
         };
     }
-
-    __vulkan_allocator.op_execute();
 }
 
 var first_draw: bool = true;
@@ -2128,7 +2121,20 @@ pub fn drawFrame() void {
     var imageIndex: u32 = 0;
     const state = struct {
         var frame: usize = 0;
+        var wait_th: ?std.Thread = null;
+        var fence_wait_mutex: std.Thread.Mutex = .{};
+        pub fn wait_and_op_destory(wait_idx: usize) void {
+            load_instance_and_device();
+            fence_wait_mutex.lock();
+            const waitForFences_result = vkd.?.waitForFences(1, @ptrCast(&vkInFlightFence[wait_idx]), vk.TRUE, std.math.maxInt(u64)) catch |e| {
+                xfit.herr3("__vulkan.wait_for_fences.vkWaitForFences", e);
+            };
+            xfit.herr(waitForFences_result == .success, "__vulkan.wait_for_fences.vkWaitForFences : {}", .{waitForFences_result});
+            fence_wait_mutex.unlock();
+            __vulkan_allocator.op_execute_destroy();
+        }
     };
+    __vulkan_allocator.op_execute(false);
 
     if (vkExtent.width <= 0 or vkExtent.height <= 0) {
         recreate_swapchain();
@@ -2141,10 +2147,12 @@ pub fn drawFrame() void {
         if (first_draw) {
             first_draw = false;
         } else {
+            state.fence_wait_mutex.lock();
             const waitForFences_result = vkd.?.waitForFences(1, @ptrCast(&vkInFlightFence[state.frame]), vk.TRUE, std.math.maxInt(u64)) catch |e| {
                 xfit.herr3("__vulkan.wait_for_fences.vkWaitForFences", e);
             };
             xfit.herr(waitForFences_result == .success, "__vulkan.wait_for_fences.vkWaitForFences : {}", .{waitForFences_result});
+            state.fence_wait_mutex.unlock();
         }
 
         const acquireNextImageKHR_result = vkd.?.acquireNextImageKHR(vkSwapchain, std.math.maxInt(u64), vkImageAvailableSemaphore[state.frame], .null_handle) catch |e| {
@@ -2172,33 +2180,13 @@ pub fn drawFrame() void {
         imageIndex = acquireNextImageKHR_result.image_index;
 
         const cmds = __system.allocator.alloc(vk.CommandBuffer, xfit.render_cmd.?.len + 1) catch xfit.herrm("drawframe cmds alloc");
-        defer __system.allocator.free(cmds);
 
         cmds[0] = vkCommandBuffer[state.frame];
         var cmdidx: usize = 1;
 
-        render_command.mutex.lock();
-        for (xfit.render_cmd.?) |*cmd| {
-            if (@cmpxchgStrong(bool, &cmd.*.*.__refesh[state.frame], true, false, .monotonic, .monotonic) == null) {
-                recordCommandBuffer(cmd, @intCast(state.frame));
-            }
-            if (cmd.*.*.scene != null and cmd.*.*.scene.?.len > 0) {
-                cmds[cmdidx] = cmd.*.*.__command_buffers[state.frame][imageIndex];
-                cmdidx += 1;
-            }
-        }
-        render_command.mutex.unlock();
+        defer __system.allocator.free(cmds);
 
         const waitStages: vk.PipelineStageFlags = .{ .color_attachment_output_bit = true };
-        var submitInfo: vk.SubmitInfo = .{
-            .wait_semaphore_count = 1,
-            .command_buffer_count = @intCast(cmdidx),
-            .signal_semaphore_count = 1,
-            .p_wait_semaphores = @ptrCast(&vkImageAvailableSemaphore[state.frame]),
-            .p_wait_dst_stage_mask = @ptrCast(&waitStages),
-            .p_command_buffers = cmds.ptr,
-            .p_signal_semaphores = @ptrCast(&vkRenderFinishedSemaphore[state.frame]),
-        };
 
         const cls_color0 = @atomicLoad(f32, &clear_color._0, .monotonic);
         const cls_color1 = @atomicLoad(f32, &clear_color._1, .monotonic);
@@ -2223,9 +2211,37 @@ pub fn drawFrame() void {
         vkd.?.cmdEndRenderPass(vkCommandBuffer[state.frame]);
         vkd.?.endCommandBuffer(vkCommandBuffer[state.frame]) catch |e| xfit.herr3("__vulkan.drawFrame.endCommandBuffer", e);
 
+        render_command.mutex.lock();
+        for (xfit.render_cmd.?) |*cmd| {
+            if (@cmpxchgStrong(bool, &cmd.*.*.__refesh[state.frame], true, false, .monotonic, .monotonic) == null) {
+                recordCommandBuffer(cmd, @intCast(state.frame));
+            }
+            if (cmd.*.*.scene != null and cmd.*.*.scene.?.len > 0) {
+                cmds[cmdidx] = cmd.*.*.__command_buffers[state.frame][imageIndex];
+                cmdidx += 1;
+            }
+        }
+        render_command.mutex.unlock();
+
+        var submitInfo: vk.SubmitInfo = .{
+            .wait_semaphore_count = 1,
+            .command_buffer_count = @intCast(cmdidx),
+            .signal_semaphore_count = 1,
+            .p_wait_semaphores = @ptrCast(&vkImageAvailableSemaphore[state.frame]),
+            .p_wait_dst_stage_mask = @ptrCast(&waitStages),
+            .p_command_buffers = cmds.ptr,
+            .p_signal_semaphores = @ptrCast(&vkRenderFinishedSemaphore[state.frame]),
+        };
+
+        state.fence_wait_mutex.lock();
         vkd.?.resetFences(1, @ptrCast(&vkInFlightFence[state.frame])) catch |e| xfit.herr3("__vulkan.drawFrame.resetFences", e);
 
         vkd.?.queueSubmit(vkGraphicsQueue, 1, @ptrCast(&submitInfo), vkInFlightFence[state.frame]) catch |e| xfit.herr3("__vulkan.drawFrame.queueSubmit", e);
+        state.fence_wait_mutex.unlock();
+
+        __vulkan_allocator.wait_fence();
+        if (state.wait_th != null) state.wait_th.?.join();
+        state.wait_th = std.Thread.spawn(.{}, state.wait_and_op_destory, .{state.frame}) catch unreachable;
 
         const swapChains = [_]vk.SwapchainKHR{vkSwapchain};
 
